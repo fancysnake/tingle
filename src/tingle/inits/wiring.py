@@ -1,8 +1,10 @@
-"""Static wiring: the metric-type table and project IO construction."""
+"""Static wiring: the metric-type table, config loading, and project IO."""
 
 from pathlib import Path
 
+from tingle.links.config_file.toml import load_raw
 from tingle.links.fs.local import LocalProjectFiles
+from tingle.mills.config import validate
 from tingle.mills.metrics.config_lists import (
     ini_list_length,
     toml_list_length,
@@ -22,6 +24,7 @@ from tingle.mills.metrics.symbol_uses import (
 from tingle.mills.metrics.symbol_uses import (
     validate_params as validate_symbol_params,
 )
+from tingle.pacts.config import Config
 from tingle.pacts.metrics import MetricType, ProjectFiles
 
 METRIC_TYPES: dict[str, MetricType] = {
@@ -73,3 +76,10 @@ METRIC_TYPES: dict[str, MetricType] = {
 
 def project_files(root: Path) -> ProjectFiles:
     return LocalProjectFiles(root)
+
+
+def load_config(cwd: Path, override: Path | None = None) -> Config:
+    """Discover, parse, and validate the tingle configuration."""
+    source, raw = load_raw(cwd, override)
+    resolved = source.resolve()
+    return validate(raw, METRIC_TYPES, root=resolved.parent, source=resolved)

@@ -66,3 +66,5 @@ name = "gates must not import links or specs"
 type = "forbidden"
 source_modules = ["tingle.gates"]
 forbidden_modules = ["tingle.links", "tingle.specs"]
+# reaching links/specs through inits (wiring) and mills is the intended path
+allow_indirect_imports = true

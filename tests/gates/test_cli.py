@@ -1,9 +1,42 @@
+import json
+from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from tingle import __version__
 from tingle.gates.cli.typer import app
+from tingle.inits.wiring import METRIC_TYPES
+from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 runner = CliRunner()
+
+CONFIG = """
+[ranges.python]
+include = ["src/**/*.py"]
+default = true
+
+[[metrics]]
+name = "noqa-comments"
+type = "regex_count"
+range = "python"
+pattern = '#\\s*noqa'
+
+[[metrics]]
+name = "python-files"
+type = "file_count"
+"""
+
+
+@pytest.fixture
+def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    (tmp_path / "tingle.toml").write_text(CONFIG)
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.py").write_text("x = 1  # noqa\ny = 2  # noqa\n")
+    (src / "b.py").write_text("z = 3  # noqa\n")
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
 
 
 def test_version() -> None:
@@ -15,3 +48,122 @@ def test_version() -> None:
 def test_help() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
+
+
+@pytest.mark.usefixtures("project")
+def test_bare_invocation_runs_metrics() -> None:
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    assert "noqa-comments" in result.output
+    assert "3" in result.output
+    assert "python-files" in result.output
+    assert "2" in result.output
+
+
+@pytest.mark.usefixtures("project")
+def test_run_subcommand() -> None:
+    result = runner.invoke(app, ["run"])
+
+    assert result.exit_code == 0
+    assert "noqa-comments" in result.output
+
+
+@pytest.mark.usefixtures("project")
+def test_json_format() -> None:
+    result = runner.invoke(app, ["run", "--format", "json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["config"].endswith("tingle.toml")
+    metrics = {entry["name"]: entry for entry in payload["metrics"]}
+    assert metrics["noqa-comments"]["value"] == 3
+    assert metrics["noqa-comments"]["ranges"] == ["python"]
+    assert metrics["noqa-comments"]["details"] == {"src/a.py": 2, "src/b.py": 1}
+    assert metrics["noqa-comments"]["error"] is None
+    assert metrics["python-files"]["value"] == 2
+
+
+@pytest.mark.usefixtures("project")
+def test_metric_filter() -> None:
+    result = runner.invoke(
+        app, ["run", "--format", "json", "--metric", "python-files"]
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert [entry["name"] for entry in payload["metrics"]] == ["python-files"]
+
+
+@pytest.mark.usefixtures("project")
+def test_unknown_metric_filter_exits_2() -> None:
+    result = runner.invoke(app, ["run", "--metric", "nope"])
+
+    assert result.exit_code == 2
+    assert 'unknown metric "nope"' in result.stderr
+
+
+def test_missing_config_exits_2(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 2
+    assert "config error" in result.stderr
+
+
+def test_invalid_config_exits_2(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "tingle.toml").write_text('[[metrics]]\nname = "x"\ntype = "nope"\n')
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 2
+    assert "unknown type 'nope'" in result.stderr
+
+
+@pytest.mark.usefixtures("project")
+def test_raising_metric_exits_1_but_others_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(_: MetricContext) -> MetricResult:
+        raise RuntimeError("boom")
+
+    monkeypatch.setitem(
+        METRIC_TYPES, "file_count", MetricType(name="file_count", func=boom)
+    )
+
+    result = runner.invoke(app, ["run", "--format", "json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    metrics = {entry["name"]: entry for entry in payload["metrics"]}
+    assert metrics["python-files"]["error"] == "RuntimeError: boom"
+    assert metrics["python-files"]["value"] is None
+    assert metrics["noqa-comments"]["value"] == 3
+    assert "error: python-files: RuntimeError: boom" in result.stderr
+
+
+@pytest.mark.usefixtures("project")
+def test_list_shows_configured_metrics() -> None:
+    result = runner.invoke(app, ["list"])
+
+    assert result.exit_code == 0
+    assert "noqa-comments" in result.output
+    assert "regex_count" in result.output
+
+
+def test_list_types_works_without_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["list", "--types"])
+
+    assert result.exit_code == 0
+    for name in METRIC_TYPES:
+        assert name in result.output
