@@ -6,11 +6,63 @@ authors = [
     {name = "Radosław Ganczarek",email = "radoslaw@ganczarek.in"}
 ]
 license = {text = "MIT"}
-requires-python = "3.14"
+requires-python = ">=3.14"
 dependencies = [
+    "typer (>=0.16.0,<1.0.0)",
+    "rich (>=13.0.0,<15.0.0)",
+    "tomlkit (>=0.13.0,<1.0.0)",
 ]
 
+[project.scripts]
+tingle = "tingle.gates.cli.typer:main"
+
+[tool.poetry]
+packages = [{ include = "tingle", from = "src" }]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0"
+ruff = ">=0.12"
+mypy = ">=1.16"
+import-linter = ">=2.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "C4",
+    "SIM", "PT", "RET", "ARG", "PTH", "RUF",
+]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.importlinter]
+root_package = "tingle"
+
+[[tool.importlinter.contracts]]
+name = "GLIMPSE layers"
+type = "layers"
+layers = ["gates", "inits", "mills | links", "specs", "pacts"]
+containers = ["tingle"]
+
+[[tool.importlinter.contracts]]
+name = "links must not import specs"
+type = "forbidden"
+source_modules = ["tingle.links"]
+forbidden_modules = ["tingle.specs"]
+
+[[tool.importlinter.contracts]]
+name = "gates must not import links or specs"
+type = "forbidden"
+source_modules = ["tingle.gates"]
+forbidden_modules = ["tingle.links", "tingle.specs"]
