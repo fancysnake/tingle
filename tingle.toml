@@ -1,0 +1,27 @@
+# tingle measuring itself
+[ranges.python]
+include = ["src/**/*.py", "tests/**/*.py"]
+default = true
+
+[[metrics]]
+name = "noqa-comments"
+type = "regex_count"
+pattern = '#\s*noqa'
+
+[[metrics]]
+name = "type-ignores"
+type = "regex_count"
+pattern = '#\s*type:\s*ignore'
+
+[[metrics]]
+name = "ruff-selected-rules"
+type = "toml_list_length"
+key = "tool.ruff.lint.select"
+
+[[metrics]]
+name = "python-loc"
+type = "line_count"
+
+[[metrics]]
+name = "python-files"
+type = "file_count"
