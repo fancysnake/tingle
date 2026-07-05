@@ -1,8 +1,15 @@
-"""Static wiring: the metric-type table, config loading, and project IO."""
+"""Static wiring: the metric-type table, config loading/editing, project IO."""
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
-from tingle.links.config_file.toml import load_raw
+from tingle.links.config_file.toml import (
+    append_metric,
+    edit_target,
+    load_raw,
+    write_starter,
+)
 from tingle.links.fs.local import LocalProjectFiles
 from tingle.mills.config import validate
 from tingle.mills.metrics.config_lists import (
@@ -24,7 +31,7 @@ from tingle.mills.metrics.symbol_uses import (
 from tingle.mills.metrics.symbol_uses import (
     validate_params as validate_symbol_params,
 )
-from tingle.pacts.config import Config
+from tingle.pacts.config import Config, ConfigNotFoundError
 from tingle.pacts.metrics import MetricType, ProjectFiles
 
 METRIC_TYPES: dict[str, MetricType] = {
@@ -83,3 +90,23 @@ def load_config(cwd: Path, override: Path | None = None) -> Config:
     source, raw = load_raw(cwd, override)
     resolved = source.resolve()
     return validate(raw, METRIC_TYPES, root=resolved.parent, source=resolved)
+
+
+def load_raw_config(cwd: Path) -> dict[str, Any]:
+    """Raw config data for editing flows; empty when no config exists yet."""
+    try:
+        return load_raw(cwd)[1]
+    except ConfigNotFoundError:
+        return {}
+
+
+def config_edit_target(cwd: Path) -> Path:
+    return edit_target(cwd)
+
+
+def append_metric_to(path: Path, metric: Mapping[str, Any]) -> None:
+    append_metric(path, metric)
+
+
+def write_starter_config(cwd: Path) -> Path:
+    return write_starter(cwd)

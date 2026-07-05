@@ -10,7 +10,16 @@ from rich.console import Console
 from rich.table import Table
 
 from tingle import __version__
-from tingle.inits.wiring import METRIC_TYPES, load_config, project_files
+from tingle.inits.wiring import (
+    METRIC_TYPES,
+    append_metric_to,
+    config_edit_target,
+    load_config,
+    load_raw_config,
+    project_files,
+    write_starter_config,
+)
+from tingle.mills.add import build_metric
 from tingle.mills.runner import run as run_metrics
 from tingle.pacts.config import Config, ConfigError, ConfigNotFoundError
 from tingle.pacts.report import RunReport
@@ -87,8 +96,70 @@ def list_command(
     _stdout.print(_metrics_table(_load(config)))
 
 
+@app.command("add")
+def add_command(
+    type_name: Annotated[str, typer.Argument(metavar="TYPE")],
+    value: Annotated[str | None, typer.Argument(metavar="[VALUE]")] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Metric name (auto-generated if omitted)."),
+    ] = None,
+    range_names: Annotated[
+        list[str] | None,
+        typer.Option("--range", help="Target range (repeatable)."),
+    ] = None,
+    param: Annotated[
+        list[str] | None,
+        typer.Option("--param", help="Extra metric param as key=value (repeatable)."),
+    ] = None,
+) -> None:
+    """Add a metric to the config, e.g.: tingle add regex_count '#\\s*noqa'."""
+    cwd = Path.cwd()
+    try:
+        raw = load_raw_config(cwd)
+        metric = build_metric(
+            raw,
+            METRIC_TYPES,
+            type_name,
+            value=value,
+            name=name,
+            ranges=range_names or (),
+            params=_parse_params(param or []),
+        )
+    except ConfigError as exc:
+        _config_failure(exc)
+    target = config_edit_target(cwd)
+    append_metric_to(target, metric)
+    typer.echo(f'Added metric "{metric["name"]}" to {target}')
+
+
+@app.command("init")
+def init_command() -> None:
+    """Create a starter tingle.toml in the current directory."""
+    try:
+        path = write_starter_config(Path.cwd())
+    except FileExistsError as exc:
+        typer.echo(f"config error: {exc.args[0]} already exists", err=True)
+        raise typer.Exit(2) from None
+    typer.echo(f"Created {path}")
+
+
 def main() -> None:
     app()
+
+
+def _parse_params(pairs: list[str]) -> dict[str, str]:
+    params: dict[str, str] = {}
+    for pair in pairs:
+        key, sep, value = pair.partition("=")
+        if not sep or not key:
+            typer.echo(
+                f'config error: invalid --param "{pair}" (expected key=value)',
+                err=True,
+            )
+            raise typer.Exit(2)
+        params[key] = value
+    return params
 
 
 def _execute_run(
