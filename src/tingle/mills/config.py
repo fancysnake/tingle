@@ -1,4 +1,5 @@
 """Validation of raw configuration data into a Config."""
+from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any

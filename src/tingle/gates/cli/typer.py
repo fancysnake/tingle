@@ -1,4 +1,5 @@
 """Command-line gate for tingle (typer adapter)."""
+from __future__ import annotations
 
 import json
 from enum import StrEnum

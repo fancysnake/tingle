@@ -1,4 +1,5 @@
 """Contracts describing the outcome of a run."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING

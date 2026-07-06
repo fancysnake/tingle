@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path, PurePath
 
 from tingle.links.fs.local import LocalProjectFiles

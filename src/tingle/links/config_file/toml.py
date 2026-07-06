@@ -1,4 +1,5 @@
 """TOML adapter for tingle's own configuration file."""
+from __future__ import annotations
 
 import tomllib
 from typing import TYPE_CHECKING, Any

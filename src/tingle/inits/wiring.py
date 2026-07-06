@@ -1,4 +1,5 @@
 """Static wiring: the metric-type table, config loading/editing, project IO."""
+from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 

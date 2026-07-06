@@ -4,6 +4,7 @@ Static analysis only: re-exports, string references, and getattr are
 invisible. Bare symbols count every same-named name/attribute in scope.
 An occurrence is attributed to the line where the reference starts.
 """
+from __future__ import annotations
 
 import ast
 from typing import TYPE_CHECKING, Any
