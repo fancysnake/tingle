@@ -1,8 +1,9 @@
-"""Rendering of run and diff reports: tables, listings, and JSON."""
+"""Rendering of run and diff reports: tables, listings, JSON, cobertura."""
 from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any
+from xml.etree import ElementTree as ET
 
 from rich.table import Table
 from rich.text import Text
@@ -208,6 +209,74 @@ def _diff_values(outcome: DiffOutcome) -> dict[str, Any]:
         "added_occurrences": _occurrences_json(result.added_occurrences),
         "removed_occurrences": _occurrences_json(result.removed_occurrences),
     }
+
+
+def cobertura(report: RunReport) -> tuple[str, list[str]]:
+    """Cobertura XML where every located occurrence is an uncovered line.
+
+    The format is line-based, so only metrics with line-located
+    occurrences contribute; the second return value names the excluded
+    metrics.
+
+    Consumers (GitLab MR widgets, Jenkins, diff-cover) then annotate the
+    occurrence lines as "uncovered", i.e. carrying debt.
+    """
+    excluded: list[str] = []
+    packages = ET.Element("packages")
+    total_lines = 0
+    for outcome in report.outcomes:
+        if outcome.result is None:
+            continue
+        located = [o for o in outcome.result.occurrences if o.line is not None]
+        if not located:
+            if outcome.result.occurrences or outcome.result.value:
+                excluded.append(outcome.spec.name)
+            continue
+        total_lines += _cobertura_package(packages, outcome.spec.name, located)
+
+    root = ET.Element(
+        "coverage",
+        {
+            "version": "tingle",
+            "timestamp": "0",
+            "lines-valid": str(total_lines),
+            "lines-covered": "0",
+            "line-rate": "0",
+        },
+    )
+    sources = ET.SubElement(root, "sources")
+    ET.SubElement(sources, "source").text = str(report.root)
+    root.append(packages)
+    xml = ET.tostring(root, encoding="unicode", xml_declaration=True)
+    return xml, excluded
+
+
+def _cobertura_package(
+    packages: ET.Element, name: str, located: list[Occurrence]
+) -> int:
+    package = ET.SubElement(
+        packages, "package", {"name": name, "line-rate": "0"}
+    )
+    classes = ET.SubElement(package, "classes")
+    by_file: dict[str, set[int]] = {}
+    for occurrence in located:
+        if occurrence.line is not None:
+            by_file.setdefault(occurrence.path, set()).add(occurrence.line)
+    total = 0
+    for path in sorted(by_file):
+        cls = ET.SubElement(
+            classes,
+            "class",
+            {"name": path, "filename": path, "line-rate": "0"},
+        )
+        ET.SubElement(cls, "methods")
+        lines = ET.SubElement(cls, "lines")
+        for line in sorted(by_file[path]):
+            ET.SubElement(
+                lines, "line", {"number": str(line), "hits": "0"}
+            )
+        total += len(by_file[path])
+    return total
 
 
 def _occurrences_json(

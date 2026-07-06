@@ -30,6 +30,8 @@ pytest = ">=8.0"
 ruff = ">=0.12"
 mypy = ">=1.16"
 import-linter = ">=2.0"
+defusedxml = "^0.7.1"
+types-defusedxml = "^0.7.0.20260504"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -65,8 +67,9 @@ required-imports = ["from __future__ import annotations"]
 # per-metric isolation: the runners must catch everything a metric raises
 "src/tingle/mills/runner.py" = ["BLE001"]
 "src/tingle/mills/diff.py" = ["BLE001"]
-# CLI flags are inherently boolean and typer requires this parameter shape
-"src/tingle/gates/cli/typer.py" = ["FBT001", "FBT002"]
+# CLI flags are inherently boolean and typer requires this parameter shape;
+# a command function has one parameter per CLI option by construction
+"src/tingle/gates/cli/typer.py" = ["FBT001", "FBT002", "PLR0913"]
 # the adapter's whole job is invoking the git executable
 "src/tingle/links/git/cli.py" = ["S603", "S607"]
 

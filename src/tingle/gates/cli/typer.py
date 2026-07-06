@@ -113,12 +113,37 @@ def stat_command(
 @app.command("report")
 def report_command(
     json_out: JsonOption = False,
+    cobertura: Annotated[
+        bool,
+        typer.Option(
+            "--cobertura",
+            help="Cobertura XML for CI consumers (line-scoped metrics only).",
+        ),
+    ] = False,
     diff: DiffOption = False,
     base: BaseOption = None,
     config: ConfigOption = None,
     metric: MetricOption = None,
 ) -> None:
     """Print the full report: every occurrence with file and line."""
+    if cobertura and (json_out or diff or base is not None):
+        typer.echo(
+            "usage error: --cobertura cannot be combined with --json or --diff",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if cobertura:
+        run_report = _collect_run(config, metric)
+        xml, excluded = render.cobertura(run_report)
+        typer.echo(xml)
+        for name in excluded:
+            typer.echo(
+                f"note: {name}: not representable in cobertura"
+                " (no line locations)",
+                err=True,
+            )
+        _finish_run(run_report)
+        return
     if diff or base is not None:
         diff_report = _collect_diff(base, config, metric)
         if json_out:
