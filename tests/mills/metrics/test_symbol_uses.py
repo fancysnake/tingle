@@ -130,6 +130,7 @@ def test_details_are_per_file() -> None:
     )
 
     assert dict(result.details) == {"a.py": 2}
+    assert [str(o) for o in result.occurrences] == ["a.py:1", "a.py:2"]
 
 
 def test_validate_params() -> None:

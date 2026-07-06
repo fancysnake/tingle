@@ -31,6 +31,39 @@ def test_counts_matches_across_files() -> None:
 
     assert result.value == 3
     assert dict(result.details) == {"a.py": 2, "b.py": 1}
+    assert [str(o) for o in result.occurrences] == ["a.py:1", "a.py:2", "b.py:1"]
+
+
+def test_occurrence_line_numbers() -> None:
+    text = "TODO at start\nclean line\n  trailing TODO\n\nTODO after blank"
+    result = regex_count(_context({"a.py": text}, {"pattern": "TODO"}))
+
+    assert [o.line for o in result.occurrences] == [1, 3, 5]
+
+
+def test_occurrence_line_for_multiline_match_is_its_start() -> None:
+    result = regex_count(
+        _context(
+            {"a.py": "one\nstart\nend\n"},
+            {"pattern": r"start\nend", "flags": ["DOTALL"]},
+        )
+    )
+
+    assert result.value == 1
+    assert [str(o) for o in result.occurrences] == ["a.py:2"]
+
+
+def test_occurrences_in_crlf_text() -> None:
+    result = regex_count(_context({"a.py": "x\r\nTODO\r\n"}, {"pattern": "TODO"}))
+
+    assert [o.line for o in result.occurrences] == [2]
+
+
+def test_empty_file_has_no_occurrences() -> None:
+    result = regex_count(_context({"a.py": ""}, {"pattern": "TODO"}))
+
+    assert result.value == 0
+    assert result.occurrences == ()
 
 
 def test_zero_matches_has_empty_details() -> None:

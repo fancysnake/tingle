@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
 from typing import TYPE_CHECKING, Any
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult
-from tingle.pacts.metrics import MetricContext, MetricResult
+from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -21,21 +22,43 @@ _FLAGS = {
 
 
 def regex_count(ctx: MetricContext) -> MetricResult:
-    """Count matches of the `pattern` param across the context's files."""
+    """Count matches of the `pattern` param across the context's files.
+
+    Matching is full-text (multi-line patterns work); each match is
+    located at the line where it starts.
+    """
     pattern = _compile(ctx.params)
-    total = 0
     details: dict[str, int] = {}
     warnings: list[str] = []
+    occurrences: list[Occurrence] = []
     for path in ctx.files:
         text = ctx.read(path)
         if text is None:
             warnings.append(f"{path}: skipped (binary, unreadable, or missing)")
             continue
-        count = sum(1 for _ in pattern.finditer(text))
-        if count:
-            details[str(path)] = count
-        total += count
-    return MetricResult(value=total, details=details, warnings=tuple(warnings))
+        line_starts = _line_starts(text)
+        found = [
+            Occurrence(
+                path=str(path), line=bisect_right(line_starts, match.start())
+            )
+            for match in pattern.finditer(text)
+        ]
+        if found:
+            details[str(path)] = len(found)
+            occurrences.extend(found)
+    return MetricResult(
+        value=len(occurrences),
+        details=details,
+        warnings=tuple(warnings),
+        occurrences=tuple(occurrences),
+    )
+
+
+def _line_starts(text: str) -> list[int]:
+    """Offsets where each line begins; bisect_right(starts, i) is i's line."""
+    starts = [0]
+    starts.extend(match.end() for match in re.finditer("\n", text))
+    return starts
 
 
 def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:

@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult, FileStatus
-from tingle.pacts.metrics import MetricContext, MetricResult
+from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 
 def file_count(ctx: MetricContext) -> MetricResult:
     """Count the files selected by the metric's ranges."""
-    return MetricResult(value=len(ctx.files))
+    return MetricResult(
+        value=len(ctx.files),
+        occurrences=tuple(Occurrence(path=str(path)) for path in ctx.files),
+    )
 
 
 def line_count(ctx: MetricContext) -> MetricResult:

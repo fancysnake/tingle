@@ -12,7 +12,7 @@ from pathlib import PurePath
 from typing import Any, TypeAlias
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult
-from tingle.pacts.metrics import MetricContext, MetricResult
+from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 from tingle.specs.config import TOML_LIST_DEFAULT_FILE
 
 _Reader: TypeAlias = Callable[[PurePath], str | None]
@@ -68,12 +68,21 @@ def _toml_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
         data = data[part]
 
     if isinstance(data, list):
-        return MetricResult(value=len(data))
+        return MetricResult(
+            value=len(data), occurrences=_entries(file, data)
+        )
     if isinstance(data, Mapping) and all(
         isinstance(value, list) for value in data.values()
     ):
         details = {str(name): len(value) for name, value in data.items()}
-        return MetricResult(value=sum(details.values()), details=details)
+        occurrences = tuple(
+            Occurrence(path=str(file), note=f"{name}: {entry}")
+            for name, value in data.items()
+            for entry in value
+        )
+        return MetricResult(
+            value=sum(details.values()), details=details, occurrences=occurrences
+        )
     return _empty(f'{file}: value at "{key}" is not a list or a table of lists')
 
 
@@ -119,7 +128,7 @@ def _ini_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
         for entry in value.replace(",", "\n").splitlines()
         if entry.strip()
     ]
-    return MetricResult(value=len(entries))
+    return MetricResult(value=len(entries), occurrences=_entries(file, entries))
 
 
 def validate_ini_params(params: Mapping[str, Any]) -> list[str]:
@@ -129,6 +138,13 @@ def validate_ini_params(params: Mapping[str, Any]) -> list[str]:
         for name in ("file", "section", "option")
         if name in params and not isinstance(params[name], str)
     ]
+
+
+def _entries(file: str, values: list[Any]) -> tuple[Occurrence, ...]:
+    """List entries as occurrences, keeping the file's own order."""
+    return tuple(
+        Occurrence(path=str(file), note=str(entry)) for entry in values
+    )
 
 
 def _empty(warning: str) -> MetricResult:

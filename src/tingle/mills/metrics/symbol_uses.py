@@ -10,7 +10,7 @@ import ast
 from typing import TYPE_CHECKING, Any
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult
-from tingle.pacts.metrics import MetricContext, MetricResult
+from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -21,9 +21,9 @@ if TYPE_CHECKING:
 def symbol_uses(ctx: MetricContext) -> MetricResult:
     """Count references to the `symbol` param across the Python files."""
     parts = tuple(ctx.params["symbol"].split("."))
-    total = 0
     details: dict[str, int] = {}
     warnings: list[str] = []
+    occurrences: list[Occurrence] = []
 
     for path in ctx.files:
         if path.suffix != ".py":
@@ -45,9 +45,16 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
             )
         if lines:
             details[str(path)] = len(lines)
-        total += len(lines)
+            occurrences.extend(
+                Occurrence(path=str(path), line=line) for line in sorted(lines)
+            )
 
-    return MetricResult(value=total, details=details, warnings=tuple(warnings))
+    return MetricResult(
+        value=len(occurrences),
+        details=details,
+        warnings=tuple(warnings),
+        occurrences=tuple(occurrences),
+    )
 
 
 def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:

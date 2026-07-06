@@ -54,6 +54,11 @@ def test_toml_list_length_counts_entries() -> None:
 
     assert result.value == 3
     assert result.warnings == ()
+    assert [str(o) for o in result.occurrences] == [
+        "pyproject.toml: E501",
+        "pyproject.toml: D203",
+        "pyproject.toml: ANN101",
+    ]
 
 
 def test_toml_file_defaults_to_pyproject() -> None:
@@ -85,6 +90,11 @@ def test_toml_table_of_lists_sums_lengths() -> None:
 
     assert result.value == 3
     assert dict(result.details) == {"tests/**": 2, "scripts/**": 1}
+    assert [o.note for o in result.occurrences] == [
+        "tests/**: S101",
+        "tests/**: D103",
+        "scripts/**: T201",
+    ]
 
 
 def test_toml_non_list_value_warns() -> None:
@@ -137,6 +147,11 @@ def test_ini_list_length_splits_commas_and_newlines() -> None:
 
     assert result.value == 3
     assert result.warnings == ()
+    assert [o.note for o in result.occurrences] == [
+        "too-many-arguments",
+        "missing-docstring",
+        "invalid-name",
+    ]
 
 
 def test_ini_missing_file_warns() -> None:
