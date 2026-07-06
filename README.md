@@ -22,6 +22,7 @@ $ tingle add regex_count '#\s*noqa'              # add a metric from the CLI
 $ tingle add toml_list_length tool.ruff.lint.ignore --name ruff-ignores
 $ tingle                                         # run all metrics (table)
 $ tingle --format json                           # machine-readable output
+$ tingle diff                                    # impact of the current branch
 ```
 
 ## Configuration
@@ -105,10 +106,67 @@ $ tingle add ini_list_length --name pylintrc-disables \
     --param file=.pylintrc --param 'section=MESSAGES CONTROL' --param option=disable
 ```
 
+## Branch impact: `tingle diff`
+
+Like diff-cover, but for your metrics: `tingle diff` measures only what
+the current branch changed, compared against the merge-base with a base
+branch — so commits that landed on the base after you branched don't
+pollute your numbers. The working tree counts, including uncommitted
+changes; untracked (non-ignored) files count as fully added.
+
+```console
+$ tingle diff
+                  /home/you/project vs main
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━┳━━━━━━━┓
+┃ Metric        ┃ Type             ┃ Added ┃ Removed ┃ Net ┃ Total ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━╇━━━━━━━┩
+│ noqa-comments │ regex_count      │    +3 │      -1 │  +2 │    13 │
+│ ruff-ignores  │ toml_list_length │       │         │  +1 │     5 │
+└───────────────┴──────────────────┴───────┴─────────┴─────┴───────┘
+```
+
+Red numbers mean the branch added debt; green means it removed some.
+Lower is better. The Total column is today's full-repo value, for scale.
+
+Each metric type has diff semantics:
+
+| Type | Diff meaning |
+|---|---|
+| `regex_count` | matches on lines you added (+) vs lines you removed (−) |
+| `symbol_uses` | references starting on added vs removed lines |
+| `line_count` | added vs removed lines |
+| `file_count` | created vs deleted files |
+| `toml_list_length` / `ini_list_length` | value at the merge-base vs now (net only) |
+
+The base branch resolves as `--base` flag > `[diff] base` in the config
+> `main`; if the ref doesn't exist locally, `origin/<base>` is tried.
+
+```toml
+[diff]
+base = "origin/main"
+```
+
+Approximations to know about:
+
+- Diff counting is **per line**: regex patterns containing newlines never
+  match in diff mode (`MULTILINE`/`DOTALL` have no cross-line effect), so
+  the Total column — which uses full-text matching — can disagree for
+  such patterns.
+- A `symbol_uses` reference is attributed to the line where it *starts*;
+  edits to a later line of a multi-line call don't count it.
+- Renames are treated as delete + add (net zero for line metrics; a
+  renamed config file makes the value-delta metrics see a missing base).
+- CI note: the merge-base needs history — shallow clones
+  (`fetch-depth: 1`) will fail; fetch enough history or use
+  `fetch-depth: 0`.
+
 ## CLI
 
 - `tingle` / `tingle run` — run metrics. Options: `--format table|json`,
   `--config PATH`, `--metric NAME` (repeatable filter).
+- `tingle diff` — branch impact vs a base branch (see above). Options:
+  `--base REF`, plus the same `--format`/`--config`/`--metric` options as
+  run. JSON output includes the resolved base ref and merge-base sha.
 - `tingle add TYPE [VALUE]` — append a metric to the config. The
   positional VALUE binds to the type's primary param (see table). Options:
   `--name`, `--range` (repeatable), `--param key=value` (repeatable). The
