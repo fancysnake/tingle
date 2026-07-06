@@ -30,7 +30,7 @@ def test_add_creates_config_and_round_trips(workdir: Path) -> None:
     assert 'Added metric "regex_count-s-noqa"' in added.output
     assert (workdir / "tingle.toml").is_file()
 
-    ran = runner.invoke(app, ["run", "--format", "json"])
+    ran = runner.invoke(app, ["stat", "--json"])
 
     assert ran.exit_code == 0
     payload = json.loads(ran.stdout)
@@ -148,7 +148,7 @@ def test_init_creates_starter(workdir: Path) -> None:
     assert "Created" in result.output
     assert "[ranges.python]" in (workdir / "tingle.toml").read_text()
 
-    ran = runner.invoke(app, ["run", "--format", "json"])
+    ran = runner.invoke(app, ["stat", "--json"])
     assert ran.exit_code == 0
 
 

@@ -76,57 +76,68 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.mark.usefixtures("repo")
-def test_diff_table_shows_impact_and_totals() -> None:
-    result = runner.invoke(app, ["diff"])
+def test_stat_diff_table() -> None:
+    result = runner.invoke(app, ["stat", "--diff"])
 
     assert result.exit_code == 0
     assert "noqa-comments" in result.output
-    assert "+3" in result.output  # 2 committed + 1 untracked
+    assert "+3" in result.output
     assert "ruff-ignores" in result.output
     assert "+1" in result.output
 
 
 @pytest.mark.usefixtures("repo")
-def test_diff_json_payload() -> None:
-    result = runner.invoke(app, ["diff", "--format", "json"])
+def test_stat_diff_json_includes_occurrences() -> None:
+    result = runner.invoke(app, ["stat", "--json", "--diff"])
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["base"] == "main"
     assert len(payload["merge_base"]) == 40
-    assert payload["skipped"] == []
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
 
     noqa = metrics["noqa-comments"]
     assert noqa["added"] == 3
-    assert noqa["removed"] == 0
     assert noqa["net"] == 3
     assert noqa["total"] == 4
+    assert {"file": "src/a.py", "line": 2, "note": None} in noqa[
+        "added_occurrences"
+    ]
+    assert {"file": "src/new.py", "line": 1, "note": None} in noqa[
+        "added_occurrences"
+    ]
 
     ignores = metrics["ruff-ignores"]
-    assert ignores["added"] is None
     assert ignores["net"] == 1
-    assert ignores["total"] == 2
-    assert ignores["details"] == {"base": 1, "current": 2}
+    assert ignores["added_occurrences"] == [
+        {"file": "pyproject.toml", "line": None, "note": "D203"}
+    ]
 
 
 @pytest.mark.usefixtures("repo")
-def test_diff_counts_removals(repo: Path) -> None:
-    (repo / "src" / "a.py").write_text("x = 1\n")  # uncommitted: drop all noqa
+def test_report_diff_lists_signed_occurrences(repo: Path) -> None:
+    (repo / "src" / "a.py").write_text("x = 1\ny = 2  # noqa\nz = 3  # noqa\n")
 
-    result = runner.invoke(app, ["diff", "--format", "json"])
+    result = runner.invoke(app, ["report", "--diff"])
 
-    payload = json.loads(result.stdout)
-    noqa = {entry["name"]: entry for entry in payload["metrics"]}["noqa-comments"]
-    assert noqa["removed"] == 1  # base line 1 rewritten without noqa
-    assert noqa["added"] == 1  # untracked new.py still adds one
-    assert noqa["net"] == 0
+    assert result.exit_code == 0
+    assert "+ src/a.py:2" in result.output
+    assert "- src/a.py:1" in result.output
+    assert "+ pyproject.toml: D203" in result.output
+
+
+@pytest.mark.usefixtures("repo")
+def test_base_flag_implies_diff() -> None:
+    result = runner.invoke(app, ["stat", "--base", "main"])
+
+    assert result.exit_code == 0
+    assert "Net" in result.output
 
 
 @pytest.mark.usefixtures("repo")
 def test_diff_metric_filter() -> None:
     result = runner.invoke(
-        app, ["diff", "--format", "json", "--metric", "ruff-ignores"]
+        app, ["stat", "--json", "--diff", "--metric", "ruff-ignores"]
     )
 
     assert result.exit_code == 0
@@ -135,26 +146,26 @@ def test_diff_metric_filter() -> None:
 
 
 @pytest.mark.usefixtures("repo")
-def test_diff_missing_base_exits_2() -> None:
-    result = runner.invoke(app, ["diff", "--base", "nope"])
+def test_missing_base_exits_2() -> None:
+    result = runner.invoke(app, ["stat", "--diff", "--base", "nope"])
 
     assert result.exit_code == 2
     assert 'base ref "nope" not found' in result.stderr
 
 
 @pytest.mark.usefixtures("repo")
-def test_diff_base_from_config(repo: Path) -> None:
+def test_base_from_config(repo: Path) -> None:
     config = (repo / "tingle.toml").read_text()
     (repo / "tingle.toml").write_text(config + '\n[diff]\nbase = "nope"\n')
 
-    result = runner.invoke(app, ["diff"])
+    result = runner.invoke(app, ["stat", "--diff"])
 
     assert result.exit_code == 2
     assert 'base ref "nope" not found' in result.stderr
 
 
 @pytest.mark.usefixtures("repo")
-def test_diff_raising_metric_exits_1_but_others_render(
+def test_raising_diff_metric_exits_1_but_others_render(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def boom(_: DiffMetricContext) -> DiffResult:
@@ -176,7 +187,7 @@ def test_diff_raising_metric_exits_1_but_others_render(
         ),
     )
 
-    result = runner.invoke(app, ["diff", "--format", "json"])
+    result = runner.invoke(app, ["stat", "--json", "--diff"])
 
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
@@ -192,32 +203,13 @@ def test_diff_outside_repo_exits_2(
     (tmp_path / "tingle.toml").write_text(CONFIG)
     monkeypatch.chdir(tmp_path)
 
-    result = runner.invoke(app, ["diff"])
+    result = runner.invoke(app, ["stat", "--diff"])
 
     assert result.exit_code == 2
     assert "diff error" in result.stderr
 
 
-def test_diff_with_config_in_repo_subdirectory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    repo = tmp_path / "repo"
-    pkg = repo / "pkg" / "src"
-    pkg.mkdir(parents=True)
-    _git(repo, "init", "-b", "main")
-    (repo / "pkg" / "tingle.toml").write_text(CONFIG)
-    (repo / "pkg" / "pyproject.toml").write_text(BASE_PYPROJECT)
-    (pkg / "a.py").write_text("x = 1\n")
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-m", "base")
-    _git(repo, "checkout", "-b", "feature")
-    (pkg / "a.py").write_text("x = 1  # noqa\n")
-    monkeypatch.chdir(repo / "pkg")
+def test_diff_command_is_gone() -> None:
+    result = runner.invoke(app, ["diff"])
 
-    result = runner.invoke(app, ["diff", "--format", "json"])
-
-    assert result.exit_code == 0
-    payload = json.loads(result.stdout)
-    noqa = {entry["name"]: entry for entry in payload["metrics"]}["noqa-comments"]
-    assert noqa["added"] == 1
-    assert noqa["removed"] == 0
+    assert result.exit_code != 0
