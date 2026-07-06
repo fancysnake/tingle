@@ -2,15 +2,19 @@
 
 Static analysis only: re-exports, string references, and getattr are
 invisible. Bare symbols count every same-named name/attribute in scope.
+An occurrence is attributed to the line where the reference starts.
 """
 
 import ast
 from typing import TYPE_CHECKING, Any
 
+from tingle.pacts.diff import DiffMetricContext, DiffResult
 from tingle.pacts.metrics import MetricContext, MetricResult
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
+    from collections.abc import Set as AbstractSet
+    from pathlib import PurePath
 
 
 def symbol_uses(ctx: MetricContext) -> MetricResult:
@@ -33,12 +37,49 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
             warnings.append(f"{path}: skipped (syntax error: {exc.msg})")
             continue
 
-        count = _count(tree, parts, str(path), warnings)
-        if count:
-            details[str(path)] = count
-        total += count
+        lines, star_fallback = _occurrence_lines(tree, parts)
+        if star_fallback:
+            warnings.append(
+                f"{path}: star import: falling back to bare-name counting"
+            )
+        if lines:
+            details[str(path)] = len(lines)
+        total += len(lines)
 
     return MetricResult(value=total, details=details, warnings=tuple(warnings))
+
+
+def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
+    """Count references on lines the branch added vs lines it removed."""
+    parts = tuple(ctx.params["symbol"].split("."))
+    added = 0
+    removed = 0
+    details: dict[str, int] = {}
+    warnings: list[str] = []
+
+    for file in ctx.files:
+        if file.path.suffix != ".py":
+            continue
+        file_added, added_warnings = _side_count(
+            ctx.read, file.path, parts, file.added_lines, "current"
+        )
+        file_removed, removed_warnings = _side_count(
+            ctx.read_base, file.path, parts, file.removed_lines, "base"
+        )
+        warnings.extend(added_warnings)
+        warnings.extend(removed_warnings)
+        added += file_added
+        removed += file_removed
+        if file_added - file_removed:
+            details[str(file.path)] = file_added - file_removed
+
+    return DiffResult(
+        net=added - removed,
+        added=added,
+        removed=removed,
+        details=details,
+        warnings=tuple(warnings),
+    )
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
@@ -53,32 +94,59 @@ def validate_params(params: Mapping[str, Any]) -> list[str]:
     return []
 
 
-def _count(
-    tree: ast.AST, parts: tuple[str, ...], path: str, warnings: list[str]
-) -> int:
-    if len(parts) == 1:
-        return _count_bare(tree, parts[0])
+def _side_count(
+    reader: Callable[[PurePath], str | None],
+    path: PurePath,
+    parts: tuple[str, ...],
+    touched: AbstractSet[int],
+    side: str,
+) -> tuple[int, list[str]]:
+    """Count occurrences starting on the touched lines of one diff side."""
+    if not touched:
+        return 0, []
+    text = reader(path)
+    if text is None:
+        return 0, [f"{path}: {side} side unreadable"]
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as exc:
+        return 0, [f"{path}: {side} side skipped (syntax error: {exc.msg})"]
+    lines, star_fallback = _occurrence_lines(tree, parts)
+    warnings = (
+        [f"{path}: {side} side: star import: falling back to bare-name counting"]
+        if star_fallback
+        else []
+    )
+    return sum(1 for line in lines if line in touched), warnings
 
-    bindings, import_uses, has_star_import = _collect_bindings(tree, parts)
+
+def _occurrence_lines(
+    tree: ast.AST, parts: tuple[str, ...]
+) -> tuple[list[int], bool]:
+    """Line numbers of every occurrence; flag = star-import fallback used."""
+    if len(parts) == 1:
+        return _bare_occurrences(tree, parts[0]), False
+
+    bindings, import_lines, has_star_import = _collect_bindings(tree, parts)
     if has_star_import:
-        warnings.append(f"{path}: star import: falling back to bare-name counting")
-        return _count_bare(tree, parts[-1])
+        return _bare_occurrences(tree, parts[-1]), True
 
     counter = _DottedCounter(bindings)
     counter.visit(tree)
-    return counter.count + import_uses
+    return [*import_lines, *counter.lines], False
 
 
 def _collect_bindings(
     tree: ast.AST, parts: tuple[str, ...]
-) -> tuple[dict[str, tuple[str, ...]], int, bool]:
+) -> tuple[dict[str, tuple[str, ...]], list[int], bool]:
     """Map local names to the attribute suffix still needed to reach the symbol.
 
     An empty suffix means the name is the symbol itself; every such
-    binding created by an import counts as one use of the symbol.
+    binding created by an import counts as one use of the symbol, at the
+    import statement's line.
     """
     bindings: dict[str, tuple[str, ...]] = {}
-    import_uses = 0
+    import_lines: list[int] = []
     has_star_import = False
 
     for node in ast.walk(tree):
@@ -88,9 +156,9 @@ def _collect_bindings(
             if any(alias.name == "*" for alias in node.names):
                 has_star_import = True
             else:
-                import_uses += _bind_from_import(node, parts, bindings)
+                import_lines.extend(_bind_from_import(node, parts, bindings))
 
-    return bindings, import_uses, has_star_import
+    return bindings, import_lines, has_star_import
 
 
 def _bind_plain_import(
@@ -111,10 +179,10 @@ def _bind_from_import(
     node: ast.ImportFrom,
     parts: tuple[str, ...],
     bindings: dict[str, tuple[str, ...]],
-) -> int:
-    """Bind from-imported names; return how many import the symbol itself."""
+) -> list[int]:
+    """Bind from-imported names; return lines that import the symbol itself."""
     module = tuple(node.module.split(".")) if node.module else ()
-    uses = 0
+    use_lines: list[int] = []
     for alias in node.names:
         chain = (*module, alias.name)
         if node.level == 0:
@@ -124,8 +192,8 @@ def _bind_from_import(
         if suffix is not None:
             bindings[alias.asname or alias.name] = suffix
             if not suffix:
-                uses += 1
-    return uses
+                use_lines.append(node.lineno)
+    return use_lines
 
 
 def _align_prefix(
@@ -149,18 +217,18 @@ def _align_anywhere(
 class _DottedCounter(ast.NodeVisitor):
     def __init__(self, bindings: Mapping[str, tuple[str, ...]]) -> None:
         self._bindings = bindings
-        self.count = 0
+        self.lines: list[int] = []
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         chain = _attribute_chain(node)
         if chain is not None and self._matches(chain):
-            self.count += 1
+            self.lines.append(node.lineno)
             return  # the whole chain is one use; do not descend
         self.generic_visit(node)
 
     def visit_Name(self, node: ast.Name) -> None:
         if self._bindings.get(node.id) == ():
-            self.count += 1
+            self.lines.append(node.lineno)
 
     def _matches(self, chain: tuple[str, ...]) -> bool:
         suffix = self._bindings.get(chain[0])
@@ -181,32 +249,32 @@ def _attribute_chain(node: ast.Attribute) -> tuple[str, ...] | None:
     return tuple(reversed(names))
 
 
-def _count_bare(tree: ast.AST, name: str) -> int:
+def _bare_occurrences(tree: ast.AST, name: str) -> list[int]:
     counter = _BareCounter(name)
     counter.visit(tree)
-    return counter.count
+    return counter.lines
 
 
 class _BareCounter(ast.NodeVisitor):
     def __init__(self, name: str) -> None:
         self._name = name
-        self.count = 0
+        self.lines: list[int] = []
 
     def visit_Name(self, node: ast.Name) -> None:
         if node.id == self._name:
-            self.count += 1
+            self.lines.append(node.lineno)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         if node.attr == self._name:
-            self.count += 1
+            self.lines.append(node.lineno)
         self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             if self._name in (alias.name.split(".")[-1], alias.asname):
-                self.count += 1
+                self.lines.append(node.lineno)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         for alias in node.names:
             if self._name in (alias.name, alias.asname):
-                self.count += 1
+                self.lines.append(node.lineno)
