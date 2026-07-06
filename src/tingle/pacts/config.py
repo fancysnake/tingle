@@ -50,6 +50,7 @@ class Config:
     ranges: Mapping[str, RangeSpec]
     metrics: tuple[MetricSpec, ...]
     default_range: RangeSpec
+    diff_base: str | None = None
 
 
 @dataclass(frozen=True)

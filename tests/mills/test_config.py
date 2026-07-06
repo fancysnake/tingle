@@ -222,3 +222,33 @@ def test_include_must_be_string_list() -> None:
     errors = _errors_of({"ranges": {"python": {"include": [1, 2]}}})
 
     assert 'range "python": include must be a list of strings' in errors
+
+
+def test_diff_base_defaults_to_none() -> None:
+    config = _validate({"metrics": []})
+
+    assert config.diff_base is None
+
+
+def test_diff_base_is_read() -> None:
+    config = _validate({"diff": {"base": "origin/develop"}, "metrics": []})
+
+    assert config.diff_base == "origin/develop"
+
+
+def test_diff_unknown_key() -> None:
+    errors = _errors_of({"diff": {"branch": "main"}})
+
+    assert '[diff]: unknown key "branch"' in errors
+
+
+def test_diff_base_must_be_string() -> None:
+    errors = _errors_of({"diff": {"base": 5}})
+
+    assert "[diff]: base must be a string" in errors
+
+
+def test_diff_must_be_table() -> None:
+    errors = _errors_of({"diff": "main"})
+
+    assert "[diff] must be a table" in errors

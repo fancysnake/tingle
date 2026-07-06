@@ -15,7 +15,8 @@ if TYPE_CHECKING:
 
     from tingle.pacts.metrics import MetricType
 
-_TOP_LEVEL_KEYS = frozenset({"ranges", "metrics"})
+_TOP_LEVEL_KEYS = frozenset({"ranges", "metrics", "diff"})
+_DIFF_KEYS = frozenset({"base"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
 _METRIC_RESERVED_KEYS = frozenset({"name", "type", "range", "ranges"})
 
@@ -37,6 +38,7 @@ def validate(
     ranges = _validate_ranges(raw.get("ranges", {}), errors)
     metrics = _validate_metrics(raw.get("metrics", []), metric_types, ranges, errors)
     default_range = _resolve_default_range(ranges, errors)
+    diff_base = _validate_diff(raw.get("diff", {}), errors)
 
     if errors:
         raise ConfigError(errors)
@@ -46,6 +48,7 @@ def validate(
         ranges=ranges,
         metrics=metrics,
         default_range=default_range,
+        diff_base=diff_base,
     )
 
 
@@ -212,6 +215,20 @@ def _validate_params(
         errors.extend(
             f"{label}: {problem}" for problem in metric_type.validate_params(params)
         )
+
+
+def _validate_diff(raw_diff: object, errors: list[str]) -> str | None:
+    if not isinstance(raw_diff, Mapping):
+        errors.append("[diff] must be a table")
+        return None
+    errors.extend(
+        f'[diff]: unknown key "{key}"' for key in sorted(set(raw_diff) - _DIFF_KEYS)
+    )
+    base = raw_diff.get("base")
+    if base is not None and not isinstance(base, str):
+        errors.append("[diff]: base must be a string")
+        return None
+    return base
 
 
 def _resolve_default_range(

@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 if TYPE_CHECKING:
     from pathlib import PurePath
 
+    from tingle.pacts.diff import DiffMetricFunction
+
 
 class ProjectFiles(Protocol):
     """Read-only view of the project tree."""
@@ -57,3 +59,4 @@ class MetricType:
     primary_param: str | None = None
     validate_params: Callable[[Mapping[str, Any]], list[str]] | None = None
     description: str = ""
+    diff_func: DiffMetricFunction | None = None
