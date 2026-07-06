@@ -70,52 +70,54 @@ def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
     the two can disagree for such patterns.
     """
     pattern = _compile(ctx.params)
-    added = 0
-    removed = 0
+    added_occurrences: list[Occurrence] = []
+    removed_occurrences: list[Occurrence] = []
     details: dict[str, int] = {}
     warnings: list[str] = []
     for file in ctx.files:
-        file_added = _count_on_lines(pattern, ctx.read, file, file.added_lines)
-        file_removed = _count_on_lines(
+        file_added = _matches_on_lines(pattern, ctx.read, file, file.added_lines)
+        file_removed = _matches_on_lines(
             pattern, ctx.read_base, file, file.removed_lines
         )
         if file_added is None:
             warnings.append(f"{file.path}: current side unreadable")
-            file_added = 0
+            file_added = []
         if file_removed is None:
             warnings.append(f"{file.path}: base side unreadable")
-            file_removed = 0
-        added += file_added
-        removed += file_removed
-        if file_added - file_removed:
-            details[str(file.path)] = file_added - file_removed
+            file_removed = []
+        added_occurrences.extend(file_added)
+        removed_occurrences.extend(file_removed)
+        if len(file_added) - len(file_removed):
+            details[str(file.path)] = len(file_added) - len(file_removed)
     return DiffResult(
-        net=added - removed,
-        added=added,
-        removed=removed,
+        net=len(added_occurrences) - len(removed_occurrences),
+        added=len(added_occurrences),
+        removed=len(removed_occurrences),
         details=details,
         warnings=tuple(warnings),
+        added_occurrences=tuple(added_occurrences),
+        removed_occurrences=tuple(removed_occurrences),
     )
 
 
-def _count_on_lines(
+def _matches_on_lines(
     pattern: re.Pattern[str],
     reader: Callable[..., str | None],
     file: FileDiff,
     lines: AbstractSet[int],
-) -> int | None:
-    """Count matches on the given line numbers; None when text is unreadable."""
+) -> list[Occurrence] | None:
+    """Locate matches on the given line numbers; None when text is unreadable."""
     if not lines:
-        return 0
+        return []
     text = reader(file.path)
     if text is None:
         return None
-    return sum(
-        1
+    return [
+        Occurrence(path=str(file.path), line=lineno)
         for lineno, line in enumerate(text.splitlines(), start=1)
         if lineno in lines
         for _ in pattern.finditer(line)
-    )
+    ]
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:

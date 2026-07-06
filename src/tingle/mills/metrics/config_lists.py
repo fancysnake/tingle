@@ -43,10 +43,20 @@ def _delta(
         *(f"base side: {warning}" for warning in base.warnings),
         *current.warnings,
     )
+    # entry sets show WHICH entries changed; net stays count-based, so with
+    # duplicate entries the occurrence lists can be shorter than the net
+    base_entries = set(base.occurrences)
+    current_entries = set(current.occurrences)
     return DiffResult(
         net=current.value - base.value,
         details={"base": base.value, "current": current.value},
         warnings=warnings,
+        added_occurrences=tuple(
+            o for o in current.occurrences if o not in base_entries
+        ),
+        removed_occurrences=tuple(
+            o for o in base.occurrences if o not in current_entries
+        ),
     )
 
 

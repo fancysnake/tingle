@@ -39,6 +39,8 @@ def test_counts_only_on_added_lines() -> None:
     assert result.added == 1
     assert result.removed == 0
     assert result.net == 1
+    assert [str(o) for o in result.added_occurrences] == ["a.py:2"]
+    assert result.removed_occurrences == ()
 
 
 def test_removed_side_uses_base_content() -> None:
@@ -56,6 +58,7 @@ def test_removed_side_uses_base_content() -> None:
     assert result.added == 0
     assert result.removed == 2
     assert result.net == -2
+    assert [str(o) for o in result.removed_occurrences] == ["a.py:1", "a.py:2"]
 
 
 def test_modified_line_with_surviving_match_is_net_zero() -> None:

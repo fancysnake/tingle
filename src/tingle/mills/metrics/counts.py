@@ -31,9 +31,23 @@ def line_count(ctx: MetricContext) -> MetricResult:
 
 def file_count_diff(ctx: DiffMetricContext) -> DiffResult:
     """Files created by the branch vs files deleted."""
-    added = sum(1 for file in ctx.files if file.status is FileStatus.ADDED)
-    removed = sum(1 for file in ctx.files if file.status is FileStatus.DELETED)
-    return DiffResult(net=added - removed, added=added, removed=removed)
+    created = tuple(
+        Occurrence(path=str(file.path))
+        for file in ctx.files
+        if file.status is FileStatus.ADDED
+    )
+    deleted = tuple(
+        Occurrence(path=str(file.path))
+        for file in ctx.files
+        if file.status is FileStatus.DELETED
+    )
+    return DiffResult(
+        net=len(created) - len(deleted),
+        added=len(created),
+        removed=len(deleted),
+        added_occurrences=created,
+        removed_occurrences=deleted,
+    )
 
 
 def line_count_diff(ctx: DiffMetricContext) -> DiffResult:
