@@ -38,6 +38,8 @@ def test_diff_result_value_delta_shape() -> None:
     assert result.added is None
     assert result.removed is None
     assert dict(result.details) == {}
+    assert result.added_occurrences == ()
+    assert result.removed_occurrences == ()
 
 
 def test_metric_type_diff_func_defaults_to_none() -> None:

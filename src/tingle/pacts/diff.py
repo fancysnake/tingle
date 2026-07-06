@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from pathlib import Path, PurePath
 
     from tingle.pacts.config import MetricSpec
-    from tingle.pacts.metrics import MetricResult
+    from tingle.pacts.metrics import MetricResult, Occurrence
 
 
 class DiffSourceError(Exception):
@@ -76,7 +76,8 @@ class DiffResult:
     """Branch impact on one metric.
 
     Line-scoped metrics fill `added`/`removed` (net = added - removed);
-    value-delta metrics report `net` only.
+    value-delta metrics report `net` only. Occurrences locate what the
+    branch introduced and what it removed.
     """
 
     net: int
@@ -84,6 +85,8 @@ class DiffResult:
     removed: int | None = None
     details: Mapping[str, int] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
+    added_occurrences: tuple[Occurrence, ...] = ()
+    removed_occurrences: tuple[Occurrence, ...] = ()
 
 
 DiffMetricFunction: TypeAlias = Callable[[DiffMetricContext], DiffResult]

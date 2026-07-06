@@ -38,12 +38,35 @@ class MetricContext:
 
 
 @dataclass(frozen=True)
+class Occurrence:
+    """One located hit: a file plus optional line, or a list-entry note."""
+
+    path: str
+    line: int | None = None
+    note: str | None = None
+
+    @property
+    def sort_key(self) -> tuple[str, int, str]:
+        """Deterministic ordering: by path, then line, then note."""
+        return (self.path, self.line or 0, self.note or "")
+
+    def __str__(self) -> str:
+        """Render as path:line, path: note, or bare path."""
+        if self.line is not None:
+            return f"{self.path}:{self.line}"
+        if self.note is not None:
+            return f"{self.path}: {self.note}"
+        return self.path
+
+
+@dataclass(frozen=True)
 class MetricResult:
     """A measured value with optional per-item details and warnings."""
 
     value: int
     details: Mapping[str, int] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
+    occurrences: tuple[Occurrence, ...] = ()
 
 
 MetricFunction: TypeAlias = Callable[[MetricContext], MetricResult]

@@ -6,7 +6,7 @@ from pathlib import Path, PurePath
 import pytest
 
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
-from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
+from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, Occurrence
 from tingle.pacts.report import MetricOutcome, RunReport
 
 
@@ -33,6 +33,39 @@ def test_metric_result_defaults() -> None:
     result = MetricResult(value=3)
     assert dict(result.details) == {}
     assert result.warnings == ()
+    assert result.occurrences == ()
+
+
+def test_occurrence_rendering() -> None:
+    assert str(Occurrence(path="src/a.py", line=3)) == "src/a.py:3"
+    assert str(Occurrence(path="pyproject.toml", note="E501")) == (
+        "pyproject.toml: E501"
+    )
+    assert str(Occurrence(path="src/a.py")) == "src/a.py"
+
+
+def test_occurrence_sort_key_handles_missing_fields() -> None:
+    occurrences = [
+        Occurrence(path="b.py", line=2),
+        Occurrence(path="a.py", note="E501"),
+        Occurrence(path="a.py", line=5),
+        Occurrence(path="a.py"),
+    ]
+
+    ordered = sorted(occurrences, key=lambda o: o.sort_key)
+
+    assert [str(o) for o in ordered] == [
+        "a.py",
+        "a.py: E501",
+        "a.py:5",
+        "b.py:2",
+    ]
+
+
+def test_occurrence_is_immutable() -> None:
+    occurrence = Occurrence(path="a.py", line=1)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        occurrence.line = 2  # type: ignore[misc]
 
 
 def test_metric_type_holds_function() -> None:
