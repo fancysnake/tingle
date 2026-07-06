@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tingle diff` — measure the impact of the current branch against the
+  merge-base with a base branch (diff-cover style). Line-scoped metrics
+  (`regex_count`, `symbol_uses`, `line_count`, `file_count`) count
+  occurrences on added vs removed lines; value metrics
+  (`toml_list_length`, `ini_list_length`) report the delta between the
+  merge-base and now. Colored table (added red, removed green) with a
+  Total column; JSON output includes the resolved base ref and
+  merge-base sha. Base branch: `--base` flag > `[diff] base` config key
+  > `main`, with `origin/<base>` fallback. Uncommitted changes count;
+  untracked files count as fully added.
+
 ## [0.1.0] - 2026-07-06
 
 ### Added

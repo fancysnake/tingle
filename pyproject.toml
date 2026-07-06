@@ -48,11 +48,16 @@ ignore = [
     "D1",      # test names are the documentation
     "PLR2004", # literal expected values are the point of assertions
     "INP001",  # test directories are not importable packages
+    "S603",    # tests drive the real git executable on purpose
+    "S607",    # (and rely on it being on PATH)
 ]
-# per-metric isolation: the runner must catch everything a metric raises
+# per-metric isolation: the runners must catch everything a metric raises
 "src/tingle/mills/runner.py" = ["BLE001"]
+"src/tingle/mills/diff.py" = ["BLE001"]
 # CLI flags are inherently boolean and typer requires this parameter shape
 "src/tingle/gates/cli/typer.py" = ["FBT001", "FBT002"]
+# the adapter's whole job is invoking the git executable
+"src/tingle/links/git/cli.py" = ["S603", "S607"]
 
 [tool.mypy]
 strict = true

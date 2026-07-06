@@ -6,20 +6,54 @@ point them at whatever config file and key/option a linter actually uses.
 
 import configparser
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import PurePath
 from typing import Any
 
+from tingle.pacts.diff import DiffMetricContext, DiffResult
 from tingle.pacts.metrics import MetricContext, MetricResult
 from tingle.specs.config import TOML_LIST_DEFAULT_FILE
+
+type _Reader = Callable[[PurePath], str | None]
 
 
 def toml_list_length(ctx: MetricContext) -> MetricResult:
     """Length of the list at the dotted `key` in a TOML `file`."""
-    file = ctx.params.get("file", TOML_LIST_DEFAULT_FILE)
-    key = ctx.params["key"]
+    return _toml_count(ctx.read, ctx.params)
 
-    text = ctx.read(PurePath(file))
+
+def toml_list_length_diff(ctx: DiffMetricContext) -> DiffResult:
+    """Change in the list's length between the merge-base and now."""
+    return _delta(_toml_count, ctx)
+
+
+def ini_list_length_diff(ctx: DiffMetricContext) -> DiffResult:
+    """Change in the option's entry count between the merge-base and now."""
+    return _delta(_ini_count, ctx)
+
+
+def _delta(
+    count: Callable[[_Reader, Mapping[str, Any]], MetricResult],
+    ctx: DiffMetricContext,
+) -> DiffResult:
+    base = count(ctx.read_base, ctx.params)
+    current = count(ctx.read, ctx.params)
+    warnings = (
+        *(f"base side: {warning}" for warning in base.warnings),
+        *current.warnings,
+    )
+    return DiffResult(
+        net=current.value - base.value,
+        details={"base": base.value, "current": current.value},
+        warnings=warnings,
+    )
+
+
+def _toml_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
+    file = params.get("file", TOML_LIST_DEFAULT_FILE)
+    key = params["key"]
+
+    text = read(PurePath(file))
     if text is None:
         return _empty(f"{file}: not found or unreadable")
     try:
@@ -55,11 +89,15 @@ def validate_toml_params(params: Mapping[str, Any]) -> list[str]:
 
 def ini_list_length(ctx: MetricContext) -> MetricResult:
     """Count comma/newline separated entries of `option` in `section`."""
-    file = ctx.params["file"]
-    section = ctx.params["section"]
-    option = ctx.params["option"]
+    return _ini_count(ctx.read, ctx.params)
 
-    text = ctx.read(PurePath(file))
+
+def _ini_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
+    file = params["file"]
+    section = params["section"]
+    option = params["option"]
+
+    text = read(PurePath(file))
     if text is None:
         return _empty(f"{file}: not found or unreadable")
 
