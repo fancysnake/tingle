@@ -3,10 +3,14 @@
 import re
 from typing import TYPE_CHECKING, Any
 
+from tingle.pacts.diff import DiffMetricContext, DiffResult
 from tingle.pacts.metrics import MetricContext, MetricResult
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
+    from collections.abc import Set as AbstractSet
+
+    from tingle.pacts.diff import FileDiff
 
 _FLAGS = {
     "IGNORECASE": re.IGNORECASE,
@@ -31,6 +35,63 @@ def regex_count(ctx: MetricContext) -> MetricResult:
             details[str(path)] = count
         total += count
     return MetricResult(value=total, details=details, warnings=tuple(warnings))
+
+
+def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
+    """Count matches on lines the branch added vs lines it removed.
+
+    Diff mode matches line by line with terminators stripped: patterns
+    containing newlines never match here, and MULTILINE/DOTALL have no
+    cross-line effect. The full-repo total uses full-text matching, so
+    the two can disagree for such patterns.
+    """
+    pattern = _compile(ctx.params)
+    added = 0
+    removed = 0
+    details: dict[str, int] = {}
+    warnings: list[str] = []
+    for file in ctx.files:
+        file_added = _count_on_lines(pattern, ctx.read, file, file.added_lines)
+        file_removed = _count_on_lines(
+            pattern, ctx.read_base, file, file.removed_lines
+        )
+        if file_added is None:
+            warnings.append(f"{file.path}: current side unreadable")
+            file_added = 0
+        if file_removed is None:
+            warnings.append(f"{file.path}: base side unreadable")
+            file_removed = 0
+        added += file_added
+        removed += file_removed
+        if file_added - file_removed:
+            details[str(file.path)] = file_added - file_removed
+    return DiffResult(
+        net=added - removed,
+        added=added,
+        removed=removed,
+        details=details,
+        warnings=tuple(warnings),
+    )
+
+
+def _count_on_lines(
+    pattern: re.Pattern[str],
+    reader: Callable[..., str | None],
+    file: FileDiff,
+    lines: AbstractSet[int],
+) -> int | None:
+    """Count matches on the given line numbers; None when text is unreadable."""
+    if not lines:
+        return 0
+    text = reader(file.path)
+    if text is None:
+        return None
+    return sum(
+        1
+        for lineno, line in enumerate(text.splitlines(), start=1)
+        if lineno in lines
+        for _ in pattern.finditer(line)
+    )
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
