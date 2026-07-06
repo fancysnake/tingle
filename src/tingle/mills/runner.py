@@ -31,7 +31,7 @@ def run(
         if only is not None and spec.name not in only:
             continue
 
-        range_specs, range_names = _ranges_for(spec, config)
+        range_specs, range_names = ranges_for(spec, config)
         files = resolve(walked, range_specs)
         context = MetricContext(
             files=files,
@@ -62,9 +62,10 @@ def run(
     return RunReport(root=config.root, source=config.source, outcomes=tuple(outcomes))
 
 
-def _ranges_for(
+def ranges_for(
     spec: MetricSpec, config: Config
 ) -> tuple[list[RangeSpec], tuple[str, ...]]:
+    """Resolve a metric's range specs and display names (default applies)."""
     if spec.ranges:
         return [config.ranges[name] for name in spec.ranges], spec.ranges
     return [config.default_range], (config.default_range.name,)

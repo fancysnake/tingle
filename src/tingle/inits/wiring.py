@@ -9,22 +9,32 @@ from tingle.links.config_file.toml import (
     write_starter,
 )
 from tingle.links.fs.local import LocalProjectFiles
+from tingle.links.git.cli import GitCli
 from tingle.mills.config import validate
 from tingle.mills.metrics.config_lists import (
     ini_list_length,
+    ini_list_length_diff,
     toml_list_length,
+    toml_list_length_diff,
     validate_ini_params,
     validate_toml_params,
 )
-from tingle.mills.metrics.counts import file_count, line_count
+from tingle.mills.metrics.counts import (
+    file_count,
+    file_count_diff,
+    line_count,
+    line_count_diff,
+)
 from tingle.mills.metrics.regex_count import (
     regex_count,
+    regex_count_diff,
 )
 from tingle.mills.metrics.regex_count import (
     validate_params as validate_regex_params,
 )
 from tingle.mills.metrics.symbol_uses import (
     symbol_uses,
+    symbol_uses_diff,
 )
 from tingle.mills.metrics.symbol_uses import (
     validate_params as validate_symbol_params,
@@ -36,6 +46,8 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
+    from tingle.pacts.diff import DiffSource
+
 METRIC_TYPES: dict[str, MetricType] = {
     "regex_count": MetricType(
         name="regex_count",
@@ -45,6 +57,7 @@ METRIC_TYPES: dict[str, MetricType] = {
         primary_param="pattern",
         validate_params=validate_regex_params,
         description="Count regex matches in the files of the metric's ranges.",
+        diff_func=regex_count_diff,
     ),
     "symbol_uses": MetricType(
         name="symbol_uses",
@@ -53,6 +66,7 @@ METRIC_TYPES: dict[str, MetricType] = {
         primary_param="symbol",
         validate_params=validate_symbol_params,
         description="Count references to a function or class in Python files.",
+        diff_func=symbol_uses_diff,
     ),
     "toml_list_length": MetricType(
         name="toml_list_length",
@@ -62,6 +76,7 @@ METRIC_TYPES: dict[str, MetricType] = {
         primary_param="key",
         validate_params=validate_toml_params,
         description="Length of the list at a dotted key in a TOML file.",
+        diff_func=toml_list_length_diff,
     ),
     "ini_list_length": MetricType(
         name="ini_list_length",
@@ -69,16 +84,19 @@ METRIC_TYPES: dict[str, MetricType] = {
         required_params=("file", "section", "option"),
         validate_params=validate_ini_params,
         description="Number of entries in a comma/newline separated INI option.",
+        diff_func=ini_list_length_diff,
     ),
     "file_count": MetricType(
         name="file_count",
         func=file_count,
         description="Number of files in the metric's ranges.",
+        diff_func=file_count_diff,
     ),
     "line_count": MetricType(
         name="line_count",
         func=line_count,
         description="Total number of lines in the files of the metric's ranges.",
+        diff_func=line_count_diff,
     ),
 }
 
@@ -86,6 +104,11 @@ METRIC_TYPES: dict[str, MetricType] = {
 def project_files(root: Path) -> ProjectFiles:
     """Build the filesystem view metrics read from."""
     return LocalProjectFiles(root)
+
+
+def diff_source(root: Path) -> DiffSource:
+    """Build the branch-diff provider (git) anchored at the project root."""
+    return GitCli(root)
 
 
 def load_config(cwd: Path, override: Path | None = None) -> Config:

@@ -101,10 +101,14 @@ class DiffOutcome:
 
 @dataclass(frozen=True)
 class DiffReport:
-    """The outcome of one `tingle diff` run."""
+    """The outcome of one `tingle diff` run.
+
+    `skipped` names metrics whose type has no diff variant.
+    """
 
     root: Path
     source: Path
     base_ref: str
     merge_base: str
     outcomes: tuple[DiffOutcome, ...]
+    skipped: tuple[str, ...] = ()
