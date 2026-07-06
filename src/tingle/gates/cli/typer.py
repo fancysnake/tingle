@@ -19,7 +19,9 @@ from tingle.inits.wiring import (
     project_files,
     write_starter_config,
 )
+from tingle.inits.wiring import diff_source as make_diff_source
 from tingle.mills.add import build_metric
+from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run as run_metrics
 from tingle.pacts.config import (
     Config,
@@ -27,8 +29,10 @@ from tingle.pacts.config import (
     ConfigNotFoundError,
     MetricDraft,
 )
+from tingle.pacts.diff import DiffSourceError
 
 if TYPE_CHECKING:
+    from tingle.pacts.diff import DiffReport, DiffResult
     from tingle.pacts.report import RunReport
 
 app = typer.Typer(add_completion=False)
@@ -103,6 +107,46 @@ def list_command(
         _stdout.print(_types_table())
         return
     _stdout.print(_metrics_table(_load(config)))
+
+
+@app.command("diff")
+def diff_command(
+    base: Annotated[
+        str | None,
+        typer.Option(
+            "--base",
+            help="Base branch to compare against"
+            " (default: [diff] base in the config, then 'main').",
+        ),
+    ] = None,
+    output_format: FormatOption = OutputFormat.TABLE,
+    config: ConfigOption = None,
+    metric: MetricOption = None,
+) -> None:
+    """Measure the impact of the current branch, diff-cover style."""
+    loaded = _load(config)
+    runner = DiffRunner(
+        config=loaded,
+        project=project_files(loaded.root),
+        diff_source=make_diff_source(loaded.root),
+        metric_types=METRIC_TYPES,
+    )
+    try:
+        report = runner.run(base or loaded.diff_base or "main", only=metric)
+    except ConfigError as exc:
+        _config_failure(exc)
+    except DiffSourceError as exc:
+        typer.echo(f"diff error: {exc}", err=True)
+        raise typer.Exit(2) from None
+
+    if output_format is OutputFormat.JSON:
+        typer.echo(_diff_to_json(report))
+    else:
+        _stdout.print(_diff_table(report))
+    _print_diff_diagnostics(report)
+
+    if any(outcome.error for outcome in report.outcomes):
+        raise typer.Exit(1)
 
 
 @app.command("add")
@@ -256,6 +300,99 @@ def _to_json(report: RunReport) -> str:
 
 
 def _print_diagnostics(report: RunReport) -> None:
+    for outcome in report.outcomes:
+        if outcome.error is not None:
+            typer.echo(f"error: {outcome.spec.name}: {outcome.error}", err=True)
+        elif outcome.result is not None:
+            for warning in outcome.result.warnings:
+                typer.echo(f"warning: {outcome.spec.name}: {warning}", err=True)
+
+
+def _diff_table(report: DiffReport) -> Table:
+    table = Table(title=f"{report.root} vs {report.base_ref}")
+    table.add_column("Metric")
+    table.add_column("Type")
+    table.add_column("Added", justify="right")
+    table.add_column("Removed", justify="right")
+    table.add_column("Net", justify="right")
+    table.add_column("Total", justify="right")
+    for outcome in report.outcomes:
+        if outcome.result is None:
+            cells = ("", "", "[red]ERROR[/]", "")
+        else:
+            cells = (
+                _added_cell(outcome.result.added),
+                _removed_cell(outcome.result.removed),
+                _net_cell(outcome.result.net),
+                str(outcome.total.value) if outcome.total else "",
+            )
+        table.add_row(outcome.spec.name, outcome.spec.type, *cells)
+    return table
+
+
+def _added_cell(added: int | None) -> str:
+    if added is None:
+        return ""
+    return f"[red]+{added}[/]" if added > 0 else "0"
+
+
+def _removed_cell(removed: int | None) -> str:
+    if removed is None:
+        return ""
+    return f"[green]-{removed}[/]" if removed > 0 else "0"
+
+
+def _net_cell(net: int) -> str:
+    if net > 0:
+        return f"[red]+{net}[/]"
+    if net < 0:
+        return f"[green]{net}[/]"
+    return "0"
+
+
+def _diff_to_json(report: DiffReport) -> str:
+    return json.dumps(
+        {
+            "root": str(report.root),
+            "config": str(report.source),
+            "base": report.base_ref,
+            "merge_base": report.merge_base,
+            "metrics": [
+                {
+                    "name": outcome.spec.name,
+                    "type": outcome.spec.type,
+                    "ranges": list(outcome.range_names),
+                    **_diff_values(outcome.result),
+                    "total": outcome.total.value if outcome.total else None,
+                    "warnings": (
+                        list(outcome.result.warnings) if outcome.result else []
+                    ),
+                    "error": outcome.error,
+                }
+                for outcome in report.outcomes
+            ],
+            "skipped": list(report.skipped),
+        },
+        indent=2,
+    )
+
+
+def _diff_values(result: DiffResult | None) -> dict[str, object]:
+    if result is None:
+        return {"added": None, "removed": None, "net": None, "details": {}}
+    return {
+        "added": result.added,
+        "removed": result.removed,
+        "net": result.net,
+        "details": dict(result.details),
+    }
+
+
+def _print_diff_diagnostics(report: DiffReport) -> None:
+    for name in report.skipped:
+        typer.echo(
+            f"note: {name}: metric type does not support diff mode", err=True
+        )
     for outcome in report.outcomes:
         if outcome.error is not None:
             typer.echo(f"error: {outcome.spec.name}: {outcome.error}", err=True)
