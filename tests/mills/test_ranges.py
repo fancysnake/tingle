@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import PurePath
 
 from tingle.mills.ranges import resolve

@@ -1,4 +1,5 @@
 """Entry point for `python -m tingle`."""
+from __future__ import annotations
 
 from tingle.gates.cli.typer import main
 

@@ -3,18 +3,19 @@
 These are the generic building blocks for counting ignored lint rules:
 point them at whatever config file and key/option a linter actually uses.
 """
+from __future__ import annotations
 
 import configparser
 import tomllib
 from collections.abc import Callable, Mapping
 from pathlib import PurePath
-from typing import Any
+from typing import Any, TypeAlias
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult
 from tingle.pacts.metrics import MetricContext, MetricResult
 from tingle.specs.config import TOML_LIST_DEFAULT_FILE
 
-type _Reader = Callable[[PurePath], str | None]
+_Reader: TypeAlias = Callable[[PurePath], str | None]
 
 
 def toml_list_length(ctx: MetricContext) -> MetricResult:

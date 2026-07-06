@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import PurePath
 
 from tingle.mills.metrics.counts import file_count_diff, line_count_diff

@@ -1,9 +1,10 @@
 """Contracts for diff-scoped metric runs (`tingle diff`)."""
+from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
 if TYPE_CHECKING:
     from pathlib import Path, PurePath
@@ -85,7 +86,7 @@ class DiffResult:
     warnings: tuple[str, ...] = ()
 
 
-type DiffMetricFunction = Callable[[DiffMetricContext], DiffResult]
+DiffMetricFunction: TypeAlias = Callable[[DiffMetricContext], DiffResult]
 
 
 @dataclass(frozen=True)

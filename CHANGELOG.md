@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Support Python 3.11 through 3.14 (previously 3.14 only): PEP 695 type
+  aliases replaced with `TypeAlias`, lazy annotations enabled everywhere,
+  and range globs matched by tingle's own translator instead of
+  `PurePath.full_match` (3.13+). CI runs the test matrix on all four
+  versions.
+
 ### Added
 
 - `tingle diff` — measure the impact of the current branch against the
