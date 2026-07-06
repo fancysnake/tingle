@@ -1,11 +1,14 @@
-from collections.abc import Iterable, Mapping
 from pathlib import Path, PurePath
+from typing import TYPE_CHECKING
 
 import pytest
 
 from tingle.mills.runner import run
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 
 class FakeProject:
@@ -27,7 +30,8 @@ def _file_count(ctx: MetricContext) -> MetricResult:
 
 
 def _boom(_: MetricContext) -> MetricResult:
-    raise ValueError("boom")
+    msg = "boom"
+    raise ValueError(msg)
 
 
 METRIC_TYPES = {

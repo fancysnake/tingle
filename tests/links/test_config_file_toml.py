@@ -1,9 +1,13 @@
-from pathlib import Path
+
+from typing import TYPE_CHECKING
 
 import pytest
 
 from tingle.links.config_file.toml import load_raw
 from tingle.pacts.config import ConfigError, ConfigNotFoundError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_reads_tingle_toml(tmp_path: Path) -> None:

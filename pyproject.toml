@@ -34,10 +34,25 @@ target-version = "py314"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = [
-    "E", "W", "F", "I", "N", "UP", "B", "C4",
-    "SIM", "PT", "RET", "ARG", "PTH", "RUF",
+select = ["ALL"]
+ignore = [
+    # conflicts with the ruff formatter and each other; standard exclusions
+    "COM812", # trailing commas are the formatter's job
+    "D203",   # incompatible with D211 (blank line before class docstring)
+    "D213",   # incompatible with D212 (multi-line summary on first line)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # pytest is built on assert
+    "D1",      # test names are the documentation
+    "PLR2004", # literal expected values are the point of assertions
+    "INP001",  # test directories are not importable packages
+]
+# per-metric isolation: the runner must catch everything a metric raises
+"src/tingle/mills/runner.py" = ["BLE001"]
+# CLI flags are inherently boolean and typer requires this parameter shape
+"src/tingle/gates/cli/typer.py" = ["FBT001", "FBT002"]
 
 [tool.mypy]
 strict = true

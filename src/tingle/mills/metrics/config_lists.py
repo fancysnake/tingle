@@ -15,6 +15,7 @@ from tingle.specs.config import TOML_LIST_DEFAULT_FILE
 
 
 def toml_list_length(ctx: MetricContext) -> MetricResult:
+    """Length of the list at the dotted `key` in a TOML `file`."""
     file = ctx.params.get("file", TOML_LIST_DEFAULT_FILE)
     key = ctx.params["key"]
 
@@ -42,6 +43,7 @@ def toml_list_length(ctx: MetricContext) -> MetricResult:
 
 
 def validate_toml_params(params: Mapping[str, Any]) -> list[str]:
+    """Check `key` is a non-empty string and `file` (if given) a string."""
     errors: list[str] = []
     key = params.get("key")
     if not isinstance(key, str) or not key:
@@ -52,6 +54,7 @@ def validate_toml_params(params: Mapping[str, Any]) -> list[str]:
 
 
 def ini_list_length(ctx: MetricContext) -> MetricResult:
+    """Count comma/newline separated entries of `option` in `section`."""
     file = ctx.params["file"]
     section = ctx.params["section"]
     option = ctx.params["option"]
@@ -81,6 +84,7 @@ def ini_list_length(ctx: MetricContext) -> MetricResult:
 
 
 def validate_ini_params(params: Mapping[str, Any]) -> list[str]:
+    """Check `file`, `section`, and `option` are strings."""
     return [
         f"{name} must be a string"
         for name in ("file", "section", "option")

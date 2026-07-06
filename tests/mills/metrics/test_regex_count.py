@@ -1,9 +1,11 @@
-from collections.abc import Mapping
 from pathlib import PurePath
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tingle.mills.metrics.regex_count import regex_count, validate_params
 from tingle.pacts.metrics import MetricContext
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 def _context(

@@ -1,13 +1,15 @@
 """TOML adapter for tingle's own configuration file."""
 
 import tomllib
-from collections.abc import Mapping
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import tomlkit
 
 from tingle.pacts.config import ConfigError, ConfigNotFoundError
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from pathlib import Path
 
 TINGLE_FILE = "tingle.toml"
 PYPROJECT_FILE = "pyproject.toml"
@@ -54,7 +56,8 @@ def load_raw(root: Path, override: Path | None = None) -> tuple[Path, dict[str, 
     """
     if override is not None:
         if not override.is_file():
-            raise ConfigNotFoundError(f"config file not found: {override}")
+            msg = f"config file not found: {override}"
+            raise ConfigNotFoundError(msg)
         return override, _parse(override)
 
     tingle = root / TINGLE_FILE
@@ -69,8 +72,9 @@ def load_raw(root: Path, override: Path | None = None) -> tuple[Path, dict[str, 
         if section is not None:
             raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
 
+    msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
     raise ConfigNotFoundError(
-        f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
+        msg
     )
 
 

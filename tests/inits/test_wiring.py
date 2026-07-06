@@ -1,7 +1,11 @@
-from pathlib import Path
+
+from typing import TYPE_CHECKING
 
 from tingle.inits.wiring import METRIC_TYPES, project_files
 from tingle.links.fs.local import LocalProjectFiles
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 EXPECTED_TYPES = {
     "regex_count",

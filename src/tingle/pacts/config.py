@@ -1,9 +1,11 @@
 """Contracts for tingle's own configuration."""
 
-from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from pathlib import Path
 
 
 class ConfigNotFoundError(Exception):
@@ -14,6 +16,7 @@ class ConfigError(Exception):
     """The configuration is invalid; carries every problem found."""
 
     def __init__(self, errors: list[str]) -> None:
+        """Collect every problem found; the message joins them."""
         self.errors = errors
         super().__init__("\n".join(errors))
 
@@ -47,3 +50,14 @@ class Config:
     ranges: Mapping[str, RangeSpec]
     metrics: tuple[MetricSpec, ...]
     default_range: RangeSpec
+
+
+@dataclass(frozen=True)
+class MetricDraft:
+    """User input for `tingle add`, before validation."""
+
+    type_name: str
+    value: str | None = None
+    name: str | None = None
+    ranges: tuple[str, ...] = ()
+    params: Mapping[str, str] = field(default_factory=dict)

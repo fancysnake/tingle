@@ -1,10 +1,12 @@
 """Regex match counting metric."""
 
 import re
-from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tingle.pacts.metrics import MetricContext, MetricResult
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _FLAGS = {
     "IGNORECASE": re.IGNORECASE,
@@ -14,6 +16,7 @@ _FLAGS = {
 
 
 def regex_count(ctx: MetricContext) -> MetricResult:
+    """Count matches of the `pattern` param across the context's files."""
     pattern = _compile(ctx.params)
     total = 0
     details: dict[str, int] = {}
@@ -31,6 +34,7 @@ def regex_count(ctx: MetricContext) -> MetricResult:
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
+    """Check that `pattern` compiles and `flags` names are known."""
     errors: list[str] = []
 
     pattern = params.get("pattern")

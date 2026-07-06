@@ -4,10 +4,12 @@ from tingle.pacts.metrics import MetricContext, MetricResult
 
 
 def file_count(ctx: MetricContext) -> MetricResult:
+    """Count the files selected by the metric's ranges."""
     return MetricResult(value=len(ctx.files))
 
 
 def line_count(ctx: MetricContext) -> MetricResult:
+    """Sum the line counts of every readable file."""
     total = 0
     details: dict[str, int] = {}
     warnings: list[str] = []

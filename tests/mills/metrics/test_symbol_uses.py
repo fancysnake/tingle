@@ -1,8 +1,11 @@
-from collections.abc import Mapping
 from pathlib import PurePath
+from typing import TYPE_CHECKING
 
 from tingle.mills.metrics.symbol_uses import symbol_uses, validate_params
 from tingle.pacts.metrics import MetricContext, MetricResult
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 SYMBOL = "myapp.legacy.OldClient"
 

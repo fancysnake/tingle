@@ -1,6 +1,5 @@
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -8,6 +7,9 @@ from tingle.mills.config import validate
 from tingle.pacts.config import Config, ConfigError
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 from tingle.specs.config import IMPLICIT_RANGE_INCLUDE, IMPLICIT_RANGE_NAME
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 ROOT = Path("/proj")
 SOURCE = Path("/proj/tingle.toml")

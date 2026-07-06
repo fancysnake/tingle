@@ -1,10 +1,13 @@
 """Contracts describing the outcome of a run."""
 
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from tingle.pacts.config import MetricSpec
-from tingle.pacts.metrics import MetricResult
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from tingle.pacts.config import MetricSpec
+    from tingle.pacts.metrics import MetricResult
 
 
 @dataclass(frozen=True)
@@ -19,6 +22,8 @@ class MetricOutcome:
 
 @dataclass(frozen=True)
 class RunReport:
+    """The outcome of one tingle run over every selected metric."""
+
     root: Path
     source: Path
     outcomes: tuple[MetricOutcome, ...]

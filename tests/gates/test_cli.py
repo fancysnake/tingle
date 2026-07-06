@@ -1,5 +1,5 @@
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
@@ -8,6 +8,9 @@ from tingle import __version__
 from tingle.gates.cli.typer import app
 from tingle.inits.wiring import METRIC_TYPES
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 runner = CliRunner()
 
@@ -131,7 +134,8 @@ def test_raising_metric_exits_1_but_others_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def boom(_: MetricContext) -> MetricResult:
-        raise RuntimeError("boom")
+        msg = "boom"
+        raise RuntimeError(msg)
 
     monkeypatch.setitem(
         METRIC_TYPES, "file_count", MetricType(name="file_count", func=boom)

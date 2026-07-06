@@ -3,7 +3,7 @@
 import json
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import TYPE_CHECKING, Annotated, NoReturn
 
 import typer
 from rich.console import Console
@@ -21,14 +21,23 @@ from tingle.inits.wiring import (
 )
 from tingle.mills.add import build_metric
 from tingle.mills.runner import run as run_metrics
-from tingle.pacts.config import Config, ConfigError, ConfigNotFoundError
-from tingle.pacts.report import RunReport
+from tingle.pacts.config import (
+    Config,
+    ConfigError,
+    ConfigNotFoundError,
+    MetricDraft,
+)
+
+if TYPE_CHECKING:
+    from tingle.pacts.report import RunReport
 
 app = typer.Typer(add_completion=False)
 _stdout = Console()
 
 
 class OutputFormat(StrEnum):
+    """Report renderings selectable via --format."""
+
     TABLE = "table"
     JSON = "json"
 
@@ -48,7 +57,7 @@ MetricOption = Annotated[
 def _show_version(value: bool) -> None:
     if value:
         typer.echo(f"tingle {__version__}")
-        raise typer.Exit()
+        raise typer.Exit
 
 
 @app.callback(invoke_without_command=True)
@@ -113,19 +122,18 @@ def add_command(
         typer.Option("--param", help="Extra metric param as key=value (repeatable)."),
     ] = None,
 ) -> None:
-    """Add a metric to the config, e.g.: tingle add regex_count '#\\s*noqa'."""
+    r"""Add a metric to the config, e.g.: tingle add regex_count '#\\s*noqa'."""
     cwd = Path.cwd()
+    draft = MetricDraft(
+        type_name=type_name,
+        value=value,
+        name=name,
+        ranges=tuple(range_names or ()),
+        params=_parse_params(param or []),
+    )
     try:
         raw = load_raw_config(cwd)
-        metric = build_metric(
-            raw,
-            METRIC_TYPES,
-            type_name,
-            value=value,
-            name=name,
-            ranges=range_names or (),
-            params=_parse_params(param or []),
-        )
+        metric = build_metric(raw, METRIC_TYPES, draft)
     except ConfigError as exc:
         _config_failure(exc)
     target = config_edit_target(cwd)
@@ -145,6 +153,7 @@ def init_command() -> None:
 
 
 def main() -> None:
+    """Console-script entry point."""
     app()
 
 
@@ -208,11 +217,11 @@ def _report_table(report: RunReport) -> Table:
     table.add_column("Ranges")
     table.add_column("Value", justify="right")
     for outcome in report.outcomes:
-        if outcome.error is not None:
-            value = "[red]ERROR[/]"
-        else:
-            assert outcome.result is not None
-            value = str(outcome.result.value)
+        value = (
+            "[red]ERROR[/]"
+            if outcome.result is None
+            else str(outcome.result.value)
+        )
         table.add_row(
             outcome.spec.name,
             outcome.spec.type,

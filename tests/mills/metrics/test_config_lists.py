@@ -1,5 +1,4 @@
-from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tingle.mills.metrics.config_lists import (
     ini_list_length,
@@ -8,6 +7,9 @@ from tingle.mills.metrics.config_lists import (
     validate_toml_params,
 )
 from tingle.pacts.metrics import MetricContext
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 PYPROJECT = """
 [tool.ruff.lint]

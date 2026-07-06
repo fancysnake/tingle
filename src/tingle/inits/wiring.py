@@ -1,8 +1,6 @@
 """Static wiring: the metric-type table, config loading/editing, project IO."""
 
-from collections.abc import Mapping
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tingle.links.config_file.toml import (
     append_metric,
@@ -33,6 +31,10 @@ from tingle.mills.metrics.symbol_uses import (
 )
 from tingle.pacts.config import Config, ConfigNotFoundError
 from tingle.pacts.metrics import MetricType, ProjectFiles
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from pathlib import Path
 
 METRIC_TYPES: dict[str, MetricType] = {
     "regex_count": MetricType(
@@ -82,6 +84,7 @@ METRIC_TYPES: dict[str, MetricType] = {
 
 
 def project_files(root: Path) -> ProjectFiles:
+    """Build the filesystem view metrics read from."""
     return LocalProjectFiles(root)
 
 
@@ -101,12 +104,15 @@ def load_raw_config(cwd: Path) -> dict[str, Any]:
 
 
 def config_edit_target(cwd: Path) -> Path:
+    """Return the config file `tingle add` should write to."""
     return edit_target(cwd)
 
 
 def append_metric_to(path: Path, metric: Mapping[str, Any]) -> None:
+    """Append a metric table to the config file, preserving formatting."""
     append_metric(path, metric)
 
 
 def write_starter_config(cwd: Path) -> Path:
+    """Create the starter tingle.toml; raises FileExistsError if present."""
     return write_starter(cwd)

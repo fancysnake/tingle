@@ -1,12 +1,15 @@
 """Execute configured metrics and collect a RunReport."""
 
-from collections.abc import Collection, Mapping
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from tingle.mills.ranges import resolve
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 from tingle.pacts.report import MetricOutcome, RunReport
+
+if TYPE_CHECKING:
+    from collections.abc import Collection, Mapping
 
 
 def run(

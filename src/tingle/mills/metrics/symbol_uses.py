@@ -5,13 +5,16 @@ invisible. Bare symbols count every same-named name/attribute in scope.
 """
 
 import ast
-from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tingle.pacts.metrics import MetricContext, MetricResult
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
 
 def symbol_uses(ctx: MetricContext) -> MetricResult:
+    """Count references to the `symbol` param across the Python files."""
     parts = tuple(ctx.params["symbol"].split("."))
     total = 0
     details: dict[str, int] = {}
@@ -39,6 +42,7 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
+    """Check that `symbol` is a bare or dotted Python name."""
     symbol = params.get("symbol")
     if (
         not isinstance(symbol, str)
@@ -79,32 +83,49 @@ def _collect_bindings(
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            for alias in node.names:
-                module = tuple(alias.name.split("."))
-                if alias.asname is None:
-                    if module[0] == parts[0]:
-                        bindings[module[0]] = parts[1:]
-                else:
-                    suffix = _align_prefix(module, parts)
-                    if suffix is not None:
-                        bindings[alias.asname] = suffix
+            _bind_plain_import(node, parts, bindings)
         elif isinstance(node, ast.ImportFrom):
             if any(alias.name == "*" for alias in node.names):
                 has_star_import = True
-                continue
-            module = tuple(node.module.split(".")) if node.module else ()
-            for alias in node.names:
-                chain = (*module, alias.name)
-                if node.level == 0:
-                    suffix = _align_prefix(chain, parts)
-                else:
-                    suffix = _align_anywhere(chain, parts)
-                if suffix is not None:
-                    bindings[alias.asname or alias.name] = suffix
-                    if not suffix:
-                        import_uses += 1
+            else:
+                import_uses += _bind_from_import(node, parts, bindings)
 
     return bindings, import_uses, has_star_import
+
+
+def _bind_plain_import(
+    node: ast.Import, parts: tuple[str, ...], bindings: dict[str, tuple[str, ...]]
+) -> None:
+    for alias in node.names:
+        module = tuple(alias.name.split("."))
+        if alias.asname is None:
+            if module[0] == parts[0]:
+                bindings[module[0]] = parts[1:]
+        else:
+            suffix = _align_prefix(module, parts)
+            if suffix is not None:
+                bindings[alias.asname] = suffix
+
+
+def _bind_from_import(
+    node: ast.ImportFrom,
+    parts: tuple[str, ...],
+    bindings: dict[str, tuple[str, ...]],
+) -> int:
+    """Bind from-imported names; return how many import the symbol itself."""
+    module = tuple(node.module.split(".")) if node.module else ()
+    uses = 0
+    for alias in node.names:
+        chain = (*module, alias.name)
+        if node.level == 0:
+            suffix = _align_prefix(chain, parts)
+        else:
+            suffix = _align_anywhere(chain, parts)
+        if suffix is not None:
+            bindings[alias.asname or alias.name] = suffix
+            if not suffix:
+                uses += 1
+    return uses
 
 
 def _align_prefix(

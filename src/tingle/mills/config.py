@@ -1,16 +1,19 @@
 """Validation of raw configuration data into a Config."""
 
 from collections.abc import Mapping
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
-from tingle.pacts.metrics import MetricType
 from tingle.specs.config import (
     IMPLICIT_RANGE_INCLUDE,
     IMPLICIT_RANGE_NAME,
     METRIC_NAME_RE,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from tingle.pacts.metrics import MetricType
 
 _TOP_LEVEL_KEYS = frozenset({"ranges", "metrics"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
@@ -26,9 +29,10 @@ def validate(
 ) -> Config:
     """Turn raw config data into a Config, or raise ConfigError with every problem."""
     errors: list[str] = []
-
-    for key in sorted(set(raw) - _TOP_LEVEL_KEYS):
-        errors.append(f'unknown top-level key "{key}"')
+    errors.extend(
+        f'unknown top-level key "{key}"'
+        for key in sorted(set(raw) - _TOP_LEVEL_KEYS)
+    )
 
     ranges = _validate_ranges(raw.get("ranges", {}), errors)
     metrics = _validate_metrics(raw.get("metrics", []), metric_types, ranges, errors)
@@ -45,7 +49,7 @@ def validate(
     )
 
 
-def _validate_ranges(raw_ranges: Any, errors: list[str]) -> dict[str, RangeSpec]:
+def _validate_ranges(raw_ranges: object, errors: list[str]) -> dict[str, RangeSpec]:
     if not isinstance(raw_ranges, Mapping):
         errors.append("[ranges] must be a table")
         return {}
@@ -56,8 +60,10 @@ def _validate_ranges(raw_ranges: Any, errors: list[str]) -> dict[str, RangeSpec]
         if not isinstance(table, Mapping):
             errors.append(f"{label}: must be a table")
             continue
-        for key in sorted(set(table) - _RANGE_KEYS):
-            errors.append(f'{label}: unknown key "{key}"')
+        errors.extend(
+            f'{label}: unknown key "{key}"'
+            for key in sorted(set(table) - _RANGE_KEYS)
+        )
 
         include = _string_list(table.get("include"), f"{label}: include", errors)
         if include is not None and not include:
@@ -84,7 +90,7 @@ def _validate_ranges(raw_ranges: Any, errors: list[str]) -> dict[str, RangeSpec]
 
 
 def _validate_metrics(
-    raw_metrics: Any,
+    raw_metrics: object,
     metric_types: Mapping[str, MetricType],
     ranges: Mapping[str, RangeSpec],
     errors: list[str],
@@ -100,22 +106,7 @@ def _validate_metrics(
             errors.append(f"metrics[{index}]: must be a table")
             continue
 
-        name = table.get("name")
-        label = f'metric "{name}"' if isinstance(name, str) else f"metrics[{index}]"
-        if name is None:
-            errors.append(f"{label}: missing name")
-        elif not isinstance(name, str):
-            errors.append(f"metrics[{index}]: name must be a string")
-            name = None
-        elif not METRIC_NAME_RE.match(name):
-            errors.append(
-                f"{label}: invalid name (allowed: letters, digits, '_', '-', '.')"
-            )
-        elif name in seen_names:
-            errors.append(f"{label}: duplicate name")
-        else:
-            seen_names.add(name)
-
+        name, label = _metric_name(table, index, seen_names, errors)
         range_names = _metric_ranges(table, ranges, label, errors)
         params = {
             key: value
@@ -132,13 +123,39 @@ def _validate_metrics(
             continue
         _validate_params(metric_types[type_name], params, label, errors)
 
-        if isinstance(name, str):
+        if name is not None:
             metrics.append(
                 MetricSpec(
                     name=name, type=type_name, ranges=range_names, params=params
                 )
             )
     return tuple(metrics)
+
+
+def _metric_name(
+    table: Mapping[str, Any],
+    index: int,
+    seen_names: set[str],
+    errors: list[str],
+) -> tuple[str | None, str]:
+    """Validate a metric's name; return it (or None) plus the error label."""
+    name = table.get("name")
+    label = f'metric "{name}"' if isinstance(name, str) else f"metrics[{index}]"
+    if name is None:
+        errors.append(f"{label}: missing name")
+        return None, label
+    if not isinstance(name, str):
+        errors.append(f"{label}: name must be a string")
+        return None, label
+    if not METRIC_NAME_RE.match(name):
+        errors.append(
+            f"{label}: invalid name (allowed: letters, digits, '_', '-', '.')"
+        )
+    elif name in seen_names:
+        errors.append(f"{label}: duplicate name")
+    else:
+        seen_names.add(name)
+    return name, label
 
 
 def _metric_ranges(
@@ -168,9 +185,9 @@ def _metric_ranges(
     else:
         return ()
 
-    for name in names:
-        if name not in ranges:
-            errors.append(f'{label}: unknown range "{name}"')
+    errors.extend(
+        f'{label}: unknown range "{name}"' for name in names if name not in ranges
+    )
     return tuple(names)
 
 
@@ -181,10 +198,14 @@ def _validate_params(
     errors: list[str],
 ) -> None:
     known = set(metric_type.required_params) | set(metric_type.optional_params)
-    for missing in sorted(set(metric_type.required_params) - set(params)):
-        errors.append(f'{label}: missing required param "{missing}"')
-    for unknown in sorted(set(params) - known):
-        errors.append(f'{label}: unknown param "{unknown}"')
+    errors.extend(
+        f'{label}: missing required param "{missing}"'
+        for missing in sorted(set(metric_type.required_params) - set(params))
+    )
+    errors.extend(
+        f'{label}: unknown param "{unknown}"'
+        for unknown in sorted(set(params) - known)
+    )
     if metric_type.validate_params is not None and set(
         metric_type.required_params
     ) <= set(params):
@@ -205,7 +226,7 @@ def _resolve_default_range(
     return RangeSpec(name=IMPLICIT_RANGE_NAME, include=IMPLICIT_RANGE_INCLUDE)
 
 
-def _string_list(value: Any, label: str, errors: list[str]) -> list[str] | None:
+def _string_list(value: object, label: str, errors: list[str]) -> list[str] | None:
     if value is None:
         return None
     if not isinstance(value, list) or not all(

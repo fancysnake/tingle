@@ -2,8 +2,10 @@
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from pathlib import PurePath
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from pathlib import PurePath
 
 
 class ProjectFiles(Protocol):
@@ -34,6 +36,8 @@ class MetricContext:
 
 @dataclass(frozen=True)
 class MetricResult:
+    """A measured value with optional per-item details and warnings."""
+
     value: int
     details: Mapping[str, int] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()

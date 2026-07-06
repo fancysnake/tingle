@@ -1,8 +1,11 @@
-from collections.abc import Mapping
 from pathlib import PurePath
+from typing import TYPE_CHECKING
 
 from tingle.mills.metrics.counts import file_count, line_count
 from tingle.pacts.metrics import MetricContext
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 def _context(contents: Mapping[str, str | None]) -> MetricContext:

@@ -1,10 +1,15 @@
 """Pure range resolution: glob filtering of walked paths."""
 
-from collections.abc import Iterable
-from pathlib import PurePath
 
-from tingle.pacts.config import RangeSpec
+from typing import TYPE_CHECKING
+
 from tingle.specs.ranges import DEFAULT_EXCLUDES
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import PurePath
+
+    from tingle.pacts.config import RangeSpec
 
 
 def resolve(

@@ -1,4 +1,5 @@
-from pathlib import Path
+
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -7,6 +8,9 @@ from tingle.links.config_file.toml import (
     edit_target,
     write_starter,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 EXISTING = """# my metrics
 [ranges.python]
