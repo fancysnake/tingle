@@ -9,8 +9,8 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
-    from tingle.pacts.diff import DiffOutcome, DiffReport
-    from tingle.pacts.metrics import Occurrence
+    from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
+    from tingle.pacts.metrics import MetricResult, Occurrence
     from tingle.pacts.report import RunReport
 
 
@@ -79,14 +79,30 @@ def run_listing(report: RunReport) -> list[Text]:
                 style="bold",
             )
         )
-        if outcome.result.occurrences:
-            lines.extend(
-                Text(f"  {occurrence}")
-                for occurrence in outcome.result.occurrences
-            )
-        else:
-            lines.append(Text("  (no located occurrences)", style="dim"))
+        lines.extend(occurrence_lines(outcome.result))
         lines.append(Text(""))
+    return lines
+
+
+def occurrence_lines(result: MetricResult) -> list[Text]:
+    """Indented occurrence lines of one metric result."""
+    if result.occurrences:
+        return [Text(f"  {occurrence}") for occurrence in result.occurrences]
+    return [Text("  (no located occurrences)", style="dim")]
+
+
+def diff_occurrence_lines(result: DiffResult) -> list[Text]:
+    """Signed, colored occurrence lines of one diff result."""
+    if not result.added_occurrences and not result.removed_occurrences:
+        return [Text("  (no located changes)", style="dim")]
+    lines = [
+        Text(f"  + {occurrence}", style="red")
+        for occurrence in result.added_occurrences
+    ]
+    lines.extend(
+        Text(f"  - {occurrence}", style="green")
+        for occurrence in result.removed_occurrences
+    )
     return lines
 
 
@@ -104,17 +120,7 @@ def diff_listing(report: DiffReport) -> list[Text]:
             lines.append(Text(""))
             continue
         lines.append(_diff_heading(outcome))
-        result = outcome.result
-        if not result.added_occurrences and not result.removed_occurrences:
-            lines.append(Text("  (no located changes)", style="dim"))
-        lines.extend(
-            Text(f"  + {occurrence}", style="red")
-            for occurrence in result.added_occurrences
-        )
-        lines.extend(
-            Text(f"  - {occurrence}", style="green")
-            for occurrence in result.removed_occurrences
-        )
+        lines.extend(diff_occurrence_lines(outcome.result))
         lines.append(Text(""))
     return lines
 

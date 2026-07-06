@@ -234,8 +234,18 @@ def _interactive(
     config_path: Path | None,
     metrics: list[str] | None,
 ) -> None:
-    """Interactive mode; falls back to the summary table until the TUI lands."""
-    _print_stat(diff, base, config_path, metrics, json_out=False)
+    """Run the metrics, then hand the report to the interactive TUI."""
+    # imported lazily: textual is heavy and only needed on this path
+    from tingle.gates.tui.app import MetricsApp
+
+    if diff:
+        diff_report = _collect_diff(base, config_path, metrics)
+        MetricsApp(diff_report).run()
+        _finish_diff(diff_report)
+    else:
+        run_report = _collect_run(config_path, metrics)
+        MetricsApp(run_report).run()
+        _finish_run(run_report)
 
 
 def _print_stat(
