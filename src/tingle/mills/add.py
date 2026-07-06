@@ -1,4 +1,5 @@
 """Building and validating a new metric entry for `tingle add`."""
+from __future__ import annotations
 
 import re
 from collections.abc import Mapping

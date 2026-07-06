@@ -4,6 +4,7 @@ All git invocations run with cwd at the tingle project root, hardened
 against user diff configuration (external diff drivers, prefix and
 quoting settings). Filenames containing newlines are unsupported.
 """
+from __future__ import annotations
 
 import os
 import re

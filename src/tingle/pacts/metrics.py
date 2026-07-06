@@ -1,8 +1,9 @@
 """Contracts between the metric runner and metric functions."""
+from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
 if TYPE_CHECKING:
     from pathlib import PurePath
@@ -45,7 +46,7 @@ class MetricResult:
     warnings: tuple[str, ...] = ()
 
 
-type MetricFunction = Callable[[MetricContext], MetricResult]
+MetricFunction: TypeAlias = Callable[[MetricContext], MetricResult]
 
 
 @dataclass(frozen=True)

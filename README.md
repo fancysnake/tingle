@@ -196,7 +196,8 @@ does not judge.
 
 ## Development
 
-The project uses [mise](https://mise.jdx.dev/) + Poetry (`mise install`,
+Python 3.11–3.14 are supported (CI runs the full matrix). The project
+uses [mise](https://mise.jdx.dev/) + Poetry (`mise install`,
 `poetry install`). Checks:
 
 ```console
