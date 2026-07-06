@@ -1,5 +1,9 @@
 # tingle
 
+> *Spider-sense for refactoring: you know that tingle — the itch that says
+> the codebase isn't right yet. This tool puts a number on it, so you can
+> watch it drop.*
+
 Code metrics for the era of constant refactoring.
 
 `tingle` measures things you want to shrink (or watch) while refactoring a

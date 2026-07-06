@@ -14,9 +14,21 @@ type = "regex_count"
 pattern = '#\s*type:\s*ignore'
 
 [[metrics]]
-name = "ruff-selected-rules"
+name = "ruff-ignores"
 type = "toml_list_length"
-key = "tool.ruff.lint.select"
+key = "tool.ruff.lint.ignore"
+
+[[metrics]]
+name = "ruff-per-file-ignores"
+type = "toml_list_length"
+key = "tool.ruff.lint.per-file-ignores"
+
+[[metrics]]
+name = "pylint-disables"
+type = "ini_list_length"
+file = ".pylintrc"
+section = "MESSAGES CONTROL"
+option = "disable"
 
 [[metrics]]
 name = "python-loc"
