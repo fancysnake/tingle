@@ -20,9 +20,12 @@ whatever tracks history for you (CI artifacts, dashboards, a spreadsheet).
 $ tingle init                                    # starter tingle.toml
 $ tingle add regex_count '#\s*noqa'              # add a metric from the CLI
 $ tingle add toml_list_length tool.ruff.lint.ignore --name ruff-ignores
-$ tingle                                         # run all metrics (table)
-$ tingle --format json                           # machine-readable output
-$ tingle diff                                    # impact of the current branch
+$ tingle                                         # interactive mode (on a terminal)
+$ tingle stat                                    # summary table
+$ tingle stat --json                             # machine-readable output
+$ tingle stat --diff                             # impact of the current branch
+$ tingle report                                  # every occurrence, file:line
+$ tingle report --diff                           # what the branch added/removed
 ```
 
 ## Configuration
@@ -115,7 +118,7 @@ pollute your numbers. The working tree counts, including uncommitted
 changes; untracked (non-ignored) files count as fully added.
 
 ```console
-$ tingle diff
+$ tingle stat --diff
                   /home/you/project vs main
 ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━┳━━━━━━━┓
 ┃ Metric        ┃ Type             ┃ Added ┃ Removed ┃ Net ┃ Total ┃
@@ -162,11 +165,23 @@ Approximations to know about:
 
 ## CLI
 
-- `tingle` / `tingle run` — run metrics. Options: `--format table|json`,
-  `--config PATH`, `--metric NAME` (repeatable filter).
-- `tingle diff` — branch impact vs a base branch (see above). Options:
-  `--base REF`, plus the same `--format`/`--config`/`--metric` options as
-  run. JSON output includes the resolved base ref and merge-base sha.
+- `tingle` — **interactive mode** on a terminal: a sortable metrics table
+  (keys `1`–`6` sort by column, same key flips direction), Enter opens a
+  metric's occurrence list, Esc goes back, `q` quits. `tingle --diff
+  [--base REF]` opens the branch-impact view. When stdout is not a
+  terminal (CI, pipes) the static summary table is printed instead.
+- `tingle stat` — the compact summary. Options: `--json`, `--diff`,
+  `--base REF` (implies `--diff`), `--config PATH`, `--metric NAME`
+  (repeatable filter). Diff JSON includes the resolved base ref and
+  merge-base sha.
+- `tingle report` — the **full report**: every occurrence with file and
+  line (`src/api/views.py:23`), or the actual list entries for the
+  config-list metrics (`pyproject.toml: E501`). Same options as stat,
+  plus `--cobertura`: Cobertura XML where each occurrence line is an
+  uncovered line — GitLab MR widgets, Jenkins, and diff-cover consume it
+  directly (line-scoped metrics only; others are noted on stderr).
+  In diff mode occurrences are signed and colored (`+` added, `-`
+  removed); for list metrics you see *which* rules changed.
 - `tingle add TYPE [VALUE]` — append a metric to the config. The
   positional VALUE binds to the type's primary param (see table). Options:
   `--name`, `--range` (repeatable), `--param key=value` (repeatable). The
@@ -180,7 +195,10 @@ Approximations to know about:
   available metric types and their params (works without a config).
 
 Reports go to stdout; warnings and per-metric errors go to stderr, so
-`tingle --format json | jq .` stays clean.
+`tingle stat --json | jq .` stays clean.
+
+Migrating from ≤0.1: `tingle run` is now `tingle stat`, and `tingle diff`
+is `tingle stat --diff` (summary) or `tingle report --diff` (locations).
 
 **Exit codes**: `0` — metrics ran (warnings allowed); `1` — a metric
 function failed (the others still run and report); `2` — config or usage
@@ -190,8 +208,9 @@ does not judge.
 ## CI example
 
 ```yaml
-- run: tingle --format json > metrics.json
+- run: tingle stat --json > metrics.json
 - run: jq -r '.metrics[] | "\(.name)\t\(.value)"' metrics.json
+- run: tingle report --cobertura > tingle.xml   # e.g. GitLab MR annotations
 ```
 
 ## Development
