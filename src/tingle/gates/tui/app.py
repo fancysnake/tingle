@@ -27,9 +27,9 @@ if TYPE_CHECKING:
 class MetricsApp(App[None]):
     """Three-level accordion: group -> metric -> file results.
 
-    Groups and their metric rows are visible at rest; expanding a metric
-    reveals its occurrences and folds the other groups, and collapsing it
-    reopens them.
+    Groups and their metric rows are visible at rest; each group and
+    metric folds and unfolds independently (arrows or Enter), a metric
+    revealing its occurrences.
     """
 
     TITLE = "tingle"
@@ -116,35 +116,6 @@ class MetricsApp(App[None]):
         )
         if collapsible is not None:
             collapsible.collapsed = collapsed
-
-    def on_collapsible_expanded(self, event: Collapsible.Expanded) -> None:
-        """Fold the other groups when a metric's file results open."""
-        collapsible = event.collapsible
-        if "metric" not in collapsible.classes:
-            return
-        active = self._group_of(collapsible)
-        for group in self._groups():
-            group.collapsed = group is not active
-
-    def on_collapsible_collapsed(self, event: Collapsible.Collapsed) -> None:
-        """Reopen every group once the last open metric closes."""
-        if "metric" not in event.collapsible.classes:
-            return
-        if any(not metric.collapsed for metric in self._metrics()):
-            return
-        for group in self._groups():
-            group.collapsed = False
-
-    def _groups(self) -> list[Collapsible]:
-        return [c for c in self.query(Collapsible) if "group" in c.classes]
-
-    def _metrics(self) -> list[Collapsible]:
-        return [c for c in self.query(Collapsible) if "metric" in c.classes]
-
-    def _group_of(self, metric: Collapsible) -> Collapsible | None:
-        return next(
-            (a for a in metric.ancestors if isinstance(a, Collapsible)), None
-        )
 
     def _title(self, outcome: MetricOutcome | DiffOutcome) -> str:
         name = _escape(outcome.spec.name).ljust(self._name_width)

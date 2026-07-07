@@ -192,12 +192,11 @@ Approximations to know about:
   of group → metric → file results, navigated like a tree. Groups and
   their metric rows (each showing its stats) are visible at rest; `↑`/`↓`
   move between headers, `→` unfolds and `←` folds the focused one (Enter
-  or click toggles too). Unfolding a metric shows its occurrences in
-  place and folds the other groups away; folding it reopens them. `q`
-  quits. With no groups configured it is a flat accordion of metrics.
-  `tingle --diff [--base REF]` opens the branch-impact view. When stdout
-  is not a terminal (CI, pipes) the static summary table is printed
-  instead.
+  or click toggles too), and each group and metric folds independently.
+  Unfolding a metric shows its occurrences in place. `q` quits. With no
+  groups configured it is a flat accordion of metrics. `tingle --diff
+  [--base REF]` opens the branch-impact view. When stdout is not a
+  terminal (CI, pipes) the static summary table is printed instead.
 - `tingle stat` — the compact summary. Options: `--json`, `--diff`,
   `--base REF` (implies `--diff`), `--config PATH`, `--metric NAME`
   (repeatable filter). Diff JSON includes the resolved base ref and

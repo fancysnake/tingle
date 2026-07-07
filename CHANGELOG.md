@@ -22,9 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--base`).
 - Interactive mode: bare `tingle` on a terminal opens a three-level
   accordion (textual) of group → metric → file results, navigated like a
-  tree (`↑`/`↓` between headers, `→` unfold, `←` fold); unfolding a
-  metric shows its occurrences and folds the other groups, `q` quits.
-  Non-TTY invocations print the static summary instead.
+  tree (`↑`/`↓` between headers, `→` unfold, `←` fold); each group and
+  metric folds independently and unfolding a metric shows its
+  occurrences, `q` quits. Non-TTY invocations print the static summary
+  instead.
 - Metric groups: an optional `group = "<name>"` (or `tingle add
   --group`) on any metric. Grouped metrics are collected under a heading
   in the report listing, a `Group` column in the summary tables, their

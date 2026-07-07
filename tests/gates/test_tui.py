@@ -179,23 +179,21 @@ def test_grouped_report_nests_groups_and_metrics() -> None:
     asyncio.run(scenario())
 
 
-def test_expanding_metric_folds_other_groups_then_reopens() -> None:
+def test_groups_and_metrics_fold_independently() -> None:
     async def scenario() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             typing = app.query_one("#group-0", Collapsible)
             lint = app.query_one("#group-1", Collapsible)
-            ungrouped = app.query_one("#group-2", Collapsible)
-            # expand a metric inside the typing group
+            # expanding a metric leaves the other groups untouched
             await pilot.click("#metric-0 CollapsibleTitle")
-            assert typing.collapsed is False  # active group stays open
-            assert lint.collapsed is True  # other groups fold away
-            assert ungrouped.collapsed is True
-            # collapsing it again returns to the all-open resting state
-            await pilot.click("#metric-0 CollapsibleTitle")
-            assert not any(
-                group.collapsed for group in (typing, lint, ungrouped)
-            )
+            assert app.query_one("#metric-0", Collapsible).collapsed is False
+            assert typing.collapsed is False
+            assert lint.collapsed is False  # not folded away
+            # groups fold on their own without disturbing metrics
+            await pilot.click("#group-1 CollapsibleTitle")
+            assert lint.collapsed is True
+            assert app.query_one("#metric-0", Collapsible).collapsed is False
 
     asyncio.run(scenario())
 
