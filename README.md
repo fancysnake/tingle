@@ -189,14 +189,16 @@ Approximations to know about:
 ## CLI
 
 - `tingle` — **interactive mode** on a terminal: a three-level accordion
-  of group → metric → file results, navigated like a tree. Groups and
-  their metric rows (each showing its stats) are visible at rest; `↑`/`↓`
-  move between headers, `→` unfolds and `←` folds the focused one (Enter
+  of group → metric → file results, navigated with vim keys. Groups and
+  their metric rows (each showing its stats) are visible at rest; `j`/`k`
+  move between headers, `l` unfolds and `h` folds the focused one (Enter
   or click toggles too), and each group and metric folds independently.
-  Unfolding a metric shows its occurrences in place. `q` quits. With no
-  groups configured it is a flat accordion of metrics. `tingle --diff
-  [--base REF]` opens the branch-impact view. When stdout is not a
-  terminal (CI, pipes) the static summary table is printed instead.
+  Unfolding a metric shows its occurrences in place. `p` opens the
+  command palette, `q` quits; the arrow keys scroll and drive the
+  palette. With no groups configured it is a flat accordion of metrics.
+  `tingle --diff [--base REF]` opens the branch-impact view. When stdout
+  is not a terminal (CI, pipes) the static summary table is printed
+  instead.
 - `tingle stat` — the compact summary. Options: `--json`, `--diff`,
   `--base REF` (implies `--diff`), `--config PATH`, `--metric NAME`
   (repeatable filter). Diff JSON includes the resolved base ref and

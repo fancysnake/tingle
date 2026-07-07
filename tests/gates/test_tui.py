@@ -134,14 +134,14 @@ def _focused_metric_id(app: MetricsApp) -> str | None:
     return collapsible.id if collapsible else None
 
 
-def test_arrows_move_between_metrics() -> None:
+def test_jk_move_between_metrics() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
             assert _focused_metric_id(app) == "metric-0"
-            await pilot.press("down")
+            await pilot.press("j")
             assert _focused_metric_id(app) == "metric-1"
-            await pilot.press("up")
+            await pilot.press("k")
             assert _focused_metric_id(app) == "metric-0"
 
     asyncio.run(scenario())
@@ -200,21 +200,21 @@ def test_groups_and_metrics_fold_independently() -> None:
     asyncio.run(scenario())
 
 
-def test_right_unfolds_and_left_folds_focused_header() -> None:
+def test_l_unfolds_and_h_folds_focused_header() -> None:
     async def scenario() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             # focus starts on the first group header (expanded at rest)
             typing = app.query_one("#group-0", Collapsible)
-            await pilot.press("left")  # fold the group
+            await pilot.press("h")  # fold the group
             assert typing.collapsed is True
-            await pilot.press("right")  # unfold it again
+            await pilot.press("l")  # unfold it again
             assert typing.collapsed is False
             # move down to a metric header and unfold its file results
-            await pilot.press("down")
-            await pilot.press("right")
+            await pilot.press("j")
+            await pilot.press("l")
             assert app.query_one("#metric-0", Collapsible).collapsed is False
-            await pilot.press("left")
+            await pilot.press("h")
             assert app.query_one("#metric-0", Collapsible).collapsed is True
 
     asyncio.run(scenario())
@@ -224,15 +224,18 @@ def test_command_palette_on_p_and_nav_hints_shown() -> None:
     # ctrl+p is taken by the VS Code terminal, so the palette moves to "p"
     assert MetricsApp.ENABLE_COMMAND_PALETTE is True
     assert MetricsApp.COMMAND_PALETTE_BINDING == "p"
+    keys = {b.key for b in MetricsApp.BINDINGS if isinstance(b, Binding)}
+    # arrows stay unbound so the palette's own list can use them
+    assert keys.isdisjoint({"up", "down", "left", "right"})
     shown = {
         b.key: b.description
         for b in MetricsApp.BINDINGS
         if isinstance(b, Binding) and b.show
     }
-    assert shown["up"] == "Prev"
-    assert shown["down"] == "Next"
-    assert shown["left"] == "Fold"
-    assert shown["right"] == "Unfold"
+    assert shown["k"] == "Prev"
+    assert shown["j"] == "Next"
+    assert shown["h"] == "Fold"
+    assert shown["l"] == "Unfold"
 
 
 def test_pressing_p_opens_the_command_palette() -> None:

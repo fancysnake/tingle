@@ -39,11 +39,15 @@ class MetricsApp(App[None]):
     CSS = """
     Collapsible.group > CollapsibleTitle { text-style: bold; }
     """
+    # vim keys, not arrows: the arrow keys stay free for the command
+    # palette's own list (our priority bindings would otherwise swallow
+    # them), and letters need no priority since the scroll container only
+    # binds the arrows
     BINDINGS: ClassVar = [
-        Binding("up", "focus_metric(-1)", "Prev", priority=True),
-        Binding("down", "focus_metric(1)", "Next", priority=True),
-        Binding("left", "fold", "Fold", priority=True),
-        Binding("right", "unfold", "Unfold", priority=True),
+        Binding("k", "focus_metric(-1)", "Prev"),
+        Binding("j", "focus_metric(1)", "Next"),
+        Binding("h", "fold", "Fold"),
+        Binding("l", "unfold", "Unfold"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -102,11 +106,11 @@ class MetricsApp(App[None]):
             self.screen.focus_next("CollapsibleTitle")
 
     def action_unfold(self) -> None:
-        """Unfold (right arrow) the focused group/metric header."""
+        """Unfold (l) the focused group/metric header."""
         self._set_focused_collapsed(collapsed=False)
 
     def action_fold(self) -> None:
-        """Fold (left arrow) the focused group/metric header."""
+        """Fold (h) the focused group/metric header."""
         self._set_focused_collapsed(collapsed=True)
 
     def _set_focused_collapsed(self, *, collapsed: bool) -> None:
