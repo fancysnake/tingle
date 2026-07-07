@@ -33,9 +33,9 @@ class MetricsApp(App[None]):
     """
 
     TITLE = "tingle"
-    # the command palette lives on ctrl+p, which the VS Code terminal
-    # swallows for its own palette; drop it rather than show a dead hint
-    ENABLE_COMMAND_PALETTE = False
+    # ctrl+p (the default) is swallowed by the VS Code terminal; there is
+    # no text input to steal a bare "p" from, so bind the palette to that
+    COMMAND_PALETTE_BINDING = "p"
     CSS = """
     Collapsible.group > CollapsibleTitle { text-style: bold; }
     """

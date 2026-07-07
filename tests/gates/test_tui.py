@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 from textual.binding import Binding
+from textual.command import CommandPalette
 from textual.widgets import Collapsible, Static
 
 from tingle.gates.tui.app import MetricsApp
@@ -219,9 +220,10 @@ def test_right_unfolds_and_left_folds_focused_header() -> None:
     asyncio.run(scenario())
 
 
-def test_command_palette_disabled_and_nav_hints_shown() -> None:
-    # ctrl+p is taken by the VS Code terminal, so the palette is unreachable
-    assert MetricsApp.ENABLE_COMMAND_PALETTE is False
+def test_command_palette_on_p_and_nav_hints_shown() -> None:
+    # ctrl+p is taken by the VS Code terminal, so the palette moves to "p"
+    assert MetricsApp.ENABLE_COMMAND_PALETTE is True
+    assert MetricsApp.COMMAND_PALETTE_BINDING == "p"
     shown = {
         b.key: b.description
         for b in MetricsApp.BINDINGS
@@ -231,6 +233,16 @@ def test_command_palette_disabled_and_nav_hints_shown() -> None:
     assert shown["down"] == "Next"
     assert shown["left"] == "Fold"
     assert shown["right"] == "Unfold"
+
+
+def test_pressing_p_opens_the_command_palette() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test() as pilot:
+            await pilot.press("p")
+            assert isinstance(app.screen, CommandPalette)
+
+    asyncio.run(scenario())
 
 
 def test_quit_binding() -> None:
