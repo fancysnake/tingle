@@ -147,6 +147,20 @@ def test_jk_move_between_metrics() -> None:
     asyncio.run(scenario())
 
 
+def test_space_toggles_focused_header() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test() as pilot:
+            first = app.query_one("#metric-0", Collapsible)
+            assert first.collapsed is True
+            await pilot.press("space")
+            assert first.collapsed is False
+            await pilot.press("space")
+            assert first.collapsed is True
+
+    asyncio.run(scenario())
+
+
 def test_diff_report_stats_and_signed_occurrences() -> None:
     async def scenario() -> None:
         app = MetricsApp(DIFF_REPORT)
@@ -200,6 +214,25 @@ def test_groups_and_metrics_fold_independently() -> None:
     asyncio.run(scenario())
 
 
+def test_wasd_is_an_alternative_navigation_layout() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            typing = app.query_one("#group-0", Collapsible)
+            await pilot.press("a")  # fold the focused group
+            assert typing.collapsed is True
+            await pilot.press("d")  # unfold it
+            assert typing.collapsed is False
+            await pilot.press("s")  # down to the first metric
+            assert _focused_metric_id(app) == "metric-0"
+            await pilot.press("d")  # unfold the metric
+            assert app.query_one("#metric-0", Collapsible).collapsed is False
+            await pilot.press("w")  # back up to the group header
+            assert _focused_metric_id(app) == "group-0"
+
+    asyncio.run(scenario())
+
+
 def test_l_unfolds_and_h_folds_focused_header() -> None:
     async def scenario() -> None:
         app = MetricsApp(GROUPED_REPORT)
@@ -236,6 +269,7 @@ def test_command_palette_on_p_and_nav_hints_shown() -> None:
     assert shown["j"] == "Next"
     assert shown["h"] == "Fold"
     assert shown["l"] == "Unfold"
+    assert shown["space"] == "Toggle"
 
 
 def test_pressing_p_opens_the_command_palette() -> None:

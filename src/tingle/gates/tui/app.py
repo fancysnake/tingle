@@ -39,15 +39,21 @@ class MetricsApp(App[None]):
     CSS = """
     Collapsible.group > CollapsibleTitle { text-style: bold; }
     """
-    # vim keys, not arrows: the arrow keys stay free for the command
+    # letters, not arrows: the arrow keys stay free for the command
     # palette's own list (our priority bindings would otherwise swallow
     # them), and letters need no priority since the scroll container only
-    # binds the arrows
+    # binds the arrows. hjkl are the shown hints; wasd alias the same
+    # actions for a non-vim hand position.
     BINDINGS: ClassVar = [
         Binding("k", "focus_metric(-1)", "Prev"),
         Binding("j", "focus_metric(1)", "Next"),
         Binding("h", "fold", "Fold"),
         Binding("l", "unfold", "Unfold"),
+        Binding("space", "toggle_fold", "Toggle"),
+        Binding("w", "focus_metric(-1)", "Prev", show=False),
+        Binding("s", "focus_metric(1)", "Next", show=False),
+        Binding("a", "fold", "Fold", show=False),
+        Binding("d", "unfold", "Unfold", show=False),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -107,22 +113,30 @@ class MetricsApp(App[None]):
 
     def action_unfold(self) -> None:
         """Unfold (l) the focused group/metric header."""
-        self._set_focused_collapsed(collapsed=False)
+        collapsible = self._focused_collapsible()
+        if collapsible is not None:
+            collapsible.collapsed = False
 
     def action_fold(self) -> None:
         """Fold (h) the focused group/metric header."""
-        self._set_focused_collapsed(collapsed=True)
+        collapsible = self._focused_collapsible()
+        if collapsible is not None:
+            collapsible.collapsed = True
 
-    def _set_focused_collapsed(self, *, collapsed: bool) -> None:
+    def action_toggle_fold(self) -> None:
+        """Toggle (space) the focused group/metric header."""
+        collapsible = self._focused_collapsible()
+        if collapsible is not None:
+            collapsible.collapsed = not collapsible.collapsed
+
+    def _focused_collapsible(self) -> Collapsible | None:
         focused = self.focused
         if focused is None:
-            return
-        collapsible = next(
+            return None
+        return next(
             (a for a in focused.ancestors_with_self if isinstance(a, Collapsible)),
             None,
         )
-        if collapsible is not None:
-            collapsible.collapsed = collapsed
 
     def _title(self, outcome: MetricOutcome | DiffOutcome) -> str:
         name = _escape(outcome.spec.name).ljust(self._name_width)

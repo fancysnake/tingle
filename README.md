@@ -191,8 +191,9 @@ Approximations to know about:
 - `tingle` — **interactive mode** on a terminal: a three-level accordion
   of group → metric → file results, navigated with vim keys. Groups and
   their metric rows (each showing its stats) are visible at rest; `j`/`k`
-  move between headers, `l` unfolds and `h` folds the focused one (Enter
-  or click toggles too), and each group and metric folds independently.
+  move between headers, `l` unfolds and `h` folds the focused one (or
+  `w`/`s`/`a`/`d`; Space or Enter/click toggles it), and each group and
+  metric folds independently.
   Unfolding a metric shows its occurrences in place. `p` opens the
   command palette, `q` quits; the arrow keys scroll and drive the
   palette. With no groups configured it is a flat accordion of metrics.
