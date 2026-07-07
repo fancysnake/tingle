@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from textual.binding import Binding
 from textual.widgets import Collapsible, Static
 
 from tingle.gates.tui.app import MetricsApp
@@ -216,6 +217,20 @@ def test_right_unfolds_and_left_folds_focused_header() -> None:
             assert app.query_one("#metric-0", Collapsible).collapsed is True
 
     asyncio.run(scenario())
+
+
+def test_command_palette_disabled_and_nav_hints_shown() -> None:
+    # ctrl+p is taken by the VS Code terminal, so the palette is unreachable
+    assert MetricsApp.ENABLE_COMMAND_PALETTE is False
+    shown = {
+        b.key: b.description
+        for b in MetricsApp.BINDINGS
+        if isinstance(b, Binding) and b.show
+    }
+    assert shown["up"] == "Prev"
+    assert shown["down"] == "Next"
+    assert shown["left"] == "Fold"
+    assert shown["right"] == "Unfold"
 
 
 def test_quit_binding() -> None:

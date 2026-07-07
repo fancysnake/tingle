@@ -33,15 +33,18 @@ class MetricsApp(App[None]):
     """
 
     TITLE = "tingle"
+    # the command palette lives on ctrl+p, which the VS Code terminal
+    # swallows for its own palette; drop it rather than show a dead hint
+    ENABLE_COMMAND_PALETTE = False
     CSS = """
     Collapsible.group > CollapsibleTitle { text-style: bold; }
     """
     BINDINGS: ClassVar = [
+        Binding("up", "focus_metric(-1)", "Prev", priority=True),
+        Binding("down", "focus_metric(1)", "Next", priority=True),
+        Binding("left", "fold", "Fold", priority=True),
+        Binding("right", "unfold", "Unfold", priority=True),
         Binding("q", "quit", "Quit"),
-        Binding("down", "focus_metric(1)", "Next", show=False, priority=True),
-        Binding("up", "focus_metric(-1)", "Prev", show=False, priority=True),
-        Binding("right", "unfold", "Unfold", show=False, priority=True),
-        Binding("left", "fold", "Fold", show=False, priority=True),
     ]
 
     def __init__(self, report: RunReport | DiffReport) -> None:
