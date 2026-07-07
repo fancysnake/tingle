@@ -54,6 +54,7 @@ pattern = '#\s*noqa'
 name = "todo-comments"
 type = "regex_count"
 ranges = ["python", "js"]    # ...or several: the union of matched files
+group = "lint"               # optional heading to show related metrics under
 pattern = '\bTODO\b'
 ```
 
@@ -72,6 +73,7 @@ range, all (non-excluded) files are used.
 | `regex_count` | `pattern` (positional), `flags` | regex matches in the range's files |
 | `symbol_uses` | `symbol` (positional) | references to a function/class in Python files |
 | `toml_list_length` | `key` (positional), `file` = `pyproject.toml` | entries of the list at a dotted TOML key |
+| `toml_table_array` | `key` (positional), `file` = `pyproject.toml`, `label`, `explode` | entries of a TOML array of tables (e.g. `[[tool.mypy.overrides]]`) |
 | `ini_list_length` | `file`, `section`, `option` | comma/newline-separated entries of an INI option |
 | `file_count` | — | files in the range |
 | `line_count` | — | lines in the range's files |
@@ -91,10 +93,31 @@ Notes and limitations:
 - `toml_list_length` sums the lengths of a table of lists (e.g. ruff's
   `per-file-ignores`). Missing file/key or malformed content is a warning
   plus value 0, not an error — the file may legitimately not exist yet.
+- `toml_table_array` counts the tables of an array of tables such as
+  `[[tool.mypy.overrides]]`. `label` names a field used to describe each
+  occurrence (`pyproject.toml: foo.*` instead of a raw dict); a
+  list-valued label is joined with `, `. By default one table counts as
+  one; `explode = true` (which requires `label`) instead counts each
+  element of the label list separately.
 - `ini_list_length` works on e.g. `.pylintrc`:
   `file = ".pylintrc"`, `section = "MESSAGES CONTROL"`, `option = "disable"`.
-- `toml_list_length` and `ini_list_length` read the named file relative to
-  the project root and ignore ranges.
+- `toml_list_length`, `toml_table_array`, and `ini_list_length` read the
+  named file relative to the project root and ignore ranges.
+
+### Groups
+
+Any metric may set `group = "<name>"`. Grouping is presentation only —
+values, occurrences, and warnings are unchanged — but every human view
+collects grouped metrics together: the report listing prints a `##
+<name>` heading per group, the summary tables gain a `Group` column, and
+the interactive TUI nests each group as its own foldable section.
+Metrics keep config order within a group, groups appear in first-mention
+order, and anything ungrouped trails last. With no groups anywhere the
+output is exactly as before. Add one with `--group`:
+
+```console
+$ tingle add regex_count '#\s*type:\s*ignore' --name type-ignores --group typing
+```
 
 ### Counting ignored lint rules
 
@@ -139,7 +162,7 @@ Each metric type has diff semantics:
 | `symbol_uses` | references starting on added vs removed lines |
 | `line_count` | added vs removed lines |
 | `file_count` | created vs deleted files |
-| `toml_list_length` / `ini_list_length` | value at the merge-base vs now (net only) |
+| `toml_list_length` / `toml_table_array` / `ini_list_length` | value at the merge-base vs now (net only) |
 
 The base branch resolves as `--base` flag > `[diff] base` in the config
 > `main`; if the ref doesn't exist locally, `origin/<base>` is tried.
@@ -165,10 +188,13 @@ Approximations to know about:
 
 ## CLI
 
-- `tingle` — **interactive mode** on a terminal: an accordion of metrics,
-  each row showing its stats; `↑`/`↓` move between metrics, Enter or click
-  expands a row in place to list its occurrences, `q` quits. `tingle
-  --diff [--base REF]` opens the branch-impact view. When stdout is not a
+- `tingle` — **interactive mode** on a terminal: a three-level accordion
+  of group → metric → file results. Groups and their metric rows (each
+  showing its stats) are visible at rest; `↑`/`↓` move between headers,
+  Enter or click on a metric expands its occurrences in place and folds
+  the other groups away (collapsing it reopens them), `q` quits. With no
+  groups configured it is a flat accordion of metrics. `tingle --diff
+  [--base REF]` opens the branch-impact view. When stdout is not a
   terminal (CI, pipes) the static summary table is printed instead.
 - `tingle stat` — the compact summary. Options: `--json`, `--diff`,
   `--base REF` (implies `--diff`), `--config PATH`, `--metric NAME`
@@ -184,9 +210,10 @@ Approximations to know about:
   removed); for list metrics you see *which* rules changed.
 - `tingle add TYPE [VALUE]` — append a metric to the config. The
   positional VALUE binds to the type's primary param (see table). Options:
-  `--name`, `--range` (repeatable), `--param key=value` (repeatable). The
-  new metric is validated against the merged config before anything is
-  written; names are auto-generated and de-duplicated when omitted.
+  `--name`, `--range` (repeatable), `--group`, `--param key=value`
+  (repeatable). The new metric is validated against the merged config
+  before anything is written; names are auto-generated and de-duplicated
+  when omitted.
   Targets `tingle.toml` (created if needed) or `[tool.tingle]` in
   `pyproject.toml` if that is where your config lives.
 - `tingle init` — create a commented starter `tingle.toml` (refuses to

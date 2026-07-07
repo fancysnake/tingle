@@ -20,9 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uncovered.
 - `tingle stat` — the compact summary table (`--json`, `--diff`,
   `--base`).
-- Interactive mode: bare `tingle` on a terminal opens an accordion of
-  metrics (textual); expand a row to see its occurrences, `q` quits.
+- Interactive mode: bare `tingle` on a terminal opens a three-level
+  accordion (textual) of group → metric → file results; expanding a
+  metric shows its occurrences and folds the other groups, `q` quits.
   Non-TTY invocations print the static summary instead.
+- Metric groups: an optional `group = "<name>"` (or `tingle add
+  --group`) on any metric. Grouped metrics are collected under a heading
+  in the report listing, a `Group` column in the summary tables, their
+  own foldable section in the TUI, and an additive `group` key in JSON.
+  Presentation only — values, occurrences, and warnings are unchanged.
+- `toml_table_array` metric type: count entries of a TOML array of
+  tables (e.g. `[[tool.mypy.overrides]]`), labelling each occurrence by
+  a configurable field; `explode = true` fans a list-valued label out
+  into one count per element.
 
 ### Changed
 

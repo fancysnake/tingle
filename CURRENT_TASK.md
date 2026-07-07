@@ -1,35 +1,47 @@
-# Current Task: full report + interactive mode
+# Current Task: metric groups + toml_table_array (+ TUI accordion)
 
-**Status**: Feature complete — all 7 plan steps implemented, verified, and
-committed on `feature/report-and-tui` (branched from main). Awaiting
-review/merge decision.
+**Status**: Feature complete — implemented, verified, and committed on
+`feature/report-and-tui` (branched from main). Awaiting review/merge
+decision. Builds on the earlier full-report + interactive-mode work on
+the same branch (see git history).
 
-## Done
+## Done (this round)
 
-1. pacts: Occurrence(path, line, note); MetricResult.occurrences;
-   DiffResult.added/removed_occurrences
-2. Run-side collection: regex (bisect offset→line, full-text semantics
-   kept), symbol_uses linenos, file_count paths, config-list entries
-3. Diff-side collection incl. entry-set comparison for list metrics
-4. CLI restructure: `stat` + `report` commands (--json/--diff/--base);
-   BREAKING: `run`/`diff` removed; bare `tingle` prints summary when
-   stdout is not a TTY
-5. `report --cobertura`: occurrence lines as uncovered lines (GitLab/
-   Jenkins/diff-cover); line-scoped metrics only
-6. Interactive TUI (textual): sortable table (1-6, repeat to flip),
-   Enter → occurrence detail, q quits; bare `tingle` on a TTY; diff
-   variant via `tingle --diff`
-7. Docs (README CLI rewrite + migration note, CHANGELOG breaking entry)
+0. TUI redesign: the interactive view is now an **accordion**, not a
+   sortable table. Sorting/columns removed; `↑`/`↓` move between headers,
+   Enter/click expands a metric's occurrences in place.
+1. `MetricSpec.group` / `MetricDraft.group`; `group` reserved config key;
+   validated as a non-empty string (never leaks into `params`).
+2. `group_sections` reshape helper (first-appearance order, ungrouped
+   last) driving every human view: `##` headings in the report listing,
+   a `Group` column in the summary tables (only when a group is used, so
+   groupless output is byte-identical), and an additive `group` JSON key.
+3. TUI 3-level accordion: group → metric → file results. Groups expanded
+   at rest; expanding a metric folds the other groups, collapsing the
+   last open metric reopens them. Groupless config falls back to a flat
+   accordion.
+4. `toml_table_array` metric type + diff variant: count entries of a TOML
+   array of tables (e.g. `[[tool.mypy.overrides]]`), `label` describes
+   each occurrence, `explode = true` fans a list label out per element.
+   Shares load+descend with `toml_list_length` via `_descend_toml`.
+5. Wiring registration + `tingle add --group` (group written after
+   `type` for readable diffs).
+6. Dogfood (`tingle.toml` grouped into lint/typing/size + a
+   `mypy-overrides` metric) and docs (README metric-type table, Groups
+   section, CLI notes; CHANGELOG additive entries).
 
 ## Verification
 
-231 tests (ruff select=ALL, mypy strict 3.11, import-linter all green);
-suite also passes on a real 3.11 interpreter (textual works there).
-Dogfood: `tingle report --diff --base main` names the exact noqa lines
-and per-file-ignore entries this branch added.
+258 tests green: `ruff check` (select=ALL), `mypy` (strict, 3.11),
+`lint-imports`. Run via `mise exec -- pytest` / `ruff` / `mypy` /
+`lint-imports`. Dogfood: `tingle stat` shows the Group column and the
+three sections; `mypy-overrides` reads 0 with a "key not found" warning
+(the repo has no `[[tool.mypy.overrides]]` yet — a truthful baseline).
 
 ## Notes
 
-- New runtime dep: textual (requires-python now >=3.11,<4.0)
-- JSON schema extended with occurrence arrays (additive)
-- Occurrence display: path:line, or "path: entry" for list metrics
+- Groups are presentation-only: values, occurrences, warnings unchanged.
+- JSON gains an additive `group` key (null when unset); the compact
+  tables gain a `Group` column only when a group exists.
+- Plan doc: `PLAN_METRIC_GROUPS.md` (Step 3 revised to the approved
+  3-level accordion instead of the original DataTable Group column).
