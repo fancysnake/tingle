@@ -20,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uncovered.
 - `tingle stat` — the compact summary table (`--json`, `--diff`,
   `--base`).
-- Interactive mode: bare `tingle` on a terminal opens a sortable
-  metrics table (textual); Enter shows a metric's occurrences, `q`
-  quits. Non-TTY invocations print the static summary instead.
+- Interactive mode: bare `tingle` on a terminal opens an accordion of
+  metrics (textual); expand a row to see its occurrences, `q` quits.
+  Non-TTY invocations print the static summary instead.
 
 ### Changed
 

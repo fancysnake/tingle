@@ -3,182 +3,123 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from rich.text import Text
 from textual.app import App
 from textual.binding import Binding
 from textual.containers import VerticalScroll
-from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Static
+from textual.widgets import Collapsible, Footer, Header, Static
 
 from tingle.gates.cli.render import diff_occurrence_lines, occurrence_lines
-from tingle.pacts.diff import DiffOutcome, DiffReport
+from tingle.pacts.diff import DiffOutcome
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from textual.app import ComposeResult
 
+    from tingle.pacts.diff import DiffReport
     from tingle.pacts.report import MetricOutcome, RunReport
-
-RUN_COLUMNS = ("Metric", "Type", "Ranges", "Value")
-DIFF_COLUMNS = ("Metric", "Type", "Added", "Removed", "Net", "Total")
 
 
 class MetricsApp(App[None]):
-    """Sortable metrics table; Enter opens a metric's occurrences."""
+    """Accordion of metrics; expand a row to see its occurrences."""
 
     TITLE = "tingle"
     BINDINGS: ClassVar = [
         Binding("q", "quit", "Quit"),
-        *(
-            Binding(str(number), f"sort({number})", "Sort", show=False)
-            for number in range(1, len(DIFF_COLUMNS) + 1)
-        ),
+        Binding("down", "focus_metric(1)", "Next", show=False, priority=True),
+        Binding("up", "focus_metric(-1)", "Prev", show=False, priority=True),
     ]
 
     def __init__(self, report: RunReport | DiffReport) -> None:
         """Present an already-computed report; the TUI never runs metrics."""
         super().__init__()
         self._report = report
-        self._columns = (
-            DIFF_COLUMNS if isinstance(report, DiffReport) else RUN_COLUMNS
-        )
-        self._sort_column: int | None = None
-        self._sort_reverse = False
-
-    def compose(self) -> ComposeResult:
-        """Header, the metrics table, and the key legend."""
-        yield Header()
-        yield DataTable[Text]()
-        yield Footer()
+        self._name_width = _column_width(o.spec.name for o in self._outcomes)
+        self._type_width = _column_width(o.spec.type for o in self._outcomes)
 
     @property
     def _outcomes(self) -> tuple[MetricOutcome | DiffOutcome, ...]:
         return self._report.outcomes
 
-    def on_mount(self) -> None:
-        """Fill the table from the report."""
-        self.sub_title = str(self._report.root)
-        table: DataTable[Text] = self.query_one(DataTable)
-        table.cursor_type = "row"
-        for index, column in enumerate(self._columns):
-            table.add_column(column, key=str(index))
-        for index, outcome in enumerate(self._outcomes):
-            table.add_row(*_cells(outcome), key=str(index))
-
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        """Enter on a row opens the occurrence detail screen."""
-        if event.row_key.value is None:
-            return
-        self.push_screen(DetailScreen(self._outcomes[int(event.row_key.value)]))
-
-    def action_sort(self, number: int) -> None:
-        """Sort by the 1-based column; same column again flips direction."""
-        index = number - 1
-        if index >= len(self._columns):
-            return
-        self._sort_reverse = self._sort_column == index and not self._sort_reverse
-        self._sort_column = index
-        table: DataTable[Text] = self.query_one(DataTable)
-        table.sort(str(index), key=_sort_value, reverse=self._sort_reverse)
-
-
-class DetailScreen(Screen[None]):
-    """Occurrences of a single metric."""
-
-    BINDINGS: ClassVar = [
-        Binding("escape", "app.pop_screen", "Back"),
-        Binding("q", "app.quit", "Quit"),
-    ]
-
-    def __init__(self, outcome: MetricOutcome | DiffOutcome) -> None:
-        """Show one outcome's occurrences (or its error)."""
-        super().__init__()
-        self._outcome = outcome
-
     def compose(self) -> ComposeResult:
-        """Heading plus a scrollable occurrence list."""
+        """Header, one collapsible per metric, and the key legend."""
         yield Header()
-        yield Static(_heading(self._outcome), classes="detail-heading")
-        yield VerticalScroll(
-            *(Static(line) for line in _detail_lines(self._outcome))
-        )
+        self.sub_title = str(self._report.root)
+        with VerticalScroll():
+            for index, outcome in enumerate(self._outcomes):
+                yield Collapsible(
+                    *_detail_widgets(outcome),
+                    title=self._title(outcome),
+                    id=f"metric-{index}",
+                )
         yield Footer()
 
+    def on_mount(self) -> None:
+        """Focus the first metric so Up/Down move between rows at once."""
+        self.screen.focus_next("CollapsibleTitle")
 
-def _cells(outcome: MetricOutcome | DiffOutcome) -> tuple[Text, ...]:
-    name = Text(outcome.spec.name)
-    kind = Text(outcome.spec.type)
+    def action_focus_metric(self, direction: int) -> None:
+        """Move the focus (row cursor) to the next/previous metric header."""
+        if direction < 0:
+            self.screen.focus_previous("CollapsibleTitle")
+        else:
+            self.screen.focus_next("CollapsibleTitle")
+
+    def _title(self, outcome: MetricOutcome | DiffOutcome) -> str:
+        name = _escape(outcome.spec.name).ljust(self._name_width)
+        kind = _escape(outcome.spec.type).ljust(self._type_width)
+        return f"{name}  [dim]{kind}[/dim]  {_stats(outcome)}"
+
+
+def _column_width(names: Iterable[str]) -> int:
+    return max((len(name) for name in names), default=0)
+
+
+def _stats(outcome: MetricOutcome | DiffOutcome) -> str:
     if isinstance(outcome, DiffOutcome):
         if outcome.result is None:
-            return (name, kind, Text(""), Text(""), Text("ERROR", "red"), Text(""))
-        return (
-            name,
-            kind,
-            _signed(outcome.result.added, positive_style="red"),
-            _signed(outcome.result.removed, positive_style="green", sign="-"),
-            _net(outcome.result.net),
-            Text(str(outcome.total.value) if outcome.total else ""),
-        )
-    if outcome.result is None:
-        return (name, kind, Text(", ".join(outcome.range_names)), Text("ERROR", "red"))
-    return (
-        name,
-        kind,
-        Text(", ".join(outcome.range_names)),
-        Text(str(outcome.result.value)),
-    )
-
-
-def _sort_value(cell: Text) -> tuple[int, float, str]:
-    """Numbers sort numerically and before any text."""
-    plain = cell.plain.strip()
-    try:
-        return (0, float(plain.replace("+", "", 1)), "")
-    except ValueError:
-        return (1, 0.0, plain.lower())
-
-
-def _signed(value: int | None, positive_style: str, sign: str = "+") -> Text:
-    if value is None:
-        return Text("")
-    if value > 0:
-        return Text(f"{sign}{value}", style=positive_style)
-    return Text("0")
-
-
-def _net(net: int) -> Text:
-    if net > 0:
-        return Text(f"+{net}", style="red")
-    if net < 0:
-        return Text(str(net), style="green")
-    return Text("0")
-
-
-def _heading(outcome: MetricOutcome | DiffOutcome) -> Text:
-    if outcome.error is not None:
-        return Text(
-            f"{outcome.spec.name} ({outcome.spec.type}): {outcome.error}",
-            style="bold red",
-        )
-    if isinstance(outcome, DiffOutcome):
-        if outcome.result is None:
-            return Text(outcome.spec.name, style="bold")
+            return "[red]ERROR[/red]"
+        added = _signed(outcome.result.added, "red")
+        removed = _signed(outcome.result.removed, "green", sign="-")
         total = outcome.total.value if outcome.total else "?"
-        return Text(
-            f"{outcome.spec.name} ({outcome.spec.type}):"
-            f" net {outcome.result.net:+d} of {total} total",
-            style="bold",
-        )
+        net = _net(outcome.result.net)
+        return f"{added} / {removed} (net {net} of {total})"
     if outcome.result is None:
-        return Text(outcome.spec.name, style="bold")
-    return Text(
-        f"{outcome.spec.name} ({outcome.spec.type}): {outcome.result.value}",
-        style="bold",
-    )
+        return _with_ranges(outcome, "[red]ERROR[/red]")
+    return _with_ranges(outcome, f"[b]{outcome.result.value}[/b]")
 
 
-def _detail_lines(outcome: MetricOutcome | DiffOutcome) -> list[Text]:
+def _with_ranges(outcome: MetricOutcome, stat: str) -> str:
+    ranges = _escape(", ".join(outcome.range_names))
+    return f"{ranges}  {stat}" if ranges else stat
+
+
+def _signed(value: int | None, style: str, sign: str = "+") -> str:
+    if value is None:
+        return ""
+    if value > 0:
+        return f"[{style}]{sign}{value}[/{style}]"
+    return "0"
+
+
+def _net(net: int) -> str:
+    if net > 0:
+        return f"[red]+{net}[/red]"
+    if net < 0:
+        return f"[green]{net}[/green]"
+    return "0"
+
+
+def _escape(text: str) -> str:
+    """Neutralise Textual markup in dynamic text (metric names, ranges)."""
+    return text.replace("\\", "\\\\").replace("[", r"\[")
+
+
+def _detail_widgets(outcome: MetricOutcome | DiffOutcome) -> list[Static]:
     if outcome.result is None:
-        return [Text("  (metric failed; see heading)", style="dim")]
+        return [Static("[dim](metric failed; see the summary above)[/dim]")]
     if isinstance(outcome, DiffOutcome):
-        return diff_occurrence_lines(outcome.result)
-    return occurrence_lines(outcome.result)
+        lines = diff_occurrence_lines(outcome.result)
+    else:
+        lines = occurrence_lines(outcome.result)
+    return [Static(line) for line in lines]

@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from textual.widgets import DataTable
+from textual.widgets import Collapsible, Static
 
-from tingle.gates.tui.app import DetailScreen, MetricsApp
+from tingle.gates.tui.app import MetricsApp
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
@@ -59,64 +59,75 @@ DIFF_REPORT = DiffReport(
 )
 
 
-def test_main_table_lists_metrics() -> None:
+def _static_text(app: MetricsApp) -> str:
+    return " ".join(str(node.render()) for node in app.query(Static))
+
+
+def test_each_metric_is_a_collapsible_with_stats() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test():
-            table = app.query_one(DataTable)
-            assert table.row_count == 2
-            first_row = table.get_row_at(0)
-            assert first_row[0].plain == "noqa-comments"
-            assert first_row[3].plain == "2"
+            collapsibles = app.query(Collapsible)
+            assert len(collapsibles) == 2
+            titles = [node.title for node in collapsibles]
+            assert any("noqa-comments" in title for title in titles)
+            assert any("python-files" in title for title in titles)
+            # the value stat rides along in the collapsed header
+            assert any("2" in title for title in titles)
 
     asyncio.run(scenario())
 
 
-def test_enter_opens_detail_and_escape_returns() -> None:
+def test_collapsibles_start_collapsed_and_expand_in_place() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
-            await pilot.press("enter")
-            assert isinstance(app.screen, DetailScreen)
-            rendered = app.screen.query("Static")
-            texts = " ".join(str(node.render()) for node in rendered)
+            first = app.query_one("#metric-0", Collapsible)
+            assert first.collapsed is True
+            # the whole table stays on one screen; details are always in the DOM
+            texts = _static_text(app)
             assert "src/a.py:1" in texts
             assert "src/b.py:9" in texts
-            await pilot.press("escape")
-            assert not isinstance(app.screen, DetailScreen)
+            await pilot.click("#metric-0 CollapsibleTitle")
+            assert first.collapsed is False
+            # other metrics remain, so all stats stay visible
+            assert app.query_one("#metric-1", Collapsible).collapsed is True
 
     asyncio.run(scenario())
 
 
-def test_sorting_by_value_column_and_toggle() -> None:
+def _focused_metric_id(app: MetricsApp) -> str | None:
+    focused = app.focused
+    if focused is None:
+        return None
+    collapsible = next(
+        (a for a in focused.ancestors if isinstance(a, Collapsible)), None
+    )
+    return collapsible.id if collapsible else None
+
+
+def test_arrows_move_between_metrics() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
-            table = app.query_one(DataTable)
-            await pilot.press("4")  # sort by Value ascending
-            assert table.get_row_at(0)[3].plain == "2"
-            await pilot.press("4")  # same key flips direction
-            assert table.get_row_at(0)[3].plain == "5"
+            assert _focused_metric_id(app) == "metric-0"
+            await pilot.press("down")
+            assert _focused_metric_id(app) == "metric-1"
+            await pilot.press("up")
+            assert _focused_metric_id(app) == "metric-0"
 
     asyncio.run(scenario())
 
 
-def test_diff_report_columns_and_detail() -> None:
+def test_diff_report_stats_and_signed_occurrences() -> None:
     async def scenario() -> None:
         app = MetricsApp(DIFF_REPORT)
-        async with app.run_test() as pilot:
-            table = app.query_one(DataTable)
-            assert table.row_count == 1
-            row = table.get_row_at(0)
-            assert row[2].plain == "+2"
-            assert row[3].plain == "-1"
-            assert row[4].plain == "+1"
-            assert row[5].plain == "7"
-            await pilot.press("enter")
-            assert isinstance(app.screen, DetailScreen)
-            texts = " ".join(
-                str(node.render()) for node in app.screen.query("Static")
-            )
+        async with app.run_test():
+            title = app.query_one("#metric-0", Collapsible).title
+            assert "+2" in title
+            assert "-1" in title
+            assert "net" in title
+            texts = _static_text(app)
             assert "+ src/a.py:3" in texts
             assert "- src/b.py:9" in texts
 

@@ -165,10 +165,10 @@ Approximations to know about:
 
 ## CLI
 
-- `tingle` — **interactive mode** on a terminal: a sortable metrics table
-  (keys `1`–`6` sort by column, same key flips direction), Enter opens a
-  metric's occurrence list, Esc goes back, `q` quits. `tingle --diff
-  [--base REF]` opens the branch-impact view. When stdout is not a
+- `tingle` — **interactive mode** on a terminal: an accordion of metrics,
+  each row showing its stats; `↑`/`↓` move between metrics, Enter or click
+  expands a row in place to list its occurrences, `q` quits. `tingle
+  --diff [--base REF]` opens the branch-impact view. When stdout is not a
   terminal (CI, pipes) the static summary table is printed instead.
 - `tingle stat` — the compact summary. Options: `--json`, `--diff`,
   `--base REF` (implies `--diff`), `--config PATH`, `--metric NAME`
