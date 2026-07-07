@@ -39,6 +39,8 @@ def build_metric(
         or _auto_name(existing_metrics, draft.type_name, draft.value),
         "type": draft.type_name,
     }
+    if draft.group is not None:
+        metric["group"] = draft.group
     if len(draft.ranges) == 1:
         metric["range"] = draft.ranges[0]
     elif len(draft.ranges) > 1:

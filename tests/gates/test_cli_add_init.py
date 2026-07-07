@@ -95,6 +95,19 @@ def test_add_with_params_only(workdir: Path) -> None:
     assert 'section = "MESSAGES CONTROL"' in text
 
 
+def test_add_with_group_writes_and_reports_it(workdir: Path) -> None:
+    result = runner.invoke(
+        app, ["add", "file_count", "--name", "files", "--group", "size"]
+    )
+
+    assert result.exit_code == 0
+    assert 'group = "size"' in (workdir / "tingle.toml").read_text()
+
+    ran = runner.invoke(app, ["stat", "--json"])
+    payload = json.loads(ran.stdout)
+    assert payload["metrics"][0]["group"] == "size"
+
+
 def test_add_invalid_pattern_writes_nothing(workdir: Path) -> None:
     result = runner.invoke(app, ["add", "regex_count", "("])
 

@@ -188,6 +188,10 @@ def add_command(
         list[str] | None,
         typer.Option("--range", help="Target range (repeatable)."),
     ] = None,
+    group: Annotated[
+        str | None,
+        typer.Option("--group", help="Group heading to show this metric under."),
+    ] = None,
     param: Annotated[
         list[str] | None,
         typer.Option("--param", help="Extra metric param as key=value (repeatable)."),
@@ -201,6 +205,7 @@ def add_command(
         name=name,
         ranges=tuple(range_names or ()),
         params=_parse_params(param or []),
+        group=group,
     )
     try:
         raw = load_raw_config(cwd)
