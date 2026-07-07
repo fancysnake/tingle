@@ -40,6 +40,8 @@ class MetricsApp(App[None]):
         Binding("q", "quit", "Quit"),
         Binding("down", "focus_metric(1)", "Next", show=False, priority=True),
         Binding("up", "focus_metric(-1)", "Prev", show=False, priority=True),
+        Binding("right", "unfold", "Unfold", show=False, priority=True),
+        Binding("left", "fold", "Fold", show=False, priority=True),
     ]
 
     def __init__(self, report: RunReport | DiffReport) -> None:
@@ -95,6 +97,25 @@ class MetricsApp(App[None]):
             self.screen.focus_previous("CollapsibleTitle")
         else:
             self.screen.focus_next("CollapsibleTitle")
+
+    def action_unfold(self) -> None:
+        """Unfold (right arrow) the focused group/metric header."""
+        self._set_focused_collapsed(collapsed=False)
+
+    def action_fold(self) -> None:
+        """Fold (left arrow) the focused group/metric header."""
+        self._set_focused_collapsed(collapsed=True)
+
+    def _set_focused_collapsed(self, *, collapsed: bool) -> None:
+        focused = self.focused
+        if focused is None:
+            return
+        collapsible = next(
+            (a for a in focused.ancestors_with_self if isinstance(a, Collapsible)),
+            None,
+        )
+        if collapsible is not None:
+            collapsible.collapsed = collapsed
 
     def on_collapsible_expanded(self, event: Collapsible.Expanded) -> None:
         """Fold the other groups when a metric's file results open."""

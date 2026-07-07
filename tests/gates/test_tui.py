@@ -200,6 +200,26 @@ def test_expanding_metric_folds_other_groups_then_reopens() -> None:
     asyncio.run(scenario())
 
 
+def test_right_unfolds_and_left_folds_focused_header() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            # focus starts on the first group header (expanded at rest)
+            typing = app.query_one("#group-0", Collapsible)
+            await pilot.press("left")  # fold the group
+            assert typing.collapsed is True
+            await pilot.press("right")  # unfold it again
+            assert typing.collapsed is False
+            # move down to a metric header and unfold its file results
+            await pilot.press("down")
+            await pilot.press("right")
+            assert app.query_one("#metric-0", Collapsible).collapsed is False
+            await pilot.press("left")
+            assert app.query_one("#metric-0", Collapsible).collapsed is True
+
+    asyncio.run(scenario())
+
+
 def test_quit_binding() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
