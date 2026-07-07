@@ -2,85 +2,151 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 from xml.etree import ElementTree as ET
 
 from rich.table import Table
 from rich.text import Text
 
+from tingle.pacts.diff import DiffOutcome
+from tingle.pacts.report import MetricOutcome
+
 if TYPE_CHECKING:
-    from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
+    from collections.abc import Sequence
+
+    from tingle.pacts.diff import DiffReport, DiffResult
     from tingle.pacts.metrics import MetricResult, Occurrence
     from tingle.pacts.report import RunReport
+
+_Outcome = TypeVar("_Outcome", MetricOutcome, DiffOutcome)
+
+
+def group_sections(
+    outcomes: Sequence[_Outcome],
+) -> list[tuple[str | None, list[_Outcome]]]:
+    """Reshape outcomes into (group | None, outcomes) sections.
+
+    Named groups come first in the order they first appear in config; the
+    ungrouped (`None`) section is always last. Order within a section is
+    preserved, so with no groups anywhere there is a single ungrouped
+    section in the original order (byte-identical to pre-groups output).
+    """
+    sections: dict[str | None, list[_Outcome]] = {}
+    for outcome in outcomes:
+        sections.setdefault(outcome.spec.group, []).append(outcome)
+    ungrouped = sections.pop(None, None)
+    result: list[tuple[str | None, list[_Outcome]]] = list(sections.items())
+    if ungrouped is not None:
+        result.append((None, ungrouped))
+    return result
+
+
+def _in_section_order(outcomes: Sequence[_Outcome]) -> list[_Outcome]:
+    """Flatten outcomes into group_sections order (ungrouped last)."""
+    return [
+        outcome for _name, group in group_sections(outcomes) for outcome in group
+    ]
+
+
+def _section_heading(name: str | None, *, has_named: bool) -> Text | None:
+    """Bold heading for a section, or None to preserve headingless output.
+
+    The sole ungrouped section, when no named group exists, keeps today's
+    heading-free output and returns None.
+    """
+    if name is not None:
+        return Text(f"## {name}", style="bold")
+    if has_named:
+        return Text("## (ungrouped)", style="bold")
+    return None
 
 
 def report_table(report: RunReport) -> Table:
     """Compact summary table of a full run."""
+    sections = group_sections(report.outcomes)
+    grouped = any(name is not None for name, _ in sections)
     table = Table(title=str(report.root))
+    if grouped:
+        table.add_column("Group")
     table.add_column("Metric")
     table.add_column("Type")
     table.add_column("Ranges")
     table.add_column("Value", justify="right")
-    for outcome in report.outcomes:
-        value = (
-            "[red]ERROR[/]"
-            if outcome.result is None
-            else str(outcome.result.value)
-        )
-        table.add_row(
-            outcome.spec.name,
-            outcome.spec.type,
-            ", ".join(outcome.range_names),
-            value,
-        )
+    for _name, outcomes in sections:
+        for outcome in outcomes:
+            value = (
+                "[red]ERROR[/]"
+                if outcome.result is None
+                else str(outcome.result.value)
+            )
+            group = (outcome.spec.group or "",) if grouped else ()
+            table.add_row(
+                *group,
+                outcome.spec.name,
+                outcome.spec.type,
+                ", ".join(outcome.range_names),
+                value,
+            )
     return table
 
 
 def diff_table(report: DiffReport) -> Table:
     """Compact summary table of a branch diff."""
+    sections = group_sections(report.outcomes)
+    grouped = any(name is not None for name, _ in sections)
     table = Table(title=f"{report.root} vs {report.base_ref}")
+    if grouped:
+        table.add_column("Group")
     table.add_column("Metric")
     table.add_column("Type")
     table.add_column("Added", justify="right")
     table.add_column("Removed", justify="right")
     table.add_column("Net", justify="right")
     table.add_column("Total", justify="right")
-    for outcome in report.outcomes:
-        if outcome.result is None:
-            cells = ("", "", "[red]ERROR[/]", "")
-        else:
-            cells = (
-                _added_cell(outcome.result.added),
-                _removed_cell(outcome.result.removed),
-                _net_cell(outcome.result.net),
-                str(outcome.total.value) if outcome.total else "",
-            )
-        table.add_row(outcome.spec.name, outcome.spec.type, *cells)
+    for _name, outcomes in sections:
+        for outcome in outcomes:
+            if outcome.result is None:
+                cells = ("", "", "[red]ERROR[/]", "")
+            else:
+                cells = (
+                    _added_cell(outcome.result.added),
+                    _removed_cell(outcome.result.removed),
+                    _net_cell(outcome.result.net),
+                    str(outcome.total.value) if outcome.total else "",
+                )
+            group = (outcome.spec.group or "",) if grouped else ()
+            table.add_row(*group, outcome.spec.name, outcome.spec.type, *cells)
     return table
 
 
 def run_listing(report: RunReport) -> list[Text]:
     """Full report: every metric with its located occurrences."""
     lines: list[Text] = []
-    for outcome in report.outcomes:
-        if outcome.result is None:
+    sections = group_sections(report.outcomes)
+    has_named = any(name is not None for name, _ in sections)
+    for name, outcomes in sections:
+        heading = _section_heading(name, has_named=has_named)
+        if heading is not None:
+            lines.append(heading)
+        for outcome in outcomes:
+            if outcome.result is None:
+                lines.append(
+                    Text(
+                        f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
+                        style="bold red",
+                    )
+                )
+                lines.append(Text(""))
+                continue
             lines.append(
                 Text(
-                    f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
-                    style="bold red",
+                    f"{outcome.spec.name} ({outcome.spec.type}): "
+                    f"{outcome.result.value}",
+                    style="bold",
                 )
             )
+            lines.extend(occurrence_lines(outcome.result))
             lines.append(Text(""))
-            continue
-        lines.append(
-            Text(
-                f"{outcome.spec.name} ({outcome.spec.type}): "
-                f"{outcome.result.value}",
-                style="bold",
-            )
-        )
-        lines.extend(occurrence_lines(outcome.result))
-        lines.append(Text(""))
     return lines
 
 
@@ -109,19 +175,25 @@ def diff_occurrence_lines(result: DiffResult) -> list[Text]:
 def diff_listing(report: DiffReport) -> list[Text]:
     """Full diff report: added/removed occurrences per metric."""
     lines: list[Text] = []
-    for outcome in report.outcomes:
-        if outcome.result is None:
-            lines.append(
-                Text(
-                    f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
-                    style="bold red",
+    sections = group_sections(report.outcomes)
+    has_named = any(name is not None for name, _ in sections)
+    for name, outcomes in sections:
+        heading = _section_heading(name, has_named=has_named)
+        if heading is not None:
+            lines.append(heading)
+        for outcome in outcomes:
+            if outcome.result is None:
+                lines.append(
+                    Text(
+                        f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
+                        style="bold red",
+                    )
                 )
-            )
+                lines.append(Text(""))
+                continue
+            lines.append(_diff_heading(outcome))
+            lines.extend(diff_occurrence_lines(outcome.result))
             lines.append(Text(""))
-            continue
-        lines.append(_diff_heading(outcome))
-        lines.extend(diff_occurrence_lines(outcome.result))
-        lines.append(Text(""))
     return lines
 
 
@@ -148,6 +220,7 @@ def run_json(report: RunReport) -> str:
                 {
                     "name": outcome.spec.name,
                     "type": outcome.spec.type,
+                    "group": outcome.spec.group,
                     "ranges": list(outcome.range_names),
                     "value": outcome.result.value if outcome.result else None,
                     "details": dict(outcome.result.details)
@@ -161,7 +234,7 @@ def run_json(report: RunReport) -> str:
                     ),
                     "error": outcome.error,
                 }
-                for outcome in report.outcomes
+                for outcome in _in_section_order(report.outcomes)
             ],
         },
         indent=2,
@@ -180,6 +253,7 @@ def diff_json(report: DiffReport) -> str:
                 {
                     "name": outcome.spec.name,
                     "type": outcome.spec.type,
+                    "group": outcome.spec.group,
                     "ranges": list(outcome.range_names),
                     **_diff_values(outcome),
                     "total": outcome.total.value if outcome.total else None,
@@ -188,7 +262,7 @@ def diff_json(report: DiffReport) -> str:
                     ),
                     "error": outcome.error,
                 }
-                for outcome in report.outcomes
+                for outcome in _in_section_order(report.outcomes)
             ],
             "skipped": list(report.skipped),
         },
