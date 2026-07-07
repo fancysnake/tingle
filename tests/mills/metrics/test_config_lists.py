@@ -5,13 +5,27 @@ from typing import TYPE_CHECKING, Any
 from tingle.mills.metrics.config_lists import (
     ini_list_length,
     toml_list_length,
+    toml_table_array,
     validate_ini_params,
     validate_toml_params,
+    validate_toml_table_array_params,
 )
 from tingle.pacts.metrics import MetricContext
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+MYPY_OVERRIDES = """
+[[tool.mypy.overrides]]
+module = "foo.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["bar.baz", "bar.qux"]
+
+[[tool.mypy.overrides]]
+ignore_missing_imports = true
+"""
 
 PYPROJECT = """
 [tool.ruff.lint]
@@ -135,6 +149,113 @@ def test_validate_toml_params() -> None:
     assert validate_toml_params({"key": "tool.ruff.lint.ignore"}) == []
     assert validate_toml_params({"key": ""}) == ["key must be a non-empty string"]
     assert validate_toml_params({"key": "x", "file": 5}) == ["file must be a string"]
+
+
+def test_table_array_counts_tables_and_labels_them() -> None:
+    result = toml_table_array(
+        _context(
+            {"pyproject.toml": MYPY_OVERRIDES},
+            {"key": "tool.mypy.overrides", "label": "module"},
+        )
+    )
+
+    assert result.value == 3  # one per [[...]] block
+    assert result.warnings == ()
+    assert [str(o) for o in result.occurrences] == [
+        "pyproject.toml: foo.*",
+        "pyproject.toml: bar.baz, bar.qux",  # list label joined
+        "pyproject.toml: #3",  # no label field -> index fallback
+    ]
+
+
+def test_table_array_without_label_uses_index_notes() -> None:
+    result = toml_table_array(
+        _context(
+            {"pyproject.toml": MYPY_OVERRIDES}, {"key": "tool.mypy.overrides"}
+        )
+    )
+
+    assert result.value == 3
+    assert [o.note for o in result.occurrences] == ["#1", "#2", "#3"]
+
+
+def test_table_array_default_file_is_pyproject() -> None:
+    result = toml_table_array(
+        _context(
+            {"pyproject.toml": MYPY_OVERRIDES}, {"key": "tool.mypy.overrides"}
+        )
+    )
+
+    assert result.value == 3
+
+
+def test_table_array_empty_is_zero_without_warning() -> None:
+    result = toml_table_array(
+        _context(
+            {"pyproject.toml": "over = []\n"}, {"key": "over", "label": "module"}
+        )
+    )
+
+    # an empty array of tables vacuously satisfies "every element a table"
+    assert result.value == 0
+    assert result.occurrences == ()
+    assert result.warnings == ()
+
+
+def test_table_array_non_array_of_tables_warns() -> None:
+    result = toml_table_array(
+        _context(
+            {"pyproject.toml": "over = [1, 2]\n"},
+            {"key": "over"},
+        )
+    )
+
+    assert result.value == 0
+    assert 'value at "over" is not an array of tables' in result.warnings[0]
+
+
+def test_table_array_missing_key_warns() -> None:
+    result = toml_table_array(
+        _context({"pyproject.toml": MYPY_OVERRIDES}, {"key": "tool.nope"})
+    )
+
+    assert result.value == 0
+    assert 'key "tool.nope" not found' in result.warnings[0]
+
+
+def test_table_array_explode_fans_out_list_labels() -> None:
+    result = toml_table_array(
+        _context(
+            {"pyproject.toml": MYPY_OVERRIDES},
+            {"key": "tool.mypy.overrides", "label": "module", "explode": True},
+        )
+    )
+
+    # foo.* (1) + [bar.baz, bar.qux] (2) + missing label (#3, 1) = 4
+    assert result.value == 4
+    assert [str(o) for o in result.occurrences] == [
+        "pyproject.toml: foo.*",
+        "pyproject.toml: bar.baz",
+        "pyproject.toml: bar.qux",
+        "pyproject.toml: #3",
+    ]
+
+
+def test_validate_table_array_params() -> None:
+    ok = {"key": "tool.mypy.overrides", "label": "module"}
+    assert validate_toml_table_array_params(ok) == []
+    assert validate_toml_table_array_params({"key": ""}) == [
+        "key must be a non-empty string"
+    ]
+    assert validate_toml_table_array_params({"key": "x", "label": 5}) == [
+        "label must be a string"
+    ]
+    assert validate_toml_table_array_params({"key": "x", "explode": "yes"}) == [
+        "explode must be a boolean"
+    ]
+    assert validate_toml_table_array_params({"key": "x", "explode": True}) == [
+        "explode = true requires label"
+    ]
 
 
 def test_ini_list_length_splits_commas_and_newlines() -> None:
