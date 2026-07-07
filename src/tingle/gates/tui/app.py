@@ -8,7 +8,11 @@ from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.widgets import Collapsible, Footer, Header, Static
 
-from tingle.gates.cli.render import diff_occurrence_lines, occurrence_lines
+from tingle.gates.cli.render import (
+    diff_occurrence_lines,
+    group_sections,
+    occurrence_lines,
+)
 from tingle.pacts.diff import DiffOutcome
 
 if TYPE_CHECKING:
@@ -21,9 +25,17 @@ if TYPE_CHECKING:
 
 
 class MetricsApp(App[None]):
-    """Accordion of metrics; expand a row to see its occurrences."""
+    """Three-level accordion: group -> metric -> file results.
+
+    Groups and their metric rows are visible at rest; expanding a metric
+    reveals its occurrences and folds the other groups, and collapsing it
+    reopens them.
+    """
 
     TITLE = "tingle"
+    CSS = """
+    Collapsible.group > CollapsibleTitle { text-style: bold; }
+    """
     BINDINGS: ClassVar = [
         Binding("q", "quit", "Quit"),
         Binding("down", "focus_metric(1)", "Next", show=False, priority=True),
@@ -42,28 +54,76 @@ class MetricsApp(App[None]):
         return self._report.outcomes
 
     def compose(self) -> ComposeResult:
-        """Header, one collapsible per metric, and the key legend."""
+        """Header, the grouped metric accordion, and the key legend."""
         yield Header()
         self.sub_title = str(self._report.root)
+        sections = group_sections(self._outcomes)
+        grouped = any(name is not None for name, _ in sections)
+        index = 0
         with VerticalScroll():
-            for index, outcome in enumerate(self._outcomes):
-                yield Collapsible(
-                    *_detail_widgets(outcome),
-                    title=self._title(outcome),
-                    id=f"metric-{index}",
-                )
+            for section, (name, outcomes) in enumerate(sections):
+                metrics: list[Collapsible] = []
+                for outcome in outcomes:
+                    metrics.append(
+                        Collapsible(
+                            *_detail_widgets(outcome),
+                            title=self._title(outcome),
+                            id=f"metric-{index}",
+                            classes="metric",
+                        )
+                    )
+                    index += 1
+                if grouped:
+                    yield Collapsible(
+                        *metrics,
+                        title=_group_title(name),
+                        collapsed=False,
+                        id=f"group-{section}",
+                        classes="group",
+                    )
+                else:
+                    yield from metrics
         yield Footer()
 
     def on_mount(self) -> None:
-        """Focus the first metric so Up/Down move between rows at once."""
+        """Focus the first header so Up/Down move between rows at once."""
         self.screen.focus_next("CollapsibleTitle")
 
     def action_focus_metric(self, direction: int) -> None:
-        """Move the focus (row cursor) to the next/previous metric header."""
+        """Move focus to the next/previous header (group or metric)."""
         if direction < 0:
             self.screen.focus_previous("CollapsibleTitle")
         else:
             self.screen.focus_next("CollapsibleTitle")
+
+    def on_collapsible_expanded(self, event: Collapsible.Expanded) -> None:
+        """Fold the other groups when a metric's file results open."""
+        collapsible = event.collapsible
+        if "metric" not in collapsible.classes:
+            return
+        active = self._group_of(collapsible)
+        for group in self._groups():
+            group.collapsed = group is not active
+
+    def on_collapsible_collapsed(self, event: Collapsible.Collapsed) -> None:
+        """Reopen every group once the last open metric closes."""
+        if "metric" not in event.collapsible.classes:
+            return
+        if any(not metric.collapsed for metric in self._metrics()):
+            return
+        for group in self._groups():
+            group.collapsed = False
+
+    def _groups(self) -> list[Collapsible]:
+        return [c for c in self.query(Collapsible) if "group" in c.classes]
+
+    def _metrics(self) -> list[Collapsible]:
+        return [c for c in self.query(Collapsible) if "metric" in c.classes]
+
+    def _group_of(self, metric: Collapsible) -> Collapsible | None:
+        return next(
+            (a for a in metric.ancestors if isinstance(a, Collapsible)), None
+        )
 
     def _title(self, outcome: MetricOutcome | DiffOutcome) -> str:
         name = _escape(outcome.spec.name).ljust(self._name_width)
@@ -73,6 +133,10 @@ class MetricsApp(App[None]):
 
 def _column_width(names: Iterable[str]) -> int:
     return max((len(name) for name in names), default=0)
+
+
+def _group_title(name: str | None) -> str:
+    return _escape(name) if name is not None else "(ungrouped)"
 
 
 def _stats(outcome: MetricOutcome | DiffOutcome) -> str:

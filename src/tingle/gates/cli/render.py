@@ -8,17 +8,14 @@ from xml.etree import ElementTree as ET
 from rich.table import Table
 from rich.text import Text
 
-from tingle.pacts.diff import DiffOutcome
-from tingle.pacts.report import MetricOutcome
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from tingle.pacts.diff import DiffReport, DiffResult
+    from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
     from tingle.pacts.metrics import MetricResult, Occurrence
-    from tingle.pacts.report import RunReport
+    from tingle.pacts.report import MetricOutcome, RunReport
 
-_Outcome = TypeVar("_Outcome", MetricOutcome, DiffOutcome)
+_Outcome = TypeVar("_Outcome", bound="MetricOutcome | DiffOutcome")
 
 
 def group_sections(

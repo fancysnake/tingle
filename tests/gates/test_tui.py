@@ -59,8 +59,34 @@ DIFF_REPORT = DiffReport(
 )
 
 
+def _grouped(name: str, group: str | None, value: int = 1) -> MetricOutcome:
+    return MetricOutcome(
+        spec=MetricSpec(name=name, type="file_count", group=group),
+        range_names=(),
+        result=MetricResult(
+            value=value, occurrences=(Occurrence(path="x.py", line=1),)
+        ),
+    )
+
+
+GROUPED_REPORT = RunReport(
+    root=Path("/proj"),
+    source=Path("/proj/tingle.toml"),
+    outcomes=(
+        _grouped("type-ignores", "typing"),
+        _grouped("mypy-overrides", "typing"),
+        _grouped("noqa-comments", "lint"),
+        _grouped("python-files", None),
+    ),
+)
+
+
 def _static_text(app: MetricsApp) -> str:
     return " ".join(str(node.render()) for node in app.query(Static))
+
+
+def _groups(app: MetricsApp) -> list[Collapsible]:
+    return [c for c in app.query(Collapsible) if "group" in c.classes]
 
 
 def test_each_metric_is_a_collapsible_with_stats() -> None:
@@ -130,6 +156,46 @@ def test_diff_report_stats_and_signed_occurrences() -> None:
             texts = _static_text(app)
             assert "+ src/a.py:3" in texts
             assert "- src/b.py:9" in texts
+
+    asyncio.run(scenario())
+
+
+def test_grouped_report_nests_groups_and_metrics() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test():
+            groups = _groups(app)
+            metrics = [c for c in app.query(Collapsible) if "metric" in c.classes]
+            assert len(groups) == 3  # typing, lint, (ungrouped)
+            assert len(metrics) == 4
+            titles = [group.title for group in groups]
+            assert "typing" in titles
+            assert "lint" in titles
+            assert "(ungrouped)" in titles
+            # groups open at rest, metric file-results closed
+            assert all(not group.collapsed for group in groups)
+            assert all(metric.collapsed for metric in metrics)
+
+    asyncio.run(scenario())
+
+
+def test_expanding_metric_folds_other_groups_then_reopens() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            typing = app.query_one("#group-0", Collapsible)
+            lint = app.query_one("#group-1", Collapsible)
+            ungrouped = app.query_one("#group-2", Collapsible)
+            # expand a metric inside the typing group
+            await pilot.click("#metric-0 CollapsibleTitle")
+            assert typing.collapsed is False  # active group stays open
+            assert lint.collapsed is True  # other groups fold away
+            assert ungrouped.collapsed is True
+            # collapsing it again returns to the all-open resting state
+            await pilot.click("#metric-0 CollapsibleTitle")
+            assert not any(
+                group.collapsed for group in (typing, lint, ungrouped)
+            )
 
     asyncio.run(scenario())
 
