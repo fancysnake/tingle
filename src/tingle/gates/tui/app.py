@@ -24,6 +24,29 @@ if TYPE_CHECKING:
     from tingle.pacts.report import MetricOutcome, RunReport
 
 
+class NavCollapsible(Collapsible):
+    """A `Collapsible` that steers the accordion with the arrow keys.
+
+    The bindings live here rather than on the app because keys bubble up
+    from the focused `CollapsibleTitle`: this widget is its parent, so it
+    is offered the arrows before the enclosing `VerticalScroll` can claim
+    them for scrolling. Binding them on the app would need `priority`,
+    which is checked app-down and would swallow the arrows the command
+    palette's own result list needs.
+    """
+
+    BINDINGS: ClassVar = [
+        Binding("up", "app.focus_metric(-1)", "Prev"),
+        Binding("down", "app.focus_metric(1)", "Next"),
+        Binding("left", "app.fold", "Fold"),
+        Binding("right", "app.unfold", "Unfold"),
+        Binding("k", "app.focus_metric(-1)", "Prev", show=False),
+        Binding("j", "app.focus_metric(1)", "Next", show=False),
+        Binding("h", "app.fold", "Fold", show=False),
+        Binding("l", "app.unfold", "Unfold", show=False),
+    ]
+
+
 class MetricsApp(App[None]):
     """Three-level accordion: group -> metric -> file results.
 
@@ -39,21 +62,13 @@ class MetricsApp(App[None]):
     CSS = """
     Collapsible.group > CollapsibleTitle { text-style: bold; }
     """
-    # letters, not arrows: the arrow keys stay free for the command
-    # palette's own list (our priority bindings would otherwise swallow
-    # them), and letters need no priority since the scroll container only
-    # binds the arrows. hjkl are the shown hints; wasd alias the same
-    # actions for a non-vim hand position.
+    # navigation lives on NavCollapsible, not here: an app-level arrow
+    # binding would have to be priority to beat the scroll container, and
+    # priority bindings are checked app-down, stealing the arrows from the
+    # command palette.
     BINDINGS: ClassVar = [
-        Binding("k", "focus_metric(-1)", "Prev"),
-        Binding("j", "focus_metric(1)", "Next"),
-        Binding("h", "fold", "Fold"),
-        Binding("l", "unfold", "Unfold"),
         Binding("space", "toggle_fold", "Toggle"),
-        Binding("w", "focus_metric(-1)", "Prev", show=False),
-        Binding("s", "focus_metric(1)", "Next", show=False),
-        Binding("a", "fold", "Fold", show=False),
-        Binding("d", "unfold", "Unfold", show=False),
+        Binding("f", "toggle_fold_all", "Fold all"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -77,10 +92,10 @@ class MetricsApp(App[None]):
         index = 0
         with VerticalScroll():
             for section, (name, outcomes) in enumerate(sections):
-                metrics: list[Collapsible] = []
+                metrics: list[NavCollapsible] = []
                 for outcome in outcomes:
                     metrics.append(
-                        Collapsible(
+                        NavCollapsible(
                             *_detail_widgets(outcome),
                             title=self._title(outcome),
                             id=f"metric-{index}",
@@ -89,7 +104,7 @@ class MetricsApp(App[None]):
                     )
                     index += 1
                 if grouped:
-                    yield Collapsible(
+                    yield NavCollapsible(
                         *metrics,
                         title=_group_title(name),
                         collapsed=False,
@@ -112,13 +127,13 @@ class MetricsApp(App[None]):
             self.screen.focus_next("CollapsibleTitle")
 
     def action_unfold(self) -> None:
-        """Unfold (l) the focused group/metric header."""
+        """Unfold (right arrow) the focused group/metric header."""
         collapsible = self._focused_collapsible()
         if collapsible is not None:
             collapsible.collapsed = False
 
     def action_fold(self) -> None:
-        """Fold (h) the focused group/metric header."""
+        """Fold (left arrow) the focused group/metric header."""
         collapsible = self._focused_collapsible()
         if collapsible is not None:
             collapsible.collapsed = True
@@ -128,6 +143,23 @@ class MetricsApp(App[None]):
         collapsible = self._focused_collapsible()
         if collapsible is not None:
             collapsible.collapsed = not collapsible.collapsed
+
+    def action_toggle_fold_all(self) -> None:
+        """Fold/unfold every group (f), leaving file results as they are.
+
+        Groups are the headers that hold metric rows, so this collapses
+        the listing to its group titles and back. A groupless report has
+        no group headers, so there the metric rows are the top level and
+        fold instead. Unfolds only once nothing is left unfolded.
+        """
+        headers = self._fold_all_targets()
+        collapsed = any(not header.collapsed for header in headers)
+        for header in headers:
+            header.collapsed = collapsed
+
+    def _fold_all_targets(self) -> list[Collapsible]:
+        groups = list(self.query(".group").results(Collapsible))
+        return groups or list(self.query(".metric").results(Collapsible))
 
     def _focused_collapsible(self) -> Collapsible | None:
         focused = self.focused

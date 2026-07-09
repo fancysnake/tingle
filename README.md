@@ -189,14 +189,15 @@ Approximations to know about:
 ## CLI
 
 - `tingle` — **interactive mode** on a terminal: a three-level accordion
-  of group → metric → file results, navigated with vim keys. Groups and
-  their metric rows (each showing its stats) are visible at rest; `j`/`k`
-  move between headers, `l` unfolds and `h` folds the focused one (or
-  `w`/`s`/`a`/`d`; Space or Enter/click toggles it), and each group and
-  metric folds independently.
+  of group → metric → file results, navigated with the arrow keys. Groups
+  and their metric rows (each showing its stats) are visible at rest; `↑`/`↓`
+  move between headers, `→` unfolds and `←` folds the focused one (`hjkl`
+  work too; Space or Enter/click toggles it), and each group and metric
+  folds independently. `f` folds or unfolds every group at once, leaving
+  the file results as they are.
   Unfolding a metric shows its occurrences in place. `p` opens the
-  command palette, `q` quits; the arrow keys scroll and drive the
-  palette. With no groups configured it is a flat accordion of metrics.
+  command palette, `q` quits. With no groups configured it is a flat
+  accordion of metrics, and `f` folds those instead.
   `tingle --diff [--base REF]` opens the branch-impact view. When stdout
   is not a terminal (CI, pipes) the static summary table is printed
   instead.

@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from textual.binding import Binding
-from textual.command import CommandPalette
-from textual.widgets import Collapsible, Static
+from textual.command import CommandList, CommandPalette
+from textual.containers import VerticalScroll
+from textual.widgets import Collapsible, Input, Static
 
-from tingle.gates.tui.app import MetricsApp
+if TYPE_CHECKING:
+    from textual.pilot import Pilot
+
+from tingle.gates.tui.app import MetricsApp, NavCollapsible
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
@@ -134,11 +139,39 @@ def _focused_metric_id(app: MetricsApp) -> str | None:
     return collapsible.id if collapsible else None
 
 
-def test_jk_move_between_metrics() -> None:
+def test_arrows_move_between_metrics() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
             assert _focused_metric_id(app) == "metric-0"
+            await pilot.press("down")
+            assert _focused_metric_id(app) == "metric-1"
+            await pilot.press("up")
+            assert _focused_metric_id(app) == "metric-0"
+
+    asyncio.run(scenario())
+
+
+def test_arrows_navigate_even_when_content_overflows() -> None:
+    # the enclosing VerticalScroll binds the arrows for scrolling; ours sit
+    # on NavCollapsible, below it in the bubbling chain, so they win
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test(size=(80, 6)) as pilot:
+            scroll = app.query_one(VerticalScroll)
+            await pilot.press("right")  # unfold, making the content overflow
+            await pilot.pause()
+            assert scroll.max_scroll_y > 0  # the view really is too tall
+            await pilot.press("down")
+            assert _focused_metric_id(app) == "metric-1"
+
+    asyncio.run(scenario())
+
+
+def test_jk_still_work_as_hidden_aliases() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test() as pilot:
             await pilot.press("j")
             assert _focused_metric_id(app) == "metric-1"
             await pilot.press("k")
@@ -157,6 +190,65 @@ def test_space_toggles_focused_header() -> None:
             assert first.collapsed is False
             await pilot.press("space")
             assert first.collapsed is True
+
+    asyncio.run(scenario())
+
+
+def test_f_folds_and_unfolds_every_group() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            groups = _groups(app)
+            assert all(not group.collapsed for group in groups)  # open at rest
+            await pilot.press("f")
+            assert all(group.collapsed for group in groups)
+            await pilot.press("f")
+            assert all(not group.collapsed for group in groups)
+
+    asyncio.run(scenario())
+
+
+def test_f_folds_all_when_only_some_groups_are_open() -> None:
+    # a mixed state folds rather than toggling each header independently
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            app.query_one("#group-0", Collapsible).collapsed = True
+            await pilot.pause()
+            await pilot.press("f")
+            assert all(group.collapsed for group in _groups(app))
+
+    asyncio.run(scenario())
+
+
+def test_f_leaves_metric_file_results_untouched() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            metric = app.query_one("#metric-0", Collapsible)
+            metric.collapsed = False  # its file results are showing
+            await pilot.pause()
+            await pilot.press("f")  # folds the groups...
+            assert all(group.collapsed for group in _groups(app))
+            assert metric.collapsed is False  # ...but not the files
+            await pilot.press("f")
+            assert metric.collapsed is False
+
+    asyncio.run(scenario())
+
+
+def test_f_folds_metrics_when_the_report_has_no_groups() -> None:
+    # a flat accordion has no group headers, so metrics are the top level
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test() as pilot:
+            assert _groups(app) == []
+            metrics = [c for c in app.query(Collapsible) if "metric" in c.classes]
+            assert all(metric.collapsed for metric in metrics)
+            await pilot.press("f")
+            assert all(not metric.collapsed for metric in metrics)
+            await pilot.press("f")
+            assert all(metric.collapsed for metric in metrics)
 
     asyncio.run(scenario())
 
@@ -214,62 +306,64 @@ def test_groups_and_metrics_fold_independently() -> None:
     asyncio.run(scenario())
 
 
-def test_wasd_is_an_alternative_navigation_layout() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
-        async with app.run_test() as pilot:
-            typing = app.query_one("#group-0", Collapsible)
-            await pilot.press("a")  # fold the focused group
-            assert typing.collapsed is True
-            await pilot.press("d")  # unfold it
-            assert typing.collapsed is False
-            await pilot.press("s")  # down to the first metric
-            assert _focused_metric_id(app) == "metric-0"
-            await pilot.press("d")  # unfold the metric
-            assert app.query_one("#metric-0", Collapsible).collapsed is False
-            await pilot.press("w")  # back up to the group header
-            assert _focused_metric_id(app) == "group-0"
-
-    asyncio.run(scenario())
-
-
-def test_l_unfolds_and_h_folds_focused_header() -> None:
+def test_right_unfolds_and_left_folds_focused_header() -> None:
     async def scenario() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             # focus starts on the first group header (expanded at rest)
             typing = app.query_one("#group-0", Collapsible)
-            await pilot.press("h")  # fold the group
+            await pilot.press("left")  # fold the group
             assert typing.collapsed is True
-            await pilot.press("l")  # unfold it again
+            await pilot.press("right")  # unfold it again
             assert typing.collapsed is False
             # move down to a metric header and unfold its file results
-            await pilot.press("j")
-            await pilot.press("l")
+            await pilot.press("down")
+            await pilot.press("right")
             assert app.query_one("#metric-0", Collapsible).collapsed is False
-            await pilot.press("h")
+            await pilot.press("left")
             assert app.query_one("#metric-0", Collapsible).collapsed is True
 
     asyncio.run(scenario())
 
 
-def test_command_palette_on_p_and_nav_hints_shown() -> None:
+def test_hl_still_fold_and_unfold_as_hidden_aliases() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            typing = app.query_one("#group-0", Collapsible)
+            await pilot.press("h")
+            assert typing.collapsed is True
+            await pilot.press("l")
+            assert typing.collapsed is False
+
+    asyncio.run(scenario())
+
+
+def test_wasd_is_no_longer_bound() -> None:
+    # wasd only ever existed because the arrows were unavailable
+    bindings = (*MetricsApp.BINDINGS, *NavCollapsible.BINDINGS)
+    keys = {b.key for b in bindings if isinstance(b, Binding)}
+    assert keys.isdisjoint({"w", "a", "s", "d"})
+
+
+def test_arrows_are_the_advertised_navigation_keys() -> None:
     # ctrl+p is taken by the VS Code terminal, so the palette moves to "p"
     assert MetricsApp.ENABLE_COMMAND_PALETTE is True
     assert MetricsApp.COMMAND_PALETTE_BINDING == "p"
-    keys = {b.key for b in MetricsApp.BINDINGS if isinstance(b, Binding)}
-    # arrows stay unbound so the palette's own list can use them
-    assert keys.isdisjoint({"up", "down", "left", "right"})
-    shown = {
-        b.key: b.description
-        for b in MetricsApp.BINDINGS
-        if isinstance(b, Binding) and b.show
+    # navigation must NOT be app-level: an app arrow binding would need
+    # priority=True to beat VerticalScroll, and that steals the palette's
+    app_bindings = [b for b in MetricsApp.BINDINGS if isinstance(b, Binding)]
+    nav_bindings = [b for b in NavCollapsible.BINDINGS if isinstance(b, Binding)]
+    assert {b.key for b in app_bindings}.isdisjoint({"up", "down", "left", "right"})
+    assert not any(b.priority for b in (*app_bindings, *nav_bindings))
+    shown = {b.key: b.description for b in nav_bindings if b.show}
+    assert shown == {
+        "up": "Prev",
+        "down": "Next",
+        "left": "Fold",
+        "right": "Unfold",
     }
-    assert shown["k"] == "Prev"
-    assert shown["j"] == "Next"
-    assert shown["h"] == "Fold"
-    assert shown["l"] == "Unfold"
-    assert shown["space"] == "Toggle"
+    assert all(not b.show for b in nav_bindings if b.key in {"h", "j", "k", "l"})
 
 
 def test_pressing_p_opens_the_command_palette() -> None:
@@ -278,6 +372,59 @@ def test_pressing_p_opens_the_command_palette() -> None:
         async with app.run_test() as pilot:
             await pilot.press("p")
             assert isinstance(app.screen, CommandPalette)
+
+    asyncio.run(scenario())
+
+
+async def _palette_options(pilot: Pilot[None], query: str) -> CommandList:
+    """Open the palette, search, and wait for its result list to fill."""
+    await pilot.press("p")
+    assert isinstance(pilot.app.screen, CommandPalette)
+    await pilot.press(*query)
+    command_list = pilot.app.screen.query_one(CommandList)
+    for _ in range(50):  # the palette searches on a worker
+        await pilot.pause()
+        if command_list.option_count >= 2:
+            return command_list
+    msg = f"palette found {command_list.option_count} options for {query!r}"
+    raise AssertionError(msg)
+
+
+def test_open_palette_keeps_the_arrow_keys() -> None:
+    # regression: arrows used to be app-level priority bindings. Priority
+    # bindings are checked app-down even while a modal screen is up, so
+    # `down` ran focus_metric against the palette screen -- which has no
+    # CollapsibleTitle, so it did nothing, yet still reported the key as
+    # handled. The palette's own result list never saw the arrows.
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test() as pilot:
+            command_list = await _palette_options(pilot, "t")
+            assert command_list.highlighted == 0
+            await pilot.press("down")
+            await pilot.pause()
+            assert command_list.highlighted == 1
+            await pilot.press("up")
+            await pilot.pause()
+            assert command_list.highlighted == 0
+            assert isinstance(app.screen, CommandPalette)  # still open
+
+    asyncio.run(scenario())
+
+
+def test_letter_bindings_do_not_eat_the_palette_search_box() -> None:
+    # "p" is a priority binding, "q" quits and "f" folds; inside the
+    # palette all three must reach its Input as plain text
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            await pilot.press("p")
+            assert isinstance(app.screen, CommandPalette)
+            await pilot.press("f", "q", "u", "i", "p")
+            await pilot.pause()
+            assert app.screen.query_one(Input).value == "fquip"
+            assert app.is_running  # "q" did not quit
+            assert all(not group.collapsed for group in _groups(app))  # "f" no-op
 
     asyncio.run(scenario())
 

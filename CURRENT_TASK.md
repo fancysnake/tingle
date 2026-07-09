@@ -17,9 +17,11 @@ the same branch (see git history).
    a `Group` column in the summary tables (only when a group is used, so
    groupless output is byte-identical), and an additive `group` JSON key.
 3. TUI 3-level accordion: group → metric → file results. Groups expanded
-   at rest; each group and metric folds/unfolds independently (j/k move
-   between headers, l unfold, h fold, Space/Enter/click toggle; wasd
-   alias the moves; arrows left free for the command palette on `p`).
+   at rest; each group and metric folds/unfolds independently (↑/↓ move
+   between headers, → unfold, ← fold, Space/Enter/click toggle; hjkl
+   alias the moves). `f` folds/unfolds every group at once. The arrow
+   bindings live on a `NavCollapsible` widget, not the app, so the
+   command palette on `p` keeps its own arrows.
    Groupless config falls back to a flat accordion.
 4. `toml_table_array` metric type + diff variant: count entries of a TOML
    array of tables (e.g. `[[tool.mypy.overrides]]`), `label` describes
