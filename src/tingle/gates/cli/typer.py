@@ -1,8 +1,7 @@
 """Command-line gate for tingle (typer adapter)."""
 from __future__ import annotations
 
-import json
-from enum import StrEnum
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, NoReturn
 
@@ -11,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from tingle import __version__
+from tingle.gates.cli import render
 from tingle.inits.wiring import (
     METRIC_TYPES,
     append_metric_to,
@@ -30,32 +30,35 @@ from tingle.pacts.config import (
     ConfigNotFoundError,
     MetricDraft,
 )
-from tingle.pacts.diff import DiffSourceError
+from tingle.pacts.diff import DiffReport, DiffSourceError
 
 if TYPE_CHECKING:
-    from tingle.pacts.diff import DiffReport, DiffResult
     from tingle.pacts.report import RunReport
 
 app = typer.Typer(add_completion=False)
 _stdout = Console()
 
-
-class OutputFormat(StrEnum):
-    """Report renderings selectable via --format."""
-
-    TABLE = "table"
-    JSON = "json"
-
-
-FormatOption = Annotated[
-    OutputFormat, typer.Option("--format", help="Output format.")
-]
 ConfigOption = Annotated[
     Path | None, typer.Option("--config", help="Path to the config file.")
 ]
 MetricOption = Annotated[
     list[str] | None,
     typer.Option("--metric", help="Run only the named metric (repeatable)."),
+]
+JsonOption = Annotated[
+    bool, typer.Option("--json", help="Machine-readable JSON output.")
+]
+DiffOption = Annotated[
+    bool,
+    typer.Option("--diff", help="Measure the current branch's impact instead."),
+]
+BaseOption = Annotated[
+    str | None,
+    typer.Option(
+        "--base",
+        help="Base branch for --diff (default: [diff] base in the config,"
+        " then 'main'). Implies --diff.",
+    ),
 ]
 
 
@@ -77,23 +80,86 @@ def _root(
             help="Show version and exit.",
         ),
     ] = False,
-    output_format: FormatOption = OutputFormat.TABLE,
+    diff: DiffOption = False,
+    base: BaseOption = None,
     config: ConfigOption = None,
     metric: MetricOption = None,
 ) -> None:
-    """Measure code metrics during constant refactoring."""
-    if ctx.invoked_subcommand is None:
-        _execute_run(output_format, config, metric)
+    """Measure code metrics during constant refactoring.
+
+    Without a subcommand: interactive mode on a terminal, the summary
+    table otherwise.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+    if sys.stdout.isatty():
+        _interactive(diff or base is not None, base, config, metric)
+    else:
+        _print_stat(diff or base is not None, base, config, metric, json_out=False)
 
 
-@app.command("run")
-def run_command(
-    output_format: FormatOption = OutputFormat.TABLE,
+@app.command("stat")
+def stat_command(
+    json_out: JsonOption = False,
+    diff: DiffOption = False,
+    base: BaseOption = None,
     config: ConfigOption = None,
     metric: MetricOption = None,
 ) -> None:
-    """Run the configured metrics and print a report."""
-    _execute_run(output_format, config, metric)
+    """Print the metric summary (values only)."""
+    _print_stat(diff or base is not None, base, config, metric, json_out=json_out)
+
+
+@app.command("report")
+def report_command(
+    json_out: JsonOption = False,
+    cobertura: Annotated[
+        bool,
+        typer.Option(
+            "--cobertura",
+            help="Cobertura XML for CI consumers (line-scoped metrics only).",
+        ),
+    ] = False,
+    diff: DiffOption = False,
+    base: BaseOption = None,
+    config: ConfigOption = None,
+    metric: MetricOption = None,
+) -> None:
+    """Print the full report: every occurrence with file and line."""
+    if cobertura and (json_out or diff or base is not None):
+        typer.echo(
+            "usage error: --cobertura cannot be combined with --json or --diff",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if cobertura:
+        run_report = _collect_run(config, metric)
+        xml, excluded = render.cobertura(run_report)
+        typer.echo(xml)
+        for name in excluded:
+            typer.echo(
+                f"note: {name}: not representable in cobertura"
+                " (no line locations)",
+                err=True,
+            )
+        _finish_run(run_report)
+        return
+    if diff or base is not None:
+        diff_report = _collect_diff(base, config, metric)
+        if json_out:
+            typer.echo(render.diff_json(diff_report))
+        else:
+            for line in render.diff_listing(diff_report):
+                _stdout.print(line)
+        _finish_diff(diff_report)
+    else:
+        run_report = _collect_run(config, metric)
+        if json_out:
+            typer.echo(render.run_json(run_report))
+        else:
+            for line in render.run_listing(run_report):
+                _stdout.print(line)
+        _finish_run(run_report)
 
 
 @app.command("list")
@@ -110,46 +176,6 @@ def list_command(
     _stdout.print(_metrics_table(_load(config)))
 
 
-@app.command("diff")
-def diff_command(
-    base: Annotated[
-        str | None,
-        typer.Option(
-            "--base",
-            help="Base branch to compare against"
-            " (default: [diff] base in the config, then 'main').",
-        ),
-    ] = None,
-    output_format: FormatOption = OutputFormat.TABLE,
-    config: ConfigOption = None,
-    metric: MetricOption = None,
-) -> None:
-    """Measure the impact of the current branch, diff-cover style."""
-    loaded = _load(config)
-    runner = DiffRunner(
-        config=loaded,
-        project=project_files(loaded.root),
-        diff_source=make_diff_source(loaded.root),
-        metric_types=METRIC_TYPES,
-    )
-    try:
-        report = runner.run(base or loaded.diff_base or "main", only=metric)
-    except ConfigError as exc:
-        _config_failure(exc)
-    except DiffSourceError as exc:
-        typer.echo(f"diff error: {exc}", err=True)
-        raise typer.Exit(2) from None
-
-    if output_format is OutputFormat.JSON:
-        typer.echo(_diff_to_json(report))
-    else:
-        _stdout.print(_diff_table(report))
-    _print_diff_diagnostics(report)
-
-    if any(outcome.error for outcome in report.outcomes):
-        raise typer.Exit(1)
-
-
 @app.command("add")
 def add_command(
     type_name: Annotated[str, typer.Argument(metavar="TYPE")],
@@ -161,6 +187,10 @@ def add_command(
     range_names: Annotated[
         list[str] | None,
         typer.Option("--range", help="Target range (repeatable)."),
+    ] = None,
+    group: Annotated[
+        str | None,
+        typer.Option("--group", help="Group heading to show this metric under."),
     ] = None,
     param: Annotated[
         list[str] | None,
@@ -175,6 +205,7 @@ def add_command(
         name=name,
         ranges=tuple(range_names or ()),
         params=_parse_params(param or []),
+        group=group,
     )
     try:
         raw = load_raw_config(cwd)
@@ -202,6 +233,107 @@ def main() -> None:
     app()
 
 
+def _interactive(
+    diff: bool,
+    base: str | None,
+    config_path: Path | None,
+    metrics: list[str] | None,
+) -> None:
+    """Run the metrics, then hand the report to the interactive TUI."""
+    # imported lazily: textual is heavy and only needed on this path
+    from tingle.gates.tui.app import MetricsApp
+
+    if diff:
+        diff_report = _collect_diff(base, config_path, metrics)
+        MetricsApp(diff_report).run()
+        _finish_diff(diff_report)
+    else:
+        run_report = _collect_run(config_path, metrics)
+        MetricsApp(run_report).run()
+        _finish_run(run_report)
+
+
+def _print_stat(
+    diff: bool,
+    base: str | None,
+    config_path: Path | None,
+    metrics: list[str] | None,
+    *,
+    json_out: bool,
+) -> None:
+    if diff:
+        diff_report = _collect_diff(base, config_path, metrics)
+        if json_out:
+            typer.echo(render.diff_json(diff_report))
+        else:
+            _stdout.print(render.diff_table(diff_report))
+        _finish_diff(diff_report)
+    else:
+        run_report = _collect_run(config_path, metrics)
+        if json_out:
+            typer.echo(render.run_json(run_report))
+        else:
+            _stdout.print(render.report_table(run_report))
+        _finish_run(run_report)
+
+
+def _collect_run(
+    config_path: Path | None, metrics: list[str] | None
+) -> RunReport:
+    config = _load(config_path)
+    try:
+        return run_metrics(
+            config, project_files(config.root), METRIC_TYPES, only=metrics
+        )
+    except ConfigError as exc:
+        _config_failure(exc)
+
+
+def _collect_diff(
+    base: str | None, config_path: Path | None, metrics: list[str] | None
+) -> DiffReport:
+    config = _load(config_path)
+    runner = DiffRunner(
+        config=config,
+        project=project_files(config.root),
+        diff_source=make_diff_source(config.root),
+        metric_types=METRIC_TYPES,
+    )
+    try:
+        return runner.run(base or config.diff_base or "main", only=metrics)
+    except ConfigError as exc:
+        _config_failure(exc)
+    except DiffSourceError as exc:
+        typer.echo(f"diff error: {exc}", err=True)
+        raise typer.Exit(2) from None
+
+
+def _finish_run(report: RunReport) -> None:
+    for outcome in report.outcomes:
+        if outcome.error is not None:
+            typer.echo(f"error: {outcome.spec.name}: {outcome.error}", err=True)
+        elif outcome.result is not None:
+            for warning in outcome.result.warnings:
+                typer.echo(f"warning: {outcome.spec.name}: {warning}", err=True)
+    if any(outcome.error for outcome in report.outcomes):
+        raise typer.Exit(1)
+
+
+def _finish_diff(report: DiffReport) -> None:
+    for name in report.skipped:
+        typer.echo(
+            f"note: {name}: metric type does not support diff mode", err=True
+        )
+    for outcome in report.outcomes:
+        if outcome.error is not None:
+            typer.echo(f"error: {outcome.spec.name}: {outcome.error}", err=True)
+        elif outcome.result is not None:
+            for warning in outcome.result.warnings:
+                typer.echo(f"warning: {outcome.spec.name}: {warning}", err=True)
+    if any(outcome.error for outcome in report.outcomes):
+        raise typer.Exit(1)
+
+
 def _parse_params(pairs: list[str]) -> dict[str, str]:
     params: dict[str, str] = {}
     for pair in pairs:
@@ -214,29 +346,6 @@ def _parse_params(pairs: list[str]) -> dict[str, str]:
             raise typer.Exit(2)
         params[key] = value
     return params
-
-
-def _execute_run(
-    output_format: OutputFormat,
-    config_path: Path | None,
-    metrics: list[str] | None,
-) -> None:
-    config = _load(config_path)
-    try:
-        report = run_metrics(
-            config, project_files(config.root), METRIC_TYPES, only=metrics
-        )
-    except ConfigError as exc:
-        _config_failure(exc)
-
-    if output_format is OutputFormat.JSON:
-        typer.echo(_to_json(report))
-    else:
-        _stdout.print(_report_table(report))
-    _print_diagnostics(report)
-
-    if any(outcome.error for outcome in report.outcomes):
-        raise typer.Exit(1)
 
 
 def _load(config_path: Path | None) -> Config:
@@ -253,153 +362,6 @@ def _config_failure(exc: Exception) -> NoReturn:
     else:
         typer.echo(f"config error: {exc}", err=True)
     raise typer.Exit(2)
-
-
-def _report_table(report: RunReport) -> Table:
-    table = Table(title=str(report.root))
-    table.add_column("Metric")
-    table.add_column("Type")
-    table.add_column("Ranges")
-    table.add_column("Value", justify="right")
-    for outcome in report.outcomes:
-        value = (
-            "[red]ERROR[/]"
-            if outcome.result is None
-            else str(outcome.result.value)
-        )
-        table.add_row(
-            outcome.spec.name,
-            outcome.spec.type,
-            ", ".join(outcome.range_names),
-            value,
-        )
-    return table
-
-
-def _to_json(report: RunReport) -> str:
-    return json.dumps(
-        {
-            "root": str(report.root),
-            "config": str(report.source),
-            "metrics": [
-                {
-                    "name": outcome.spec.name,
-                    "type": outcome.spec.type,
-                    "ranges": list(outcome.range_names),
-                    "value": outcome.result.value if outcome.result else None,
-                    "details": dict(outcome.result.details) if outcome.result else {},
-                    "warnings": (
-                        list(outcome.result.warnings) if outcome.result else []
-                    ),
-                    "error": outcome.error,
-                }
-                for outcome in report.outcomes
-            ],
-        },
-        indent=2,
-    )
-
-
-def _print_diagnostics(report: RunReport) -> None:
-    for outcome in report.outcomes:
-        if outcome.error is not None:
-            typer.echo(f"error: {outcome.spec.name}: {outcome.error}", err=True)
-        elif outcome.result is not None:
-            for warning in outcome.result.warnings:
-                typer.echo(f"warning: {outcome.spec.name}: {warning}", err=True)
-
-
-def _diff_table(report: DiffReport) -> Table:
-    table = Table(title=f"{report.root} vs {report.base_ref}")
-    table.add_column("Metric")
-    table.add_column("Type")
-    table.add_column("Added", justify="right")
-    table.add_column("Removed", justify="right")
-    table.add_column("Net", justify="right")
-    table.add_column("Total", justify="right")
-    for outcome in report.outcomes:
-        if outcome.result is None:
-            cells = ("", "", "[red]ERROR[/]", "")
-        else:
-            cells = (
-                _added_cell(outcome.result.added),
-                _removed_cell(outcome.result.removed),
-                _net_cell(outcome.result.net),
-                str(outcome.total.value) if outcome.total else "",
-            )
-        table.add_row(outcome.spec.name, outcome.spec.type, *cells)
-    return table
-
-
-def _added_cell(added: int | None) -> str:
-    if added is None:
-        return ""
-    return f"[red]+{added}[/]" if added > 0 else "0"
-
-
-def _removed_cell(removed: int | None) -> str:
-    if removed is None:
-        return ""
-    return f"[green]-{removed}[/]" if removed > 0 else "0"
-
-
-def _net_cell(net: int) -> str:
-    if net > 0:
-        return f"[red]+{net}[/]"
-    if net < 0:
-        return f"[green]{net}[/]"
-    return "0"
-
-
-def _diff_to_json(report: DiffReport) -> str:
-    return json.dumps(
-        {
-            "root": str(report.root),
-            "config": str(report.source),
-            "base": report.base_ref,
-            "merge_base": report.merge_base,
-            "metrics": [
-                {
-                    "name": outcome.spec.name,
-                    "type": outcome.spec.type,
-                    "ranges": list(outcome.range_names),
-                    **_diff_values(outcome.result),
-                    "total": outcome.total.value if outcome.total else None,
-                    "warnings": (
-                        list(outcome.result.warnings) if outcome.result else []
-                    ),
-                    "error": outcome.error,
-                }
-                for outcome in report.outcomes
-            ],
-            "skipped": list(report.skipped),
-        },
-        indent=2,
-    )
-
-
-def _diff_values(result: DiffResult | None) -> dict[str, object]:
-    if result is None:
-        return {"added": None, "removed": None, "net": None, "details": {}}
-    return {
-        "added": result.added,
-        "removed": result.removed,
-        "net": result.net,
-        "details": dict(result.details),
-    }
-
-
-def _print_diff_diagnostics(report: DiffReport) -> None:
-    for name in report.skipped:
-        typer.echo(
-            f"note: {name}: metric type does not support diff mode", err=True
-        )
-    for outcome in report.outcomes:
-        if outcome.error is not None:
-            typer.echo(f"error: {outcome.spec.name}: {outcome.error}", err=True)
-        elif outcome.result is not None:
-            for warning in outcome.result.warnings:
-                typer.echo(f"warning: {outcome.spec.name}: {warning}", err=True)
 
 
 def _types_table() -> Table:

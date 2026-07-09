@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 _TOP_LEVEL_KEYS = frozenset({"ranges", "metrics", "diff"})
 _DIFF_KEYS = frozenset({"base"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
-_METRIC_RESERVED_KEYS = frozenset({"name", "type", "range", "ranges"})
+_METRIC_RESERVED_KEYS = frozenset({"name", "type", "range", "ranges", "group"})
 
 
 def validate(
@@ -112,6 +112,7 @@ def _validate_metrics(
 
         name, label = _metric_name(table, index, seen_names, errors)
         range_names = _metric_ranges(table, ranges, label, errors)
+        group = _metric_group(table, label, errors)
         params = {
             key: value
             for key, value in table.items()
@@ -130,10 +131,31 @@ def _validate_metrics(
         if name is not None:
             metrics.append(
                 MetricSpec(
-                    name=name, type=type_name, ranges=range_names, params=params
+                    name=name,
+                    type=type_name,
+                    ranges=range_names,
+                    params=params,
+                    group=group,
                 )
             )
     return tuple(metrics)
+
+
+def _metric_group(
+    table: Mapping[str, Any], label: str, errors: list[str]
+) -> str | None:
+    """Validate the optional `group`.
+
+    A human-facing heading, so any non-empty string is allowed (unlike
+    names, which METRIC_NAME_RE constrains).
+    """
+    if "group" not in table:
+        return None
+    group = table["group"]
+    if not isinstance(group, str) or not group:
+        errors.append(f"{label}: group must be a non-empty string")
+        return None
+    return group
 
 
 def _metric_name(

@@ -77,6 +77,40 @@ def test_explicit_name_and_params() -> None:
     assert metric["section"] == "MESSAGES CONTROL"
 
 
+def test_group_is_written_after_type_and_validates() -> None:
+    draft = MetricDraft(
+        type_name="regex_count", value="x", group="typing"
+    )
+
+    metric = build_metric(RAW, METRIC_TYPES, draft)
+
+    assert metric["group"] == "typing"
+    # emitted before params for a readable diff: name, type, group, then key
+    assert list(metric)[:3] == ["name", "type", "group"]
+
+
+def test_no_group_omits_the_key() -> None:
+    metric = build_metric(
+        RAW, METRIC_TYPES, MetricDraft(type_name="regex_count", value="x")
+    )
+
+    assert "group" not in metric
+
+
+def test_toml_table_array_can_be_added() -> None:
+    draft = MetricDraft(
+        type_name="toml_table_array",
+        value="tool.mypy.overrides",
+        params={"label": "module"},
+    )
+
+    metric = build_metric({}, METRIC_TYPES, draft)
+
+    assert metric["type"] == "toml_table_array"
+    assert metric["key"] == "tool.mypy.overrides"
+    assert metric["label"] == "module"
+
+
 def test_unknown_type_is_rejected() -> None:
     with pytest.raises(ConfigError) as excinfo:
         build_metric({}, METRIC_TYPES, MetricDraft(type_name="nope"))

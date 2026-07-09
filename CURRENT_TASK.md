@@ -1,38 +1,48 @@
-# Current Task: tingle diff
+# Current Task: metric groups + toml_table_array (+ TUI accordion)
 
-**Status**: Feature complete — all 7 plan steps implemented, verified, and
-committed on `feature/diff` (branched from origin/main). Awaiting
-review/merge decision.
+**Status**: Feature complete — implemented, verified, and committed on
+`feature/report-and-tui` (branched from main). Awaiting review/merge
+decision. Builds on the earlier full-report + interactive-mode work on
+the same branch (see git history).
 
-**Plan**: approved "tingle diff — Feature Plan" (per-type diff semantics,
-merge-base vs working tree, colored impact table + totals).
+## Done (this round)
 
-## Done
-
-1. pacts/diff contracts (FileDiff/BranchDiff/DiffSource/DiffResult/…),
-   MetricType.diff_func, `[diff] base` config key
-2. links/git/cli: hardened git adapter — merge-base with origin/ fallback,
-   -U0 hunk parser, untracked synthesis, read_base via git show
-   (21 real-git tests, fully isolated env)
-3. counts + regex diff variants (per-line added/removed counting)
-4. symbol_uses lineno refactor (behavior-neutral) + diff variant;
-   toml/ini value deltas
-5. mills/diff.DiffRunner (isolation, totals, range filtering, skip notes)
-   + wiring (diff_func on all six types, diff_source factory)
-6. `tingle diff` command: --base/--format/--metric, colored
-   Added/Removed/Net/Total table, JSON with base + merge_base
-   (9 e2e tests on real repos)
-7. README diff section, CHANGELOG Unreleased entry, dogfood run
+0. TUI redesign: the interactive view is now an **accordion**, not a
+   sortable table. Sorting/columns removed; `↑`/`↓` move between headers,
+   Enter/click expands a metric's occurrences in place.
+1. `MetricSpec.group` / `MetricDraft.group`; `group` reserved config key;
+   validated as a non-empty string (never leaks into `params`).
+2. `group_sections` reshape helper (first-appearance order, ungrouped
+   last) driving every human view: `##` headings in the report listing,
+   a `Group` column in the summary tables (only when a group is used, so
+   groupless output is byte-identical), and an additive `group` JSON key.
+3. TUI 3-level accordion: group → metric → file results. Groups expanded
+   at rest; each group and metric folds/unfolds independently (j/k move
+   between headers, l unfold, h fold, Space/Enter/click toggle; wasd
+   alias the moves; arrows left free for the command palette on `p`).
+   Groupless config falls back to a flat accordion.
+4. `toml_table_array` metric type + diff variant: count entries of a TOML
+   array of tables (e.g. `[[tool.mypy.overrides]]`), `label` describes
+   each occurrence, `explode = true` fans a list label out per element.
+   Shares load+descend with `toml_list_length` via `_descend_toml`.
+5. Wiring registration + `tingle add --group` (group written after
+   `type` for readable diffs).
+6. Dogfood (`tingle.toml` grouped into lint/typing/size + a
+   `mypy-overrides` metric) and docs (README metric-type table, Groups
+   section, CLI notes; CHANGELOG additive entries).
 
 ## Verification
 
-210 tests, ruff select=ALL, mypy strict, import-linter — all green.
-Dogfood: `tingle diff --base main` on this repo reports +14 noqa,
-+5 per-file-ignores, +2132/−47 LOC, +12 files — matches the branch.
+258 tests green: `ruff check` (select=ALL), `mypy` (strict, 3.11),
+`lint-imports`. Run via `mise exec -- pytest` / `ruff` / `mypy` /
+`lint-imports`. Dogfood: `tingle stat` shows the Group column and the
+three sections; `mypy-overrides` reads 0 with a "key not found" warning
+(the repo has no `[[tool.mypy.overrides]]` yet — a truthful baseline).
 
-## Known approximations (documented in README)
+## Notes
 
-- Diff counting is per-line; newline-containing regex patterns don't
-  match in diff mode
-- symbol_uses attributes references to their starting line
-- Renames = delete + add; shallow clones need history for merge-base
+- Groups are presentation-only: values, occurrences, warnings unchanged.
+- JSON gains an additive `group` key (null when unset); the compact
+  tables gain a `Group` column only when a group exists.
+- Plan doc: `PLAN_METRIC_GROUPS.md` (Step 3 revised to the approved
+  3-level accordion instead of the original DataTable Group column).

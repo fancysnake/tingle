@@ -13,6 +13,7 @@ EXPECTED_TYPES = {
     "regex_count",
     "symbol_uses",
     "toml_list_length",
+    "toml_table_array",
     "ini_list_length",
     "file_count",
     "line_count",
@@ -36,6 +37,13 @@ def test_param_specs() -> None:
     assert METRIC_TYPES["symbol_uses"].primary_param == "symbol"
     assert METRIC_TYPES["toml_list_length"].required_params == ("key",)
     assert METRIC_TYPES["toml_list_length"].optional_params == ("file",)
+    assert METRIC_TYPES["toml_table_array"].required_params == ("key",)
+    assert METRIC_TYPES["toml_table_array"].optional_params == (
+        "file",
+        "label",
+        "explode",
+    )
+    assert METRIC_TYPES["toml_table_array"].primary_param == "key"
     assert METRIC_TYPES["ini_list_length"].required_params == (
         "file",
         "section",

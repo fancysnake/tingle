@@ -40,6 +40,7 @@ class MetricSpec:
     type: str
     ranges: tuple[str, ...] = ()
     params: Mapping[str, Any] = field(default_factory=dict)
+    group: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,3 +64,4 @@ class MetricDraft:
     name: str | None = None
     ranges: tuple[str, ...] = ()
     params: Mapping[str, str] = field(default_factory=dict)
+    group: str | None = None

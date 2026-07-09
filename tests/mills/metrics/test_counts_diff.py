@@ -27,6 +27,8 @@ def test_file_count_diff_counts_created_and_deleted() -> None:
     assert result.added == 1
     assert result.removed == 1
     assert result.net == 0
+    assert [str(o) for o in result.added_occurrences] == ["new.py"]
+    assert [str(o) for o in result.removed_occurrences] == ["gone.py"]
 
 
 def test_file_count_diff_empty() -> None:

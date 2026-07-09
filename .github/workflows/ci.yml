@@ -12,28 +12,20 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+    env:
+      MISE_PYTHON_VERSION: ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install
-        run: pip install . pytest
-      - name: Test
-        run: pytest
+      - uses: jdx/mise-action@v2
+      - run: mise exec -- poetry install
+      - run: mise exec -- poetry run pytest
 
   quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - name: Install
-        run: pip install . pytest ruff mypy import-linter
-      - name: Ruff
-        run: ruff check
-      - name: Mypy
-        run: mypy
-      - name: Import contracts
-        run: lint-imports
+      - uses: jdx/mise-action@v2
+      - run: mise exec -- poetry install
+      - run: mise exec -- poetry run ruff check
+      - run: mise exec -- poetry run mypy
+      - run: mise exec -- poetry run lint-imports

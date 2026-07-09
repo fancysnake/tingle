@@ -45,6 +45,7 @@ def test_counts_uses_on_added_lines() -> None:
     assert result.added == 1
     assert result.removed == 0
     assert result.net == 1
+    assert [str(o) for o in result.added_occurrences] == ["a.py:4"]
 
 
 def test_counts_uses_on_removed_lines_from_base() -> None:

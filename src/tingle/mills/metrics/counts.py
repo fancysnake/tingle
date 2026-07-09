@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult, FileStatus
-from tingle.pacts.metrics import MetricContext, MetricResult
+from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 
 def file_count(ctx: MetricContext) -> MetricResult:
     """Count the files selected by the metric's ranges."""
-    return MetricResult(value=len(ctx.files))
+    return MetricResult(
+        value=len(ctx.files),
+        occurrences=tuple(Occurrence(path=str(path)) for path in ctx.files),
+    )
 
 
 def line_count(ctx: MetricContext) -> MetricResult:
@@ -28,9 +31,23 @@ def line_count(ctx: MetricContext) -> MetricResult:
 
 def file_count_diff(ctx: DiffMetricContext) -> DiffResult:
     """Files created by the branch vs files deleted."""
-    added = sum(1 for file in ctx.files if file.status is FileStatus.ADDED)
-    removed = sum(1 for file in ctx.files if file.status is FileStatus.DELETED)
-    return DiffResult(net=added - removed, added=added, removed=removed)
+    created = tuple(
+        Occurrence(path=str(file.path))
+        for file in ctx.files
+        if file.status is FileStatus.ADDED
+    )
+    deleted = tuple(
+        Occurrence(path=str(file.path))
+        for file in ctx.files
+        if file.status is FileStatus.DELETED
+    )
+    return DiffResult(
+        net=len(created) - len(deleted),
+        added=len(created),
+        removed=len(deleted),
+        added_occurrences=created,
+        removed_occurrences=deleted,
+    )
 
 
 def line_count_diff(ctx: DiffMetricContext) -> DiffResult:

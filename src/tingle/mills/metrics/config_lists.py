@@ -12,7 +12,7 @@ from pathlib import PurePath
 from typing import Any, TypeAlias
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult
-from tingle.pacts.metrics import MetricContext, MetricResult
+from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 from tingle.specs.config import TOML_LIST_DEFAULT_FILE
 
 _Reader: TypeAlias = Callable[[PurePath], str | None]
@@ -43,37 +43,74 @@ def _delta(
         *(f"base side: {warning}" for warning in base.warnings),
         *current.warnings,
     )
+    # entry sets show WHICH entries changed; net stays count-based, so with
+    # duplicate entries the occurrence lists can be shorter than the net
+    base_entries = set(base.occurrences)
+    current_entries = set(current.occurrences)
     return DiffResult(
         net=current.value - base.value,
         details={"base": base.value, "current": current.value},
         warnings=warnings,
+        added_occurrences=tuple(
+            o for o in current.occurrences if o not in base_entries
+        ),
+        removed_occurrences=tuple(
+            o for o in base.occurrences if o not in current_entries
+        ),
     )
+
+
+def _descend_toml(
+    read: _Reader, params: Mapping[str, Any]
+) -> tuple[Any, str | None]:
+    """Load `file`, walk to the dotted `key`; return (value, warning).
+
+    On any failure the value is None and the warning explains it; on
+    success the warning is None. Shared by the list-length and
+    array-of-tables counters so their load/navigate errors stay identical.
+    """
+    file = params.get("file", TOML_LIST_DEFAULT_FILE)
+    key = params["key"]
+
+    text = read(PurePath(file))
+    if text is None:
+        return None, f"{file}: not found or unreadable"
+    try:
+        data: Any = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        return None, f"{file}: invalid TOML: {exc}"
+
+    for part in key.split("."):
+        if not (isinstance(data, Mapping) and part in data):
+            return None, f'{file}: key "{key}" not found'
+        data = data[part]
+    return data, None
 
 
 def _toml_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
     file = params.get("file", TOML_LIST_DEFAULT_FILE)
     key = params["key"]
 
-    text = read(PurePath(file))
-    if text is None:
-        return _empty(f"{file}: not found or unreadable")
-    try:
-        data: Any = tomllib.loads(text)
-    except tomllib.TOMLDecodeError as exc:
-        return _empty(f"{file}: invalid TOML: {exc}")
-
-    for part in key.split("."):
-        if not (isinstance(data, Mapping) and part in data):
-            return _empty(f'{file}: key "{key}" not found')
-        data = data[part]
+    data, warning = _descend_toml(read, params)
+    if warning is not None:
+        return _empty(warning)
 
     if isinstance(data, list):
-        return MetricResult(value=len(data))
+        return MetricResult(
+            value=len(data), occurrences=_entries(file, data)
+        )
     if isinstance(data, Mapping) and all(
         isinstance(value, list) for value in data.values()
     ):
         details = {str(name): len(value) for name, value in data.items()}
-        return MetricResult(value=sum(details.values()), details=details)
+        occurrences = tuple(
+            Occurrence(path=str(file), note=f"{name}: {entry}")
+            for name, value in data.items()
+            for entry in value
+        )
+        return MetricResult(
+            value=sum(details.values()), details=details, occurrences=occurrences
+        )
     return _empty(f'{file}: value at "{key}" is not a list or a table of lists')
 
 
@@ -85,6 +122,93 @@ def validate_toml_params(params: Mapping[str, Any]) -> list[str]:
         errors.append("key must be a non-empty string")
     if "file" in params and not isinstance(params["file"], str):
         errors.append("file must be a string")
+    return errors
+
+
+def toml_table_array(ctx: MetricContext) -> MetricResult:
+    """Count entries of the TOML array of tables at dotted `key`."""
+    return _table_array_count(ctx.read, ctx.params)
+
+
+def toml_table_array_diff(ctx: DiffMetricContext) -> DiffResult:
+    """Change in the array-of-tables entry count between base and now."""
+    return _delta(_table_array_count, ctx)
+
+
+def _table_array_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
+    file = params.get("file", TOML_LIST_DEFAULT_FILE)
+    key = params["key"]
+
+    data, warning = _descend_toml(read, params)
+    if warning is not None:
+        return _empty(warning)
+    if not isinstance(data, list) or not all(
+        isinstance(entry, Mapping) for entry in data
+    ):
+        return _empty(f'{file}: value at "{key}" is not an array of tables')
+
+    occurrences = _table_array_occurrences(
+        str(file),
+        data,
+        params.get("label"),
+        explode=bool(params.get("explode", False)),
+    )
+    return MetricResult(value=len(occurrences), occurrences=occurrences)
+
+
+def _table_array_occurrences(
+    file: str,
+    tables: list[Mapping[str, Any]],
+    label: str | None,
+    *,
+    explode: bool,
+) -> tuple[Occurrence, ...]:
+    """One occurrence per table, or (explode) one per label-list element."""
+    occurrences: list[Occurrence] = []
+    for index, table in enumerate(tables, start=1):
+        if explode:
+            occurrences.extend(_exploded_entries(file, table, label, index))
+        else:
+            note = _label_note(table, label) or f"#{index}"
+            occurrences.append(Occurrence(path=file, note=note))
+    return tuple(occurrences)
+
+
+def _exploded_entries(
+    file: str, table: Mapping[str, Any], label: str | None, index: int
+) -> list[Occurrence]:
+    if label is None or label not in table:
+        return [Occurrence(path=file, note=f"#{index}")]
+    value = table[label]
+    values = value if isinstance(value, list) else [value]
+    return [Occurrence(path=file, note=str(item)) for item in values]
+
+
+def _label_note(table: Mapping[str, Any], label: str | None) -> str | None:
+    """Stringified label field (list joined by ', '), or None if absent."""
+    if label is None or label not in table:
+        return None
+    value = table[label]
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
+def validate_toml_table_array_params(params: Mapping[str, Any]) -> list[str]:
+    """Check key/file/label types and that `explode` implies a `label`."""
+    errors: list[str] = []
+    key = params.get("key")
+    if not isinstance(key, str) or not key:
+        errors.append("key must be a non-empty string")
+    errors.extend(
+        f"{name} must be a string"
+        for name in ("file", "label")
+        if name in params and not isinstance(params[name], str)
+    )
+    if "explode" in params and not isinstance(params["explode"], bool):
+        errors.append("explode must be a boolean")
+    if params.get("explode") is True and not params.get("label"):
+        errors.append("explode = true requires label")
     return errors
 
 
@@ -119,7 +243,7 @@ def _ini_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
         for entry in value.replace(",", "\n").splitlines()
         if entry.strip()
     ]
-    return MetricResult(value=len(entries))
+    return MetricResult(value=len(entries), occurrences=_entries(file, entries))
 
 
 def validate_ini_params(params: Mapping[str, Any]) -> list[str]:
@@ -129,6 +253,13 @@ def validate_ini_params(params: Mapping[str, Any]) -> list[str]:
         for name in ("file", "section", "option")
         if name in params and not isinstance(params[name], str)
     ]
+
+
+def _entries(file: str, values: list[Any]) -> tuple[Occurrence, ...]:
+    """List entries as occurrences, keeping the file's own order."""
+    return tuple(
+        Occurrence(path=str(file), note=str(entry)) for entry in values
+    )
 
 
 def _empty(warning: str) -> MetricResult:

@@ -7,7 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Occurrences: every metric now reports where its hits are — file and
+  line for `regex_count`/`symbol_uses`, file names for `file_count`,
+  and the actual list entries for `toml_list_length`/`ini_list_length`.
+  Diff results carry signed added/removed occurrences (list metrics
+  show *which* entries changed). JSON output always includes them.
+- `tingle report` — the full occurrence listing (`--json`, `--diff`,
+  `--base`), plus `--cobertura`: Cobertura XML for CI consumers
+  (GitLab, Jenkins, diff-cover) marking each occurrence line as
+  uncovered.
+- `tingle stat` — the compact summary table (`--json`, `--diff`,
+  `--base`).
+- Interactive mode: bare `tingle` on a terminal opens a three-level
+  accordion (textual) of group → metric → file results, navigated with
+  vim keys (`j`/`k` between headers, `l` unfold, `h` fold, Space to
+  toggle; `w`/`a`/`s`/`d` alias the same moves); each group and metric
+  folds independently and unfolding a metric shows its occurrences. `p`
+  opens the command palette, `q` quits. Non-TTY invocations print the
+  static summary instead.
+- Metric groups: an optional `group = "<name>"` (or `tingle add
+  --group`) on any metric. Grouped metrics are collected under a heading
+  in the report listing, a `Group` column in the summary tables, their
+  own foldable section in the TUI, and an additive `group` key in JSON.
+  Presentation only — values, occurrences, and warnings are unchanged.
+- `toml_table_array` metric type: count entries of a TOML array of
+  tables (e.g. `[[tool.mypy.overrides]]`), labelling each occurrence by
+  a configurable field; `explode = true` fans a list-valued label out
+  into one count per element.
+
 ### Changed
+
+- **BREAKING**: `tingle run` and `tingle diff` are removed. Use
+  `tingle stat` and `tingle stat --diff` / `tingle report --diff`.
+- New runtime dependency: textual (interactive mode).
 
 - Support Python 3.11 through 3.14 (previously 3.14 only): PEP 695 type
   aliases replaced with `TypeAlias`, lazy annotations enabled everywhere,

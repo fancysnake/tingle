@@ -10,7 +10,7 @@ import ast
 from typing import TYPE_CHECKING, Any
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult
-from tingle.pacts.metrics import MetricContext, MetricResult
+from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -21,9 +21,9 @@ if TYPE_CHECKING:
 def symbol_uses(ctx: MetricContext) -> MetricResult:
     """Count references to the `symbol` param across the Python files."""
     parts = tuple(ctx.params["symbol"].split("."))
-    total = 0
     details: dict[str, int] = {}
     warnings: list[str] = []
+    occurrences: list[Occurrence] = []
 
     for path in ctx.files:
         if path.suffix != ".py":
@@ -45,41 +45,50 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
             )
         if lines:
             details[str(path)] = len(lines)
-        total += len(lines)
+            occurrences.extend(
+                Occurrence(path=str(path), line=line) for line in sorted(lines)
+            )
 
-    return MetricResult(value=total, details=details, warnings=tuple(warnings))
+    return MetricResult(
+        value=len(occurrences),
+        details=details,
+        warnings=tuple(warnings),
+        occurrences=tuple(occurrences),
+    )
 
 
 def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
     """Count references on lines the branch added vs lines it removed."""
     parts = tuple(ctx.params["symbol"].split("."))
-    added = 0
-    removed = 0
+    added_occurrences: list[Occurrence] = []
+    removed_occurrences: list[Occurrence] = []
     details: dict[str, int] = {}
     warnings: list[str] = []
 
     for file in ctx.files:
         if file.path.suffix != ".py":
             continue
-        file_added, added_warnings = _side_count(
+        file_added, added_warnings = _side_occurrences(
             ctx.read, file.path, parts, file.added_lines, "current"
         )
-        file_removed, removed_warnings = _side_count(
+        file_removed, removed_warnings = _side_occurrences(
             ctx.read_base, file.path, parts, file.removed_lines, "base"
         )
         warnings.extend(added_warnings)
         warnings.extend(removed_warnings)
-        added += file_added
-        removed += file_removed
-        if file_added - file_removed:
-            details[str(file.path)] = file_added - file_removed
+        added_occurrences.extend(file_added)
+        removed_occurrences.extend(file_removed)
+        if len(file_added) - len(file_removed):
+            details[str(file.path)] = len(file_added) - len(file_removed)
 
     return DiffResult(
-        net=added - removed,
-        added=added,
-        removed=removed,
+        net=len(added_occurrences) - len(removed_occurrences),
+        added=len(added_occurrences),
+        removed=len(removed_occurrences),
         details=details,
         warnings=tuple(warnings),
+        added_occurrences=tuple(added_occurrences),
+        removed_occurrences=tuple(removed_occurrences),
     )
 
 
@@ -95,30 +104,35 @@ def validate_params(params: Mapping[str, Any]) -> list[str]:
     return []
 
 
-def _side_count(
+def _side_occurrences(
     reader: Callable[[PurePath], str | None],
     path: PurePath,
     parts: tuple[str, ...],
     touched: AbstractSet[int],
     side: str,
-) -> tuple[int, list[str]]:
-    """Count occurrences starting on the touched lines of one diff side."""
+) -> tuple[list[Occurrence], list[str]]:
+    """Locate occurrences starting on the touched lines of one diff side."""
     if not touched:
-        return 0, []
+        return [], []
     text = reader(path)
     if text is None:
-        return 0, [f"{path}: {side} side unreadable"]
+        return [], [f"{path}: {side} side unreadable"]
     try:
         tree = ast.parse(text)
     except SyntaxError as exc:
-        return 0, [f"{path}: {side} side skipped (syntax error: {exc.msg})"]
+        return [], [f"{path}: {side} side skipped (syntax error: {exc.msg})"]
     lines, star_fallback = _occurrence_lines(tree, parts)
     warnings = (
         [f"{path}: {side} side: star import: falling back to bare-name counting"]
         if star_fallback
         else []
     )
-    return sum(1 for line in lines if line in touched), warnings
+    found = [
+        Occurrence(path=str(path), line=line)
+        for line in sorted(lines)
+        if line in touched
+    ]
+    return found, warnings
 
 
 def _occurrence_lines(

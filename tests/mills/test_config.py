@@ -214,6 +214,49 @@ def test_validate_params_hook_reports_problems() -> None:
     assert 'metric "x": pattern does not compile' in errors
 
 
+def test_group_is_accepted_and_not_a_param() -> None:
+    config = _validate(
+        {
+            "metrics": [
+                {
+                    "name": "x",
+                    "type": "regex_count",
+                    "pattern": "a",
+                    "group": "typing",
+                }
+            ]
+        }
+    )
+
+    (metric,) = config.metrics
+    assert metric.group == "typing"
+    # group is presentation-only; it must not leak into the metric's params
+    assert dict(metric.params) == {"pattern": "a"}
+
+
+def test_group_defaults_to_none() -> None:
+    config = _validate({"metrics": [{"name": "x", "type": "file_count"}]})
+
+    (metric,) = config.metrics
+    assert metric.group is None
+
+
+def test_empty_group_is_rejected() -> None:
+    errors = _errors_of(
+        {"metrics": [{"name": "x", "type": "file_count", "group": ""}]}
+    )
+
+    assert 'metric "x": group must be a non-empty string' in errors
+
+
+def test_non_string_group_is_rejected() -> None:
+    errors = _errors_of(
+        {"metrics": [{"name": "x", "type": "file_count", "group": 3}]}
+    )
+
+    assert 'metric "x": group must be a non-empty string' in errors
+
+
 def test_metrics_must_be_an_array() -> None:
     errors = _errors_of({"metrics": {"name": "x"}})
 

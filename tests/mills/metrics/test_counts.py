@@ -23,6 +23,7 @@ def test_file_count() -> None:
     result = file_count(_context({"a.py": "", "b.py": ""}))
 
     assert result.value == 2
+    assert [str(o) for o in result.occurrences] == ["a.py", "b.py"]
 
 
 def test_file_count_empty() -> None:

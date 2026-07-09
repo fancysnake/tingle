@@ -6,34 +6,48 @@ default = true
 [[metrics]]
 name = "noqa-comments"
 type = "regex_count"
+group = "lint"
 pattern = '#\s*noqa'
-
-[[metrics]]
-name = "type-ignores"
-type = "regex_count"
-pattern = '#\s*type:\s*ignore'
 
 [[metrics]]
 name = "ruff-ignores"
 type = "toml_list_length"
+group = "lint"
 key = "tool.ruff.lint.ignore"
 
 [[metrics]]
 name = "ruff-per-file-ignores"
 type = "toml_list_length"
+group = "lint"
 key = "tool.ruff.lint.per-file-ignores"
 
 [[metrics]]
 name = "pylint-disables"
 type = "ini_list_length"
+group = "lint"
 file = ".pylintrc"
 section = "MESSAGES CONTROL"
 option = "disable"
 
 [[metrics]]
+name = "type-ignores"
+type = "regex_count"
+group = "typing"
+pattern = '#\s*type:\s*ignore'
+
+[[metrics]]
+name = "mypy-overrides"
+type = "toml_table_array"
+group = "typing"
+key = "tool.mypy.overrides"
+label = "module"
+
+[[metrics]]
 name = "python-loc"
 type = "line_count"
+group = "size"
 
 [[metrics]]
 name = "python-files"
 type = "file_count"
+group = "size"

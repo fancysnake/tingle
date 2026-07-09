@@ -17,8 +17,11 @@ from tingle.mills.metrics.config_lists import (
     ini_list_length_diff,
     toml_list_length,
     toml_list_length_diff,
+    toml_table_array,
+    toml_table_array_diff,
     validate_ini_params,
     validate_toml_params,
+    validate_toml_table_array_params,
 )
 from tingle.mills.metrics.counts import (
     file_count,
@@ -78,6 +81,16 @@ METRIC_TYPES: dict[str, MetricType] = {
         validate_params=validate_toml_params,
         description="Length of the list at a dotted key in a TOML file.",
         diff_func=toml_list_length_diff,
+    ),
+    "toml_table_array": MetricType(
+        name="toml_table_array",
+        func=toml_table_array,
+        required_params=("key",),
+        optional_params=("file", "label", "explode"),
+        primary_param="key",
+        validate_params=validate_toml_table_array_params,
+        description="Count entries of a TOML array of tables (e.g. mypy overrides).",
+        diff_func=toml_table_array_diff,
     ),
     "ini_list_length": MetricType(
         name="ini_list_length",

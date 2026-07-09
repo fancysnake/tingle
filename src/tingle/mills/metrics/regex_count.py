@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
 from typing import TYPE_CHECKING, Any
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult
-from tingle.pacts.metrics import MetricContext, MetricResult
+from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -21,21 +22,43 @@ _FLAGS = {
 
 
 def regex_count(ctx: MetricContext) -> MetricResult:
-    """Count matches of the `pattern` param across the context's files."""
+    """Count matches of the `pattern` param across the context's files.
+
+    Matching is full-text (multi-line patterns work); each match is
+    located at the line where it starts.
+    """
     pattern = _compile(ctx.params)
-    total = 0
     details: dict[str, int] = {}
     warnings: list[str] = []
+    occurrences: list[Occurrence] = []
     for path in ctx.files:
         text = ctx.read(path)
         if text is None:
             warnings.append(f"{path}: skipped (binary, unreadable, or missing)")
             continue
-        count = sum(1 for _ in pattern.finditer(text))
-        if count:
-            details[str(path)] = count
-        total += count
-    return MetricResult(value=total, details=details, warnings=tuple(warnings))
+        line_starts = _line_starts(text)
+        found = [
+            Occurrence(
+                path=str(path), line=bisect_right(line_starts, match.start())
+            )
+            for match in pattern.finditer(text)
+        ]
+        if found:
+            details[str(path)] = len(found)
+            occurrences.extend(found)
+    return MetricResult(
+        value=len(occurrences),
+        details=details,
+        warnings=tuple(warnings),
+        occurrences=tuple(occurrences),
+    )
+
+
+def _line_starts(text: str) -> list[int]:
+    """Offsets where each line begins; bisect_right(starts, i) is i's line."""
+    starts = [0]
+    starts.extend(match.end() for match in re.finditer("\n", text))
+    return starts
 
 
 def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
@@ -47,52 +70,54 @@ def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
     the two can disagree for such patterns.
     """
     pattern = _compile(ctx.params)
-    added = 0
-    removed = 0
+    added_occurrences: list[Occurrence] = []
+    removed_occurrences: list[Occurrence] = []
     details: dict[str, int] = {}
     warnings: list[str] = []
     for file in ctx.files:
-        file_added = _count_on_lines(pattern, ctx.read, file, file.added_lines)
-        file_removed = _count_on_lines(
+        file_added = _matches_on_lines(pattern, ctx.read, file, file.added_lines)
+        file_removed = _matches_on_lines(
             pattern, ctx.read_base, file, file.removed_lines
         )
         if file_added is None:
             warnings.append(f"{file.path}: current side unreadable")
-            file_added = 0
+            file_added = []
         if file_removed is None:
             warnings.append(f"{file.path}: base side unreadable")
-            file_removed = 0
-        added += file_added
-        removed += file_removed
-        if file_added - file_removed:
-            details[str(file.path)] = file_added - file_removed
+            file_removed = []
+        added_occurrences.extend(file_added)
+        removed_occurrences.extend(file_removed)
+        if len(file_added) - len(file_removed):
+            details[str(file.path)] = len(file_added) - len(file_removed)
     return DiffResult(
-        net=added - removed,
-        added=added,
-        removed=removed,
+        net=len(added_occurrences) - len(removed_occurrences),
+        added=len(added_occurrences),
+        removed=len(removed_occurrences),
         details=details,
         warnings=tuple(warnings),
+        added_occurrences=tuple(added_occurrences),
+        removed_occurrences=tuple(removed_occurrences),
     )
 
 
-def _count_on_lines(
+def _matches_on_lines(
     pattern: re.Pattern[str],
     reader: Callable[..., str | None],
     file: FileDiff,
     lines: AbstractSet[int],
-) -> int | None:
-    """Count matches on the given line numbers; None when text is unreadable."""
+) -> list[Occurrence] | None:
+    """Locate matches on the given line numbers; None when text is unreadable."""
     if not lines:
-        return 0
+        return []
     text = reader(file.path)
     if text is None:
         return None
-    return sum(
-        1
+    return [
+        Occurrence(path=str(file.path), line=lineno)
         for lineno, line in enumerate(text.splitlines(), start=1)
         if lineno in lines
         for _ in pattern.finditer(line)
-    )
+    ]
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
