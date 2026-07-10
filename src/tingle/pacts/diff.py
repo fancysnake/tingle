@@ -62,6 +62,14 @@ class DiffSource(Protocol):
         ...
 
 
+class DiffSourceFactory(Protocol):
+    """Builds the branch-diff provider anchored at a project root."""
+
+    def __call__(self, root: Path) -> DiffSource:
+        """Return a DiffSource rooted at `root`."""
+        ...
+
+
 @dataclass(frozen=True)
 class DiffMetricContext:
     """Everything a diff metric function may look at."""

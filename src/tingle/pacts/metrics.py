@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
 if TYPE_CHECKING:
-    from pathlib import PurePath
+    from pathlib import Path, PurePath
 
     from tingle.pacts.diff import DiffMetricFunction
 
@@ -25,6 +25,14 @@ class ProjectFiles(Protocol):
 
     def exists(self, path: PurePath) -> bool:
         """Return whether the file exists."""
+        ...
+
+
+class ProjectFilesFactory(Protocol):
+    """Builds the project-tree view anchored at a root directory."""
+
+    def __call__(self, root: Path) -> ProjectFiles:
+        """Return a ProjectFiles rooted at `root`."""
         ...
 
 
