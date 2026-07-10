@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from defusedxml import ElementTree
+from lxml import etree
 from typer.testing import CliRunner
 
 from tingle.gates.cli.typer import app
@@ -48,7 +48,9 @@ def test_cobertura_marks_occurrence_lines_uncovered() -> None:
     result = runner.invoke(app, ["report", "--cobertura"])
 
     assert result.exit_code == 0
-    root = ElementTree.fromstring(result.stdout)
+    # bytes, not str: the report carries an encoding declaration, and lxml
+    # refuses to parse those from a unicode string
+    root = etree.fromstring(result.stdout.encode())
     assert root.tag == "coverage"
     assert root.get("lines-valid") == "2"
     assert root.get("lines-covered") == "0"
