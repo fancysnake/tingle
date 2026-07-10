@@ -139,11 +139,7 @@ def test_unknown_type() -> None:
 
 def test_unknown_range_reference() -> None:
     errors = _errors_of(
-        {
-            "metrics": [
-                {"name": "x", "type": "file_count", "range": "missing"},
-            ]
-        }
+        {"metrics": [{"name": "x", "type": "file_count", "range": "missing"}]}
     )
 
     assert 'metric "x": unknown range "missing"' in errors
@@ -218,12 +214,7 @@ def test_group_is_accepted_and_not_a_param() -> None:
     config = _validate(
         {
             "metrics": [
-                {
-                    "name": "x",
-                    "type": "regex_count",
-                    "pattern": "a",
-                    "group": "typing",
-                }
+                {"name": "x", "type": "regex_count", "pattern": "a", "group": "typing"}
             ]
         }
     )
@@ -242,17 +233,13 @@ def test_group_defaults_to_none() -> None:
 
 
 def test_empty_group_is_rejected() -> None:
-    errors = _errors_of(
-        {"metrics": [{"name": "x", "type": "file_count", "group": ""}]}
-    )
+    errors = _errors_of({"metrics": [{"name": "x", "type": "file_count", "group": ""}]})
 
     assert 'metric "x": group must be a non-empty string' in errors
 
 
 def test_non_string_group_is_rejected() -> None:
-    errors = _errors_of(
-        {"metrics": [{"name": "x", "type": "file_count", "group": 3}]}
-    )
+    errors = _errors_of({"metrics": [{"name": "x", "type": "file_count", "group": 3}]})
 
     assert 'metric "x": group must be a non-empty string' in errors
 

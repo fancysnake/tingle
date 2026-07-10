@@ -8,9 +8,7 @@ from tingle.pacts.config import ConfigError, MetricDraft
 
 RAW = {
     "ranges": {"python": {"include": ["**/*.py"]}},
-    "metrics": [
-        {"name": "noqa-comments", "type": "regex_count", "pattern": "# noqa"}
-    ],
+    "metrics": [{"name": "noqa-comments", "type": "regex_count", "pattern": "# noqa"}],
 }
 
 
@@ -34,12 +32,7 @@ def test_single_range_uses_string_key() -> None:
 
 
 def test_multiple_ranges_use_list_key() -> None:
-    raw = {
-        "ranges": {
-            "a": {"include": ["**/*.a"]},
-            "b": {"include": ["**/*.b"]},
-        }
-    }
+    raw = {"ranges": {"a": {"include": ["**/*.a"]}, "b": {"include": ["**/*.b"]}}}
     draft = MetricDraft(type_name="regex_count", value="x", ranges=("a", "b"))
 
     metric = build_metric(raw, METRIC_TYPES, draft)
@@ -78,9 +71,7 @@ def test_explicit_name_and_params() -> None:
 
 
 def test_group_is_written_after_type_and_validates() -> None:
-    draft = MetricDraft(
-        type_name="regex_count", value="x", group="typing"
-    )
+    draft = MetricDraft(type_name="regex_count", value="x", group="typing")
 
     metric = build_metric(RAW, METRIC_TYPES, draft)
 
@@ -151,9 +142,7 @@ def test_duplicate_explicit_name_is_rejected() -> None:
 
 
 def test_value_and_param_conflict() -> None:
-    draft = MetricDraft(
-        type_name="regex_count", value="x", params={"pattern": "y"}
-    )
+    draft = MetricDraft(type_name="regex_count", value="x", params={"pattern": "y"})
 
     with pytest.raises(ConfigError) as excinfo:
         build_metric({}, METRIC_TYPES, draft)

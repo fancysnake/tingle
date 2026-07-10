@@ -8,10 +8,7 @@ from tingle.pacts.diff import DiffMetricContext, FileDiff, FileStatus
 
 def _context(*files: FileDiff) -> DiffMetricContext:
     return DiffMetricContext(
-        files=files,
-        read=lambda _: None,
-        read_base=lambda _: None,
-        params={},
+        files=files, read=lambda _: None, read_base=lambda _: None, params={}
     )
 
 

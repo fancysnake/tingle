@@ -4,6 +4,7 @@ All git invocations run with cwd at the tingle project root, hardened
 against user diff configuration (external diff drivers, prefix and
 quoting settings). Filenames containing newlines are unsupported.
 """
+
 from __future__ import annotations
 
 import os
@@ -60,9 +61,7 @@ class GitCli:
         diff_files = _parse_diff(self._run(*_DIFF_ARGS, merge_base))
         untracked = self._untracked_files(seen={diff.path for diff in diff_files})
         return BranchDiff(
-            base_ref=base_ref,
-            merge_base=merge_base,
-            files=(*diff_files, *untracked),
+            base_ref=base_ref, merge_base=merge_base, files=(*diff_files, *untracked)
         )
 
     def read_base(self, path: PurePath) -> str | None:

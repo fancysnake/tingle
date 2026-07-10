@@ -58,9 +58,7 @@ PROJECT = FakeProject({"a.py": "", "b.py": "", "notes.md": ""})
 
 
 def test_runs_metrics_and_reports_values() -> None:
-    config = _config(
-        MetricSpec(name="files", type="file_count", ranges=("python",))
-    )
+    config = _config(MetricSpec(name="files", type="file_count", ranges=("python",)))
 
     report = run(config, PROJECT, METRIC_TYPES)
 

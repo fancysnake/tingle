@@ -13,9 +13,7 @@ SYMBOL = "myapp.legacy.OldClient"
 
 
 def _run(
-    file: FileDiff,
-    current: Mapping[str, str | None],
-    base: Mapping[str, str | None],
+    file: FileDiff, current: Mapping[str, str | None], base: Mapping[str, str | None]
 ) -> DiffResult:
     return symbol_uses_diff(
         DiffMetricContext(
@@ -35,9 +33,7 @@ def test_counts_uses_on_added_lines() -> None:
         "new = OldClient()\n"
     )
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.MODIFIED,
-        added_lines=frozenset({4}),
+        path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({4})
     )
 
     result = _run(file, {"a.py": code}, {})
@@ -51,9 +47,7 @@ def test_counts_uses_on_added_lines() -> None:
 def test_counts_uses_on_removed_lines_from_base() -> None:
     base_code = "from myapp.legacy import OldClient\n\ngone = OldClient()\n"
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.MODIFIED,
-        removed_lines=frozenset({3}),
+        path=PurePath("a.py"), status=FileStatus.MODIFIED, removed_lines=frozenset({3})
     )
 
     result = _run(file, {"a.py": "clean = 1\n"}, {"a.py": base_code})
@@ -66,9 +60,7 @@ def test_counts_uses_on_removed_lines_from_base() -> None:
 def test_import_line_counts_as_use() -> None:
     code = "from myapp.legacy import OldClient\n"
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.ADDED,
-        added_lines=frozenset({1}),
+        path=PurePath("a.py"), status=FileStatus.ADDED, added_lines=frozenset({1})
     )
 
     result = _run(file, {"a.py": code}, {})
@@ -79,9 +71,7 @@ def test_import_line_counts_as_use() -> None:
 def test_untouched_uses_do_not_count() -> None:
     code = "from myapp.legacy import OldClient\n\nold = OldClient()\nx = 1\n"
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.MODIFIED,
-        added_lines=frozenset({4}),
+        path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({4})
     )
 
     result = _run(file, {"a.py": code}, {})
@@ -111,9 +101,7 @@ def test_base_syntax_error_warns_and_skips_side() -> None:
 
 def test_unreadable_current_side_warns() -> None:
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.MODIFIED,
-        added_lines=frozenset({1}),
+        path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({1})
     )
 
     result = _run(file, {}, {})
@@ -124,9 +112,7 @@ def test_unreadable_current_side_warns() -> None:
 
 def test_non_python_files_ignored() -> None:
     file = FileDiff(
-        path=PurePath("notes.md"),
-        status=FileStatus.ADDED,
-        added_lines=frozenset({1}),
+        path=PurePath("notes.md"), status=FileStatus.ADDED, added_lines=frozenset({1})
     )
 
     result = _run(file, {"notes.md": "myapp.legacy.OldClient\n"}, {})
@@ -138,9 +124,7 @@ def test_non_python_files_ignored() -> None:
 def test_details_show_per_file_net() -> None:
     code = "from myapp.legacy import OldClient\n"
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.ADDED,
-        added_lines=frozenset({1}),
+        path=PurePath("a.py"), status=FileStatus.ADDED, added_lines=frozenset({1})
     )
 
     result = _run(file, {"a.py": code}, {})

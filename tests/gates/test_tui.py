@@ -403,12 +403,7 @@ def test_arrows_are_the_advertised_navigation_keys() -> None:
     assert {b.key for b in app_bindings}.isdisjoint({"up", "down", "left", "right"})
     assert not any(b.priority for b in (*app_bindings, *nav_bindings))
     shown = {b.key: b.description for b in nav_bindings if b.show}
-    assert shown == {
-        "up": "Prev",
-        "down": "Next",
-        "left": "Fold",
-        "right": "Unfold",
-    }
+    assert shown == {"up": "Prev", "down": "Next", "left": "Fold", "right": "Unfold"}
     assert all(not b.show for b in nav_bindings if b.key in {"h", "j", "k", "l"})
 
 

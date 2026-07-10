@@ -1,4 +1,5 @@
 """Validation of raw configuration data into a Config."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -32,8 +33,7 @@ def validate(
     """Turn raw config data into a Config, or raise ConfigError with every problem."""
     errors: list[str] = []
     errors.extend(
-        f'unknown top-level key "{key}"'
-        for key in sorted(set(raw) - _TOP_LEVEL_KEYS)
+        f'unknown top-level key "{key}"' for key in sorted(set(raw) - _TOP_LEVEL_KEYS)
     )
 
     ranges = _validate_ranges(raw.get("ranges", {}), errors)
@@ -65,8 +65,7 @@ def _validate_ranges(raw_ranges: object, errors: list[str]) -> dict[str, RangeSp
             errors.append(f"{label}: must be a table")
             continue
         errors.extend(
-            f'{label}: unknown key "{key}"'
-            for key in sorted(set(table) - _RANGE_KEYS)
+            f'{label}: unknown key "{key}"' for key in sorted(set(table) - _RANGE_KEYS)
         )
 
         include = _string_list(table.get("include"), f"{label}: include", errors)
@@ -159,10 +158,7 @@ def _metric_group(
 
 
 def _metric_name(
-    table: Mapping[str, Any],
-    index: int,
-    seen_names: set[str],
-    errors: list[str],
+    table: Mapping[str, Any], index: int, seen_names: set[str], errors: list[str]
 ) -> tuple[str | None, str]:
     """Validate a metric's name; return it (or None) plus the error label."""
     name = table.get("name")
@@ -218,10 +214,7 @@ def _metric_ranges(
 
 
 def _validate_params(
-    metric_type: MetricType,
-    params: Mapping[str, Any],
-    label: str,
-    errors: list[str],
+    metric_type: MetricType, params: Mapping[str, Any], label: str, errors: list[str]
 ) -> None:
     known = set(metric_type.required_params) | set(metric_type.optional_params)
     errors.extend(
@@ -229,8 +222,7 @@ def _validate_params(
         for missing in sorted(set(metric_type.required_params) - set(params))
     )
     errors.extend(
-        f'{label}: unknown param "{unknown}"'
-        for unknown in sorted(set(params) - known)
+        f'{label}: unknown param "{unknown}"' for unknown in sorted(set(params) - known)
     )
     if metric_type.validate_params is not None and set(
         metric_type.required_params
@@ -269,9 +261,7 @@ def _resolve_default_range(
 def _string_list(value: object, label: str, errors: list[str]) -> list[str] | None:
     if value is None:
         return None
-    if not isinstance(value, list) or not all(
-        isinstance(item, str) for item in value
-    ):
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         errors.append(f"{label} must be a list of strings")
         return None
     return value

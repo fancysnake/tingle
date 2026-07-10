@@ -26,15 +26,11 @@ def _context(
 
 def test_counts_only_on_added_lines() -> None:
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.MODIFIED,
-        added_lines=frozenset({2}),
+        path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({2})
     )
     current = {"a.py": "x = 1  # noqa\ny = 2  # noqa\nz = 3  # noqa\n"}
 
-    result = regex_count_diff(
-        _context((file,), current, {}, {"pattern": r"#\s*noqa"})
-    )
+    result = regex_count_diff(_context((file,), current, {}, {"pattern": r"#\s*noqa"}))
 
     assert result.added == 1
     assert result.removed == 0
@@ -85,9 +81,7 @@ def test_modified_line_with_surviving_match_is_net_zero() -> None:
 
 def test_multiple_matches_per_line() -> None:
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.ADDED,
-        added_lines=frozenset({1}),
+        path=PurePath("a.py"), status=FileStatus.ADDED, added_lines=frozenset({1})
     )
     result = regex_count_diff(
         _context((file,), {"a.py": "TODO and TODO again\n"}, {}, {"pattern": "TODO"})
@@ -98,9 +92,7 @@ def test_multiple_matches_per_line() -> None:
 
 def test_newline_patterns_never_match_in_diff_mode() -> None:
     file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.ADDED,
-        added_lines=frozenset({1, 2}),
+        path=PurePath("a.py"), status=FileStatus.ADDED, added_lines=frozenset({1, 2})
     )
     result = regex_count_diff(
         _context((file,), {"a.py": "one\ntwo\n"}, {}, {"pattern": r"one\ntwo"})

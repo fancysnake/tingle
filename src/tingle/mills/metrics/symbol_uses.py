@@ -4,6 +4,7 @@ Static analysis only: re-exports, string references, and getattr are
 invisible. Bare symbols count every same-named name/attribute in scope.
 An occurrence is attributed to the line where the reference starts.
 """
+
 from __future__ import annotations
 
 import ast
@@ -40,9 +41,7 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
 
         lines, star_fallback = _occurrence_lines(tree, parts)
         if star_fallback:
-            warnings.append(
-                f"{path}: star import: falling back to bare-name counting"
-            )
+            warnings.append(f"{path}: star import: falling back to bare-name counting")
         if lines:
             details[str(path)] = len(lines)
             occurrences.extend(
@@ -135,9 +134,7 @@ def _side_occurrences(
     return found, warnings
 
 
-def _occurrence_lines(
-    tree: ast.AST, parts: tuple[str, ...]
-) -> tuple[list[int], bool]:
+def _occurrence_lines(tree: ast.AST, parts: tuple[str, ...]) -> tuple[list[int], bool]:
     """Line numbers of every occurrence; flag = star-import fallback used."""
     if len(parts) == 1:
         return _bare_occurrences(tree, parts[0]), False
@@ -191,9 +188,7 @@ def _bind_plain_import(
 
 
 def _bind_from_import(
-    node: ast.ImportFrom,
-    parts: tuple[str, ...],
-    bindings: dict[str, tuple[str, ...]],
+    node: ast.ImportFrom, parts: tuple[str, ...], bindings: dict[str, tuple[str, ...]]
 ) -> list[int]:
     """Bind from-imported names; return lines that import the symbol itself."""
     module = tuple(node.module.split(".")) if node.module else ()

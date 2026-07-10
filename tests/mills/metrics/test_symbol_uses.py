@@ -123,10 +123,7 @@ def test_non_python_files_are_ignored() -> None:
 
 def test_details_are_per_file() -> None:
     result = _run_files(
-        {
-            "a.py": "from myapp.legacy import OldClient\nOldClient()\n",
-            "b.py": "x = 1\n",
-        }
+        {"a.py": "from myapp.legacy import OldClient\nOldClient()\n", "b.py": "x = 1\n"}
     )
 
     assert dict(result.details) == {"a.py": 2}

@@ -54,12 +54,7 @@ def test_occurrence_sort_key_handles_missing_fields() -> None:
 
     ordered = sorted(occurrences, key=lambda o: o.sort_key)
 
-    assert [str(o) for o in ordered] == [
-        "a.py",
-        "a.py: E501",
-        "a.py:5",
-        "b.py:2",
-    ]
+    assert [str(o) for o in ordered] == ["a.py", "a.py: E501", "a.py:5", "b.py:2"]
 
 
 def test_occurrence_is_immutable() -> None:

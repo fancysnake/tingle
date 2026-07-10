@@ -1,4 +1,5 @@
 """Command-line gate for tingle (typer adapter)."""
+
 from __future__ import annotations
 
 import sys
@@ -24,12 +25,7 @@ from tingle.inits.wiring import diff_source as make_diff_source
 from tingle.mills.add import build_metric
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run as run_metrics
-from tingle.pacts.config import (
-    Config,
-    ConfigError,
-    ConfigNotFoundError,
-    MetricDraft,
-)
+from tingle.pacts.config import Config, ConfigError, ConfigNotFoundError, MetricDraft
 from tingle.pacts.diff import DiffReport, DiffSourceError
 
 if TYPE_CHECKING:
@@ -49,8 +45,7 @@ JsonOption = Annotated[
     bool, typer.Option("--json", help="Machine-readable JSON output.")
 ]
 DiffOption = Annotated[
-    bool,
-    typer.Option("--diff", help="Measure the current branch's impact instead."),
+    bool, typer.Option("--diff", help="Measure the current branch's impact instead.")
 ]
 BaseOption = Annotated[
     str | None,
@@ -138,8 +133,7 @@ def report_command(
         typer.echo(xml)
         for name in excluded:
             typer.echo(
-                f"note: {name}: not representable in cobertura"
-                " (no line locations)",
+                f"note: {name}: not representable in cobertura (no line locations)",
                 err=True,
             )
         _finish_run(run_report)
@@ -185,8 +179,7 @@ def add_command(
         typer.Option("--name", help="Metric name (auto-generated if omitted)."),
     ] = None,
     range_names: Annotated[
-        list[str] | None,
-        typer.Option("--range", help="Target range (repeatable)."),
+        list[str] | None, typer.Option("--range", help="Target range (repeatable).")
     ] = None,
     group: Annotated[
         str | None,
@@ -234,10 +227,7 @@ def main() -> None:
 
 
 def _interactive(
-    diff: bool,
-    base: str | None,
-    config_path: Path | None,
-    metrics: list[str] | None,
+    diff: bool, base: str | None, config_path: Path | None, metrics: list[str] | None
 ) -> None:
     """Run the metrics, then hand the report to the interactive TUI."""
     # imported lazily: textual is heavy and only needed on this path
@@ -277,9 +267,7 @@ def _print_stat(
         _finish_run(run_report)
 
 
-def _collect_run(
-    config_path: Path | None, metrics: list[str] | None
-) -> RunReport:
+def _collect_run(config_path: Path | None, metrics: list[str] | None) -> RunReport:
     config = _load(config_path)
     try:
         return run_metrics(
@@ -321,9 +309,7 @@ def _finish_run(report: RunReport) -> None:
 
 def _finish_diff(report: DiffReport) -> None:
     for name in report.skipped:
-        typer.echo(
-            f"note: {name}: metric type does not support diff mode", err=True
-        )
+        typer.echo(f"note: {name}: metric type does not support diff mode", err=True)
     for outcome in report.outcomes:
         if outcome.error is not None:
             typer.echo(f"error: {outcome.spec.name}: {outcome.error}", err=True)
@@ -340,8 +326,7 @@ def _parse_params(pairs: list[str]) -> dict[str, str]:
         key, sep, value = pair.partition("=")
         if not sep or not key:
             typer.echo(
-                f'config error: invalid --param "{pair}" (expected key=value)',
-                err=True,
+                f'config error: invalid --param "{pair}" (expected key=value)', err=True
             )
             raise typer.Exit(2)
         params[key] = value

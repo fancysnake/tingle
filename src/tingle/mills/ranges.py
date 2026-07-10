@@ -4,6 +4,7 @@ The matcher mirrors pathlib's full-match glob semantics (`*` and `?`
 stay within a path segment, `**` spans any number of segments) and is
 implemented here because PurePath.full_match only exists on 3.13+.
 """
+
 from __future__ import annotations
 
 import re
@@ -26,9 +27,7 @@ def resolve(
     spec_list = list(specs)
     return tuple(
         sorted(
-            path
-            for path in files
-            if any(_matches(path, spec) for spec in spec_list)
+            path for path in files if any(_matches(path, spec) for spec in spec_list)
         )
     )
 
@@ -38,8 +37,7 @@ def _matches(path: PurePath, spec: RangeSpec) -> bool:
     if not any(_pattern(glob).match(name) for glob in spec.include):
         return False
     return not any(
-        _pattern(glob).match(name)
-        for glob in (*spec.exclude, *DEFAULT_EXCLUDES)
+        _pattern(glob).match(name) for glob in (*spec.exclude, *DEFAULT_EXCLUDES)
     )
 
 

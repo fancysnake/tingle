@@ -33,9 +33,7 @@ key = "tool.ruff.lint.ignore"
 @pytest.fixture
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "tingle.toml").write_text(CONFIG)
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.ruff.lint]\nignore = ["E501"]\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[tool.ruff.lint]\nignore = ["E501"]\n')
     src = tmp_path / "src"
     src.mkdir()
     (src / "a.py").write_text("x = 1  # noqa\ny = 2\nz = 3  # noqa\n")

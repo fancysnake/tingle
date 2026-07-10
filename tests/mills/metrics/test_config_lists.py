@@ -97,8 +97,7 @@ def test_toml_custom_file() -> None:
 def test_toml_table_of_lists_sums_lengths() -> None:
     result = toml_list_length(
         _context(
-            {"pyproject.toml": PYPROJECT},
-            {"key": "tool.ruff.lint.per-file-ignores"},
+            {"pyproject.toml": PYPROJECT}, {"key": "tool.ruff.lint.per-file-ignores"}
         )
     )
 
@@ -137,9 +136,7 @@ def test_toml_missing_file_warns() -> None:
 
 
 def test_toml_malformed_warns() -> None:
-    result = toml_list_length(
-        _context({"pyproject.toml": "[broken"}, {"key": "x"})
-    )
+    result = toml_list_length(_context({"pyproject.toml": "[broken"}, {"key": "x"}))
 
     assert result.value == 0
     assert "invalid TOML" in result.warnings[0]
@@ -170,9 +167,7 @@ def test_table_array_counts_tables_and_labels_them() -> None:
 
 def test_table_array_without_label_uses_index_notes() -> None:
     result = toml_table_array(
-        _context(
-            {"pyproject.toml": MYPY_OVERRIDES}, {"key": "tool.mypy.overrides"}
-        )
+        _context({"pyproject.toml": MYPY_OVERRIDES}, {"key": "tool.mypy.overrides"})
     )
 
     assert result.value == 3
@@ -181,9 +176,7 @@ def test_table_array_without_label_uses_index_notes() -> None:
 
 def test_table_array_default_file_is_pyproject() -> None:
     result = toml_table_array(
-        _context(
-            {"pyproject.toml": MYPY_OVERRIDES}, {"key": "tool.mypy.overrides"}
-        )
+        _context({"pyproject.toml": MYPY_OVERRIDES}, {"key": "tool.mypy.overrides"})
     )
 
     assert result.value == 3
@@ -191,9 +184,7 @@ def test_table_array_default_file_is_pyproject() -> None:
 
 def test_table_array_empty_is_zero_without_warning() -> None:
     result = toml_table_array(
-        _context(
-            {"pyproject.toml": "over = []\n"}, {"key": "over", "label": "module"}
-        )
+        _context({"pyproject.toml": "over = []\n"}, {"key": "over", "label": "module"})
     )
 
     # an empty array of tables vacuously satisfies "every element a table"
@@ -204,10 +195,7 @@ def test_table_array_empty_is_zero_without_warning() -> None:
 
 def test_table_array_non_array_of_tables_warns() -> None:
     result = toml_table_array(
-        _context(
-            {"pyproject.toml": "over = [1, 2]\n"},
-            {"key": "over"},
-        )
+        _context({"pyproject.toml": "over = [1, 2]\n"}, {"key": "over"})
     )
 
     assert result.value == 0
@@ -321,9 +309,7 @@ def test_ini_malformed_warns() -> None:
 
 
 def test_validate_ini_params() -> None:
-    assert (
-        validate_ini_params({"file": "a", "section": "b", "option": "c"}) == []
-    )
+    assert validate_ini_params({"file": "a", "section": "b", "option": "c"}) == []
     assert validate_ini_params({"file": 1, "section": "b", "option": "c"}) == [
         "file must be a string"
     ]

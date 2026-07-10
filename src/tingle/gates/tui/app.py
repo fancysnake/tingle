@@ -1,4 +1,5 @@
 """Interactive terminal UI over run and diff reports (textual adapter)."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
@@ -183,8 +184,7 @@ class MetricsApp(App[None]):
         if focused is None:
             return None
         return next(
-            (a for a in focused.ancestors_with_self if isinstance(a, Collapsible)),
-            None,
+            (a for a in focused.ancestors_with_self if isinstance(a, Collapsible)), None
         )
 
     def _title(self, outcome: MetricOutcome | DiffOutcome) -> str:

@@ -4,11 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tingle.links.config_file.toml import (
-    append_metric,
-    edit_target,
-    write_starter,
-)
+from tingle.links.config_file.toml import append_metric, edit_target, write_starter
 
 if TYPE_CHECKING:
     from pathlib import Path

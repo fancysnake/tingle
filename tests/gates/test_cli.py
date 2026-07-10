@@ -154,9 +154,7 @@ def test_invalid_config_exits_2(
 
 
 @pytest.mark.usefixtures("project")
-def test_raising_metric_exits_1_but_others_run(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_raising_metric_exits_1_but_others_run(monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(_: MetricContext) -> MetricResult:
         msg = "boom"
         raise RuntimeError(msg)

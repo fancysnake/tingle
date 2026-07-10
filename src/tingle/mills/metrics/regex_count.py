@@ -1,4 +1,5 @@
 """Regex match counting metric."""
+
 from __future__ import annotations
 
 import re
@@ -14,11 +15,7 @@ if TYPE_CHECKING:
 
     from tingle.pacts.diff import FileDiff
 
-_FLAGS = {
-    "IGNORECASE": re.IGNORECASE,
-    "MULTILINE": re.MULTILINE,
-    "DOTALL": re.DOTALL,
-}
+_FLAGS = {"IGNORECASE": re.IGNORECASE, "MULTILINE": re.MULTILINE, "DOTALL": re.DOTALL}
 
 
 def regex_count(ctx: MetricContext) -> MetricResult:
@@ -38,9 +35,7 @@ def regex_count(ctx: MetricContext) -> MetricResult:
             continue
         line_starts = _line_starts(text)
         found = [
-            Occurrence(
-                path=str(path), line=bisect_right(line_starts, match.start())
-            )
+            Occurrence(path=str(path), line=bisect_right(line_starts, match.start()))
             for match in pattern.finditer(text)
         ]
         if found:
@@ -134,9 +129,7 @@ def validate_params(params: Mapping[str, Any]) -> list[str]:
             errors.append(f"invalid pattern: {exc}")
 
     flags = params.get("flags", [])
-    if not isinstance(flags, list) or not all(
-        isinstance(flag, str) for flag in flags
-    ):
+    if not isinstance(flags, list) or not all(isinstance(flag, str) for flag in flags):
         errors.append("flags must be a list of strings")
     else:
         allowed = ", ".join(sorted(_FLAGS))

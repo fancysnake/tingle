@@ -3,12 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tingle.gates.cli.render import (
-    group_sections,
-    report_table,
-    run_json,
-    run_listing,
-)
+from tingle.gates.cli.render import group_sections, report_table, run_json, run_listing
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.metrics import MetricResult
 from tingle.pacts.report import MetricOutcome, RunReport
@@ -39,11 +34,7 @@ def test_group_sections_first_appearance_order_ungrouped_last() -> None:
     )
 
     names = [(group, [o.spec.name for o in outs]) for group, outs in sections]
-    assert names == [
-        ("typing", ["a", "c"]),
-        ("lint", ["b"]),
-        (None, ["d"]),
-    ]
+    assert names == [("typing", ["a", "c"]), ("lint", ["b"]), (None, ["d"])]
 
 
 def test_group_sections_no_groups_single_section_original_order() -> None:
@@ -79,9 +70,7 @@ def test_report_table_group_column_only_when_grouped() -> None:
 
 
 def test_json_carries_group_and_null_when_unset() -> None:
-    payload = json.loads(
-        run_json(_report(_outcome("a", "typing"), _outcome("b")))
-    )
+    payload = json.loads(run_json(_report(_outcome("a", "typing"), _outcome("b"))))
     by_name = {entry["name"]: entry for entry in payload["metrics"]}
 
     assert by_name["a"]["group"] == "typing"

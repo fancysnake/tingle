@@ -1,4 +1,5 @@
 """Execute configured metrics and collect a RunReport."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -35,10 +36,7 @@ def run(
         range_specs, range_names = ranges_for(spec, config)
         files = resolve(walked, range_specs)
         context = MetricContext(
-            files=files,
-            read=project.read,
-            exists=project.exists,
-            params=spec.params,
+            files=files, read=project.read, exists=project.exists, params=spec.params
         )
         try:
             result = metric_types[spec.type].func(context)

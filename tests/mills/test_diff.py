@@ -67,12 +67,8 @@ def _boom_total(_: MetricContext) -> MetricResult:
 
 
 METRIC_TYPES = {
-    "touched": MetricType(
-        name="touched", func=_total_files, diff_func=_touched_files
-    ),
-    "boom_diff": MetricType(
-        name="boom_diff", func=_total_files, diff_func=_boom_diff
-    ),
+    "touched": MetricType(name="touched", func=_total_files, diff_func=_touched_files),
+    "boom_diff": MetricType(name="boom_diff", func=_total_files, diff_func=_boom_diff),
     "boom_total": MetricType(
         name="boom_total", func=_boom_total, diff_func=_touched_files
     ),
@@ -129,15 +125,13 @@ def test_range_filtering_applies_to_changed_files() -> None:
         root=Path("/proj"),
         source=Path("/proj/tingle.toml"),
         ranges={"python": PYTHON_RANGE, "everything": everything},
-        metrics=(
-            MetricSpec(name="all", type="touched", ranges=("everything",)),
-        ),
+        metrics=(MetricSpec(name="all", type="touched", ranges=("everything",)),),
         default_range=PYTHON_RANGE,
     )
 
-    report = DiffRunner(
-        config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES
-    ).run("main")
+    report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
+        "main"
+    )
 
     outcome = report.outcomes[0]
     assert outcome.result is not None
@@ -150,9 +144,9 @@ def test_raising_diff_func_is_isolated() -> None:
         MetricSpec(name="files", type="touched"),
     )
 
-    report = DiffRunner(
-        config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES
-    ).run("main")
+    report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
+        "main"
+    )
 
     broken, files = report.outcomes
     assert broken.error == "ValueError: diff boom"
@@ -163,9 +157,9 @@ def test_raising_diff_func_is_isolated() -> None:
 def test_raising_total_func_is_isolated() -> None:
     config = _config(MetricSpec(name="broken-total", type="boom_total"))
 
-    report = DiffRunner(
-        config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES
-    ).run("main")
+    report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
+        "main"
+    )
 
     assert report.outcomes[0].error == "ValueError: total boom"
 
@@ -176,9 +170,9 @@ def test_type_without_diff_func_is_skipped() -> None:
         MetricSpec(name="files", type="touched"),
     )
 
-    report = DiffRunner(
-        config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES
-    ).run("main")
+    report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
+        "main"
+    )
 
     assert report.skipped == ("plain",)
     assert [outcome.spec.name for outcome in report.outcomes] == ["files"]
@@ -190,9 +184,9 @@ def test_only_filter() -> None:
         MetricSpec(name="second", type="touched"),
     )
 
-    report = DiffRunner(
-        config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES
-    ).run("main", only=["second"])
+    report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
+        "main", only=["second"]
+    )
 
     assert [outcome.spec.name for outcome in report.outcomes] == ["second"]
 
@@ -201,8 +195,8 @@ def test_only_filter_rejects_unknown() -> None:
     config = _config(MetricSpec(name="files", type="touched"))
 
     with pytest.raises(ConfigError) as excinfo:
-        DiffRunner(
-            config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES
-        ).run("main", only=["nope"])
+        DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
+            "main", only=["nope"]
+        )
 
     assert 'unknown metric "nope"' in excinfo.value.errors

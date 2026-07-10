@@ -48,8 +48,7 @@ def test_add_appends_preserving_comments(workdir: Path) -> None:
     (workdir / "tingle.toml").write_text(original)
 
     result = runner.invoke(
-        app,
-        ["add", "regex_count", "TODO", "--name", "todos", "--range", "python"],
+        app, ["add", "regex_count", "TODO", "--name", "todos", "--range", "python"]
     )
 
     assert result.exit_code == 0
@@ -65,8 +64,7 @@ def test_add_multiple_ranges(workdir: Path) -> None:
     )
 
     result = runner.invoke(
-        app,
-        ["add", "regex_count", "x", "--range", "a", "--range", "b"],
+        app, ["add", "regex_count", "x", "--range", "a", "--range", "b"]
     )
 
     assert result.exit_code == 0

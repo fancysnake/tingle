@@ -1,4 +1,5 @@
 """Execute configured metrics against a branch diff."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -40,9 +41,7 @@ class DiffRunner:
             known = {spec.name for spec in self.config.metrics}
             unknown = sorted(set(only) - known)
             if unknown:
-                raise ConfigError(
-                    [f'unknown metric "{name}"' for name in unknown]
-                )
+                raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
         branch_diff = self.diff_source.branch_diff(base)
         walked = tuple(self.project.walk())
@@ -92,9 +91,7 @@ class DiffRunner:
             total = self.metric_types[spec.type].func(total_context)
         except Exception as exc:  # metric isolation: a failure must not stop the run
             return DiffOutcome(
-                spec=spec,
-                range_names=range_names,
-                error=f"{type(exc).__name__}: {exc}",
+                spec=spec, range_names=range_names, error=f"{type(exc).__name__}: {exc}"
             )
         return DiffOutcome(
             spec=spec, range_names=range_names, result=result, total=total

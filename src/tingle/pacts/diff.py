@@ -1,4 +1,5 @@
 """Contracts for diff-scoped metric runs (`tingle diff`)."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping

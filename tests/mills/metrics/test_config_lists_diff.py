@@ -130,11 +130,7 @@ def test_table_array_missing_base_prefixes_warning() -> None:
 def test_ini_delta() -> None:
     base = {".pylintrc": "[MESSAGES CONTROL]\ndisable = a,b\n"}
     current = {".pylintrc": "[MESSAGES CONTROL]\ndisable = a,b,c\n"}
-    params = {
-        "file": ".pylintrc",
-        "section": "MESSAGES CONTROL",
-        "option": "disable",
-    }
+    params = {"file": ".pylintrc", "section": "MESSAGES CONTROL", "option": "disable"}
 
     result = ini_list_length_diff(_context(current, base, params))
 

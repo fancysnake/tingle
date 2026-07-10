@@ -15,16 +15,11 @@ def test_include_globs_match_nested_paths() -> None:
     spec = RangeSpec(name="python", include=("src/**/*.py",))
     files = _paths("src/a.py", "src/deep/b.py", "src/c.txt", "other/d.py")
 
-    assert resolve(files, [spec]) == (
-        PurePath("src/a.py"),
-        PurePath("src/deep/b.py"),
-    )
+    assert resolve(files, [spec]) == (PurePath("src/a.py"), PurePath("src/deep/b.py"))
 
 
 def test_exclude_globs_remove_matches() -> None:
-    spec = RangeSpec(
-        name="python", include=("src/**/*.py",), exclude=("src/gen/**",)
-    )
+    spec = RangeSpec(name="python", include=("src/**/*.py",), exclude=("src/gen/**",))
     files = _paths("src/a.py", "src/gen/b.py")
 
     assert resolve(files, [spec]) == (PurePath("src/a.py"),)

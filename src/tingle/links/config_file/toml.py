@@ -1,4 +1,5 @@
 """TOML adapter for tingle's own configuration file."""
+
 from __future__ import annotations
 
 import tomllib
@@ -74,9 +75,7 @@ def load_raw(root: Path, override: Path | None = None) -> tuple[Path, dict[str, 
             raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
 
     msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
-    raise ConfigNotFoundError(
-        msg
-    )
+    raise ConfigNotFoundError(msg)
 
 
 def edit_target(root: Path) -> Path:

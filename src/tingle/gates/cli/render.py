@@ -1,4 +1,5 @@
 """Rendering of run and diff reports: tables, listings, JSON, cobertura."""
+
 from __future__ import annotations
 
 import json
@@ -40,9 +41,7 @@ def group_sections(
 
 def _in_section_order(outcomes: Sequence[_Outcome]) -> list[_Outcome]:
     """Flatten outcomes into group_sections order (ungrouped last)."""
-    return [
-        outcome for _name, group in group_sections(outcomes) for outcome in group
-    ]
+    return [outcome for _name, group in group_sections(outcomes) for outcome in group]
 
 
 def _section_heading(name: str | None, *, has_named: bool) -> Text | None:
@@ -72,9 +71,7 @@ def report_table(report: RunReport) -> Table:
     for _name, outcomes in sections:
         for outcome in outcomes:
             value = (
-                "[red]ERROR[/]"
-                if outcome.result is None
-                else str(outcome.result.value)
+                "[red]ERROR[/]" if outcome.result is None else str(outcome.result.value)
             )
             group = (outcome.spec.group or "",) if grouped else ()
             table.add_row(
@@ -202,9 +199,7 @@ def _diff_heading(outcome: DiffOutcome) -> Text:
         impact = f"+{result.added} / -{result.removed} (net {result.net:+d})"
     else:
         impact = f"net {result.net:+d}"
-    return Text(
-        f"{outcome.spec.name} ({outcome.spec.type}): {impact}", style="bold"
-    )
+    return Text(f"{outcome.spec.name} ({outcome.spec.type}): {impact}", style="bold")
 
 
 def run_json(report: RunReport) -> str:
@@ -220,15 +215,11 @@ def run_json(report: RunReport) -> str:
                     "group": outcome.spec.group,
                     "ranges": list(outcome.range_names),
                     "value": outcome.result.value if outcome.result else None,
-                    "details": dict(outcome.result.details)
-                    if outcome.result
-                    else {},
+                    "details": dict(outcome.result.details) if outcome.result else {},
                     "occurrences": _occurrences_json(
                         outcome.result.occurrences if outcome.result else ()
                     ),
-                    "warnings": (
-                        list(outcome.result.warnings) if outcome.result else []
-                    ),
+                    "warnings": list(outcome.result.warnings) if outcome.result else [],
                     "error": outcome.error,
                 }
                 for outcome in _in_section_order(report.outcomes)
@@ -254,9 +245,7 @@ def diff_json(report: DiffReport) -> str:
                     "ranges": list(outcome.range_names),
                     **_diff_values(outcome),
                     "total": outcome.total.value if outcome.total else None,
-                    "warnings": (
-                        list(outcome.result.warnings) if outcome.result else []
-                    ),
+                    "warnings": list(outcome.result.warnings) if outcome.result else [],
                     "error": outcome.error,
                 }
                 for outcome in _in_section_order(report.outcomes)
@@ -331,9 +320,7 @@ def cobertura(report: RunReport) -> tuple[str, list[str]]:
 def _cobertura_package(
     packages: ET.Element, name: str, located: list[Occurrence]
 ) -> int:
-    package = ET.SubElement(
-        packages, "package", {"name": name, "line-rate": "0"}
-    )
+    package = ET.SubElement(packages, "package", {"name": name, "line-rate": "0"})
     classes = ET.SubElement(package, "classes")
     by_file: dict[str, set[int]] = {}
     for occurrence in located:
@@ -342,23 +329,17 @@ def _cobertura_package(
     total = 0
     for path in sorted(by_file):
         cls = ET.SubElement(
-            classes,
-            "class",
-            {"name": path, "filename": path, "line-rate": "0"},
+            classes, "class", {"name": path, "filename": path, "line-rate": "0"}
         )
         ET.SubElement(cls, "methods")
         lines = ET.SubElement(cls, "lines")
         for line in sorted(by_file[path]):
-            ET.SubElement(
-                lines, "line", {"number": str(line), "hits": "0"}
-            )
+            ET.SubElement(lines, "line", {"number": str(line), "hits": "0"})
         total += len(by_file[path])
     return total
 
 
-def _occurrences_json(
-    occurrences: tuple[Occurrence, ...],
-) -> list[dict[str, Any]]:
+def _occurrences_json(occurrences: tuple[Occurrence, ...]) -> list[dict[str, Any]]:
     return [
         {"file": occurrence.path, "line": occurrence.line, "note": occurrence.note}
         for occurrence in occurrences

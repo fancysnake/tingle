@@ -3,6 +3,7 @@
 These are the generic building blocks for counting ignored lint rules:
 point them at whatever config file and key/option a linter actually uses.
 """
+
 from __future__ import annotations
 
 import configparser
@@ -34,8 +35,7 @@ def ini_list_length_diff(ctx: DiffMetricContext) -> DiffResult:
 
 
 def _delta(
-    count: Callable[[_Reader, Mapping[str, Any]], MetricResult],
-    ctx: DiffMetricContext,
+    count: Callable[[_Reader, Mapping[str, Any]], MetricResult], ctx: DiffMetricContext
 ) -> DiffResult:
     base = count(ctx.read_base, ctx.params)
     current = count(ctx.read, ctx.params)
@@ -60,9 +60,7 @@ def _delta(
     )
 
 
-def _descend_toml(
-    read: _Reader, params: Mapping[str, Any]
-) -> tuple[Any, str | None]:
+def _descend_toml(read: _Reader, params: Mapping[str, Any]) -> tuple[Any, str | None]:
     """Load `file`, walk to the dotted `key`; return (value, warning).
 
     On any failure the value is None and the warning explains it; on
@@ -96,9 +94,7 @@ def _toml_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
         return _empty(warning)
 
     if isinstance(data, list):
-        return MetricResult(
-            value=len(data), occurrences=_entries(file, data)
-        )
+        return MetricResult(value=len(data), occurrences=_entries(file, data))
     if isinstance(data, Mapping) and all(
         isinstance(value, list) for value in data.values()
     ):
@@ -148,20 +144,13 @@ def _table_array_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult
         return _empty(f'{file}: value at "{key}" is not an array of tables')
 
     occurrences = _table_array_occurrences(
-        str(file),
-        data,
-        params.get("label"),
-        explode=bool(params.get("explode", False)),
+        str(file), data, params.get("label"), explode=bool(params.get("explode", False))
     )
     return MetricResult(value=len(occurrences), occurrences=occurrences)
 
 
 def _table_array_occurrences(
-    file: str,
-    tables: list[Mapping[str, Any]],
-    label: str | None,
-    *,
-    explode: bool,
+    file: str, tables: list[Mapping[str, Any]], label: str | None, *, explode: bool
 ) -> tuple[Occurrence, ...]:
     """One occurrence per table, or (explode) one per label-list element."""
     occurrences: list[Occurrence] = []
@@ -257,9 +246,7 @@ def validate_ini_params(params: Mapping[str, Any]) -> list[str]:
 
 def _entries(file: str, values: list[Any]) -> tuple[Occurrence, ...]:
     """List entries as occurrences, keeping the file's own order."""
-    return tuple(
-        Occurrence(path=str(file), note=str(entry)) for entry in values
-    )
+    return tuple(Occurrence(path=str(file), note=str(entry)) for entry in values)
 
 
 def _empty(warning: str) -> MetricResult:

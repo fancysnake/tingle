@@ -100,12 +100,8 @@ def test_stat_diff_json_includes_occurrences() -> None:
     assert noqa["added"] == 3
     assert noqa["net"] == 3
     assert noqa["total"] == 4
-    assert {"file": "src/a.py", "line": 2, "note": None} in noqa[
-        "added_occurrences"
-    ]
-    assert {"file": "src/new.py", "line": 1, "note": None} in noqa[
-        "added_occurrences"
-    ]
+    assert {"file": "src/a.py", "line": 2, "note": None} in noqa["added_occurrences"]
+    assert {"file": "src/new.py", "line": 1, "note": None} in noqa["added_occurrences"]
 
     ignores = metrics["ruff-ignores"]
     assert ignores["net"] == 1

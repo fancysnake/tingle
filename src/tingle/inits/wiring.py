@@ -1,4 +1,5 @@
 """Static wiring: the metric-type table, config loading/editing, project IO."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -29,20 +30,10 @@ from tingle.mills.metrics.counts import (
     line_count,
     line_count_diff,
 )
-from tingle.mills.metrics.regex_count import (
-    regex_count,
-    regex_count_diff,
-)
-from tingle.mills.metrics.regex_count import (
-    validate_params as validate_regex_params,
-)
-from tingle.mills.metrics.symbol_uses import (
-    symbol_uses,
-    symbol_uses_diff,
-)
-from tingle.mills.metrics.symbol_uses import (
-    validate_params as validate_symbol_params,
-)
+from tingle.mills.metrics.regex_count import regex_count, regex_count_diff
+from tingle.mills.metrics.regex_count import validate_params as validate_regex_params
+from tingle.mills.metrics.symbol_uses import symbol_uses, symbol_uses_diff
+from tingle.mills.metrics.symbol_uses import validate_params as validate_symbol_params
 from tingle.pacts.config import Config, ConfigNotFoundError
 from tingle.pacts.metrics import MetricType, ProjectFiles
 

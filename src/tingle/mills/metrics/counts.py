@@ -1,4 +1,5 @@
 """File and line counting metrics."""
+
 from __future__ import annotations
 
 from tingle.pacts.diff import DiffMetricContext, DiffResult, FileStatus
