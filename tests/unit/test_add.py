@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from tingle.inits.wiring import METRIC_TYPES
 from tingle.mills.add import build_metric
+from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.pacts.config import ConfigError, MetricDraft
 
 RAW = {
