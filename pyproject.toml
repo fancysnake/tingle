@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-tingle = "tingle.gates.cli.typer:main"
+tingle = "tingle.inits.cli:run"
 
 [tool.poetry]
 packages = [{ include = "tingle", from = "src" }]

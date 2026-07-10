@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING
 import pytest
 from typer.testing import CliRunner
 
-from tingle.gates.cli.typer import app
-from tingle.inits.wiring import METRIC_TYPES
+from tingle.gates.cli.typer import CliGate
+from tingle.inits.services import Services
+from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.pacts.metrics import MetricType
 
 if TYPE_CHECKING:
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     from tingle.pacts.diff import DiffMetricContext, DiffResult
 
 runner = CliRunner()
+app = CliGate(Services()).app
 
 CONFIG = """
 [ranges.python]

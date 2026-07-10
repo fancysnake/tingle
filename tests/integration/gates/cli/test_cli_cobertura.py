@@ -6,12 +6,14 @@ import pytest
 from lxml import etree
 from typer.testing import CliRunner
 
-from tingle.gates.cli.typer import app
+from tingle.gates.cli.typer import CliGate
+from tingle.inits.services import Services
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 runner = CliRunner()
+app = CliGate(Services()).app
 
 CONFIG = """
 [ranges.python]

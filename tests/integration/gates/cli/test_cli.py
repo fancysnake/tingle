@@ -7,14 +7,16 @@ import pytest
 from typer.testing import CliRunner
 
 from tingle import __version__
-from tingle.gates.cli.typer import app
-from tingle.inits.wiring import METRIC_TYPES
+from tingle.gates.cli.typer import CliGate
+from tingle.inits.services import Services
+from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 runner = CliRunner()
+app = CliGate(Services()).app
 
 CONFIG = """
 [ranges.python]

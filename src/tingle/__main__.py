@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tingle.gates.cli.typer import main
+from tingle.inits.cli import run
 
 if __name__ == "__main__":
-    main()
+    run()
