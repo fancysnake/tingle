@@ -115,6 +115,9 @@ name = "specs is imported only by mills"
 type = "forbidden"
 source_modules = ["tingle.links", "tingle.gates", "tingle.inits"]
 forbidden_modules = ["tingle.specs"]
+# Gates and inits reach specs indirectly through mills, which is by design;
+# what GLIMPSE forbids is importing specs directly.
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "mills depends only on pacts and specs"
