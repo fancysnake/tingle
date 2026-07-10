@@ -7,6 +7,7 @@ from textual.app import App
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.widgets import Collapsible, Footer, Header, Static
+from textual.widgets.collapsible import CollapsibleTitle
 
 from tingle.gates.cli.render import (
     diff_occurrence_lines,
@@ -153,13 +154,29 @@ class MetricsApp(App[None]):
         fold instead. Unfolds only once nothing is left unfolded.
         """
         headers = self._fold_all_targets()
+        if not headers:
+            return
         collapsed = any(not header.collapsed for header in headers)
+        # Folding hides any header nested in a group, and textual drops
+        # focus along with it. The arrows live on NavCollapsible, so an
+        # unfocused app has no arrows to focus anything again -- park the
+        # cursor on the enclosing header, which stays visible.
+        landing = self._enclosing_header(headers) or headers[0]
         for header in headers:
             header.collapsed = collapsed
+        if collapsed:
+            landing.query_one(CollapsibleTitle).focus()
 
     def _fold_all_targets(self) -> list[Collapsible]:
         groups = list(self.query(".group").results(Collapsible))
         return groups or list(self.query(".metric").results(Collapsible))
+
+    def _enclosing_header(self, headers: list[Collapsible]) -> Collapsible | None:
+        """Find the fold-all target containing the focused widget, if any."""
+        focused = self.focused
+        if focused is None:
+            return None
+        return next((a for a in focused.ancestors_with_self if a in headers), None)
 
     def _focused_collapsible(self) -> Collapsible | None:
         focused = self.focused

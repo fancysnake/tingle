@@ -339,6 +339,52 @@ def test_hl_still_fold_and_unfold_as_hidden_aliases() -> None:
     asyncio.run(scenario())
 
 
+def _active_keys(app: MetricsApp) -> set[str]:
+    return {active.binding.key for active in app.active_bindings.values()}
+
+
+def test_f_keeps_the_arrows_alive_when_folding_from_inside_a_group() -> None:
+    # regression: `down` focuses a metric title nested in a group, and `f`
+    # then hid it, so textual dropped focus. The arrows are bound on
+    # NavCollapsible, so an unfocused app has none left to refocus with --
+    # pressing `f` again unfolded the groups but never revived them.
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            await pilot.press("down")  # into the first group's metric rows
+            await pilot.press("f")
+            await pilot.pause()
+            assert app.focused is not None
+            assert {"up", "down"} <= _active_keys(app)
+
+            await pilot.press("f")  # unfold again
+            await pilot.pause()
+            assert {"up", "down"} <= _active_keys(app)
+
+            before = app.focused
+            await pilot.press("down")
+            await pilot.pause()
+            assert app.focused is not before  # and they still move focus
+
+    asyncio.run(scenario())
+
+
+def test_f_parks_focus_on_the_enclosing_group() -> None:
+    # folding must not fling the cursor back to the top of the listing
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            for _ in range(4):  # typing, its 2 metrics, then into lint
+                await pilot.press("down")
+            await pilot.pause()
+            await pilot.press("f")
+            await pilot.pause()
+            assert app.focused is not None
+            assert app.focused.parent is _groups(app)[1]  # lint, not typing
+
+    asyncio.run(scenario())
+
+
 def test_wasd_is_no_longer_bound() -> None:
     # wasd only ever existed because the arrows were unavailable
     bindings = (*MetricsApp.BINDINGS, *NavCollapsible.BINDINGS)
