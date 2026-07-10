@@ -4,11 +4,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tingle.links.config_file.toml import load_raw
+from tingle.links.config_file.toml import TomlConfigStore
 from tingle.pacts.config import ConfigError, ConfigNotFoundError
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+load_raw = TomlConfigStore().load_raw
 
 
 def test_reads_tingle_toml(tmp_path: Path) -> None:

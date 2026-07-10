@@ -4,10 +4,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tingle.links.config_file.toml import append_metric, edit_target, write_starter
+from tingle.links.config_file.toml import TomlConfigStore
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+_store = TomlConfigStore()
+append_metric = _store.append_metric
+edit_target = _store.edit_target
+write_starter = _store.write_starter
 
 EXISTING = """# my metrics
 [ranges.python]

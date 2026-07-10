@@ -4,12 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from tingle.links.config_file.toml import (
-    append_metric,
-    edit_target,
-    load_raw,
-    write_starter,
-)
+from tingle.links.config_file.toml import TomlConfigStore
 from tingle.links.fs.local import LocalProjectFiles
 from tingle.links.git.cli import GitCli
 from tingle.mills.config import validate
@@ -106,6 +101,9 @@ METRIC_TYPES: dict[str, MetricType] = {
 }
 
 
+_STORE = TomlConfigStore()
+
+
 def project_files(root: Path) -> ProjectFiles:
     """Build the filesystem view metrics read from."""
     return LocalProjectFiles(root)
@@ -118,7 +116,7 @@ def diff_source(root: Path) -> DiffSource:
 
 def load_config(cwd: Path, override: Path | None = None) -> Config:
     """Discover, parse, and validate the tingle configuration."""
-    source, raw = load_raw(cwd, override)
+    source, raw = _STORE.load_raw(cwd, override)
     resolved = source.resolve()
     return validate(raw, METRIC_TYPES, root=resolved.parent, source=resolved)
 
@@ -126,21 +124,21 @@ def load_config(cwd: Path, override: Path | None = None) -> Config:
 def load_raw_config(cwd: Path) -> dict[str, Any]:
     """Raw config data for editing flows; empty when no config exists yet."""
     try:
-        return load_raw(cwd)[1]
+        return _STORE.load_raw(cwd)[1]
     except ConfigNotFoundError:
         return {}
 
 
 def config_edit_target(cwd: Path) -> Path:
     """Return the config file `tingle add` should write to."""
-    return edit_target(cwd)
+    return _STORE.edit_target(cwd)
 
 
 def append_metric_to(path: Path, metric: Mapping[str, Any]) -> None:
     """Append a metric table to the config file, preserving formatting."""
-    append_metric(path, metric)
+    _STORE.append_metric(path, metric)
 
 
 def write_starter_config(cwd: Path) -> Path:
     """Create the starter tingle.toml; raises FileExistsError if present."""
-    return write_starter(cwd)
+    return _STORE.write_starter(cwd)

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import tomlkit
 
-from tingle.pacts.config import ConfigError, ConfigNotFoundError
+from tingle.pacts.config import ConfigError, ConfigNotFoundError, ConfigStore
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -50,79 +50,81 @@ pattern = '#\s*noqa'
 """
 
 
-def load_raw(root: Path, override: Path | None = None) -> tuple[Path, dict[str, Any]]:
-    """Locate and parse the tingle configuration.
+class TomlConfigStore(ConfigStore):
+    """Reads and edits tingle's configuration as TOML."""
 
-    Returns the file the configuration came from and its raw, unvalidated
-    content. `tingle.toml` wins over `[tool.tingle]` in `pyproject.toml`.
-    """
-    if override is not None:
-        if not override.is_file():
-            msg = f"config file not found: {override}"
-            raise ConfigNotFoundError(msg)
-        return override, _parse(override)
+    def load_raw(
+        self, root: Path, override: Path | None = None
+    ) -> tuple[Path, dict[str, Any]]:
+        """Locate and parse the tingle configuration.
 
-    tingle = root / TINGLE_FILE
-    if tingle.is_file():
-        return tingle, _parse(tingle)
+        Returns the file the configuration came from and its raw, unvalidated
+        content. `tingle.toml` wins over `[tool.tingle]` in `pyproject.toml`.
+        """
+        if override is not None:
+            if not override.is_file():
+                msg = f"config file not found: {override}"
+                raise ConfigNotFoundError(msg)
+            return override, _parse(override)
 
-    pyproject = root / PYPROJECT_FILE
-    if pyproject.is_file():
-        section = _parse(pyproject).get("tool", {}).get("tingle")
-        if isinstance(section, dict):
-            return pyproject, section
-        if section is not None:
-            raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
+        tingle = root / TINGLE_FILE
+        if tingle.is_file():
+            return tingle, _parse(tingle)
 
-    msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
-    raise ConfigNotFoundError(msg)
+        pyproject = root / PYPROJECT_FILE
+        if pyproject.is_file():
+            section = _parse(pyproject).get("tool", {}).get("tingle")
+            if isinstance(section, dict):
+                return pyproject, section
+            if section is not None:
+                raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
 
+        msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
+        raise ConfigNotFoundError(msg)
 
-def edit_target(root: Path) -> Path:
-    """Return the config file `tingle add` should edit.
+    def edit_target(self, root: Path) -> Path:
+        """Return the config file `tingle add` should edit.
 
-    tingle.toml wins; pyproject.toml only when it already carries a
-    [tool.tingle] table; otherwise a fresh tingle.toml (to be created).
-    """
-    tingle = root / TINGLE_FILE
-    if tingle.is_file():
+        tingle.toml wins; pyproject.toml only when it already carries a
+        [tool.tingle] table; otherwise a fresh tingle.toml (to be created).
+        """
+        tingle = root / TINGLE_FILE
+        if tingle.is_file():
+            return tingle
+        pyproject = root / PYPROJECT_FILE
+        if pyproject.is_file():
+            section = _parse(pyproject).get("tool", {}).get("tingle")
+            if isinstance(section, dict):
+                return pyproject
         return tingle
-    pyproject = root / PYPROJECT_FILE
-    if pyproject.is_file():
-        section = _parse(pyproject).get("tool", {}).get("tingle")
-        if isinstance(section, dict):
-            return pyproject
-    return tingle
 
+    def append_metric(self, path: Path, metric: Mapping[str, Any]) -> None:
+        """Append a [[metrics]] entry, preserving existing formatting."""
+        document = (
+            tomlkit.parse(path.read_text(encoding="utf-8"))
+            if path.is_file()
+            else tomlkit.document()
+        )
+        container: Any = document
+        if path.name == PYPROJECT_FILE:
+            container = document["tool"]["tingle"]  # guaranteed by edit_target
 
-def append_metric(path: Path, metric: Mapping[str, Any]) -> None:
-    """Append a [[metrics]] entry, preserving existing formatting."""
-    document = (
-        tomlkit.parse(path.read_text(encoding="utf-8"))
-        if path.is_file()
-        else tomlkit.document()
-    )
-    container: Any = document
-    if path.name == PYPROJECT_FILE:
-        container = document["tool"]["tingle"]  # guaranteed by edit_target
+        table = tomlkit.table()
+        for key, value in metric.items():
+            table[key] = value
+        if "metrics" not in container:
+            container["metrics"] = tomlkit.aot()
+        container["metrics"].append(table)
 
-    table = tomlkit.table()
-    for key, value in metric.items():
-        table[key] = value
-    if "metrics" not in container:
-        container["metrics"] = tomlkit.aot()
-    container["metrics"].append(table)
+        path.write_text(tomlkit.dumps(document), encoding="utf-8")
 
-    path.write_text(tomlkit.dumps(document), encoding="utf-8")
-
-
-def write_starter(root: Path) -> Path:
-    """Create a commented starter tingle.toml; refuse to overwrite."""
-    path = root / TINGLE_FILE
-    if path.exists():
-        raise FileExistsError(path)
-    path.write_text(STARTER, encoding="utf-8")
-    return path
+    def write_starter(self, root: Path) -> Path:
+        """Create a commented starter tingle.toml; refuse to overwrite."""
+        path = root / TINGLE_FILE
+        if path.exists():
+            raise FileExistsError(path)
+        path.write_text(STARTER, encoding="utf-8")
+        return path
 
 
 def _parse(path: Path) -> dict[str, Any]:
