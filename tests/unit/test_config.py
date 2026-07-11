@@ -194,12 +194,17 @@ def test_unknown_param() -> None:
     errors = _errors_of(
         {
             "metrics": [
-                {"name": "x", "type": "regex_count", "pattern": "a", "patern": "b"}
+                {
+                    "name": "x",
+                    "type": "regex_count",
+                    "pattern": "a",
+                    "patern": "b",  # codespell:ignore patern
+                }
             ]
         }
     )
 
-    assert 'metric "x": unknown param "patern"' in errors
+    assert 'metric "x": unknown param "patern"' in errors  # codespell:ignore patern
 
 
 def test_validate_params_hook_reports_problems() -> None:

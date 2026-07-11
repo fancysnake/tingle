@@ -42,7 +42,7 @@ def test_read_binary_returns_none(tmp_path: Path) -> None:
 
 
 def test_read_bad_utf8_returns_none(tmp_path: Path) -> None:
-    (tmp_path / "latin.txt").write_bytes(b"caf\xe9")
+    (tmp_path / "latin.txt").write_bytes(b"calf\xe9")
 
     assert LocalProjectFiles(tmp_path).read(PurePath("latin.txt")) is None
 
