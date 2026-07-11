@@ -177,10 +177,7 @@ def test_raising_diff_metric_exits_1_but_others_render(
         MetricType(
             name="toml_list_length",
             func=original.func,
-            required_params=original.required_params,
-            optional_params=original.optional_params,
-            primary_param=original.primary_param,
-            validate_params=original.validate_params,
+            params=original.params,
             diff_func=boom,
         ),
     )

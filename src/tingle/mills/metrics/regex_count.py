@@ -70,9 +70,11 @@ def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
     details: dict[str, int] = {}
     warnings: list[str] = []
     for file in ctx.files:
-        file_added = _matches_on_lines(pattern, ctx.read, file, file.added_lines)
+        file_added = _matches_on_lines(
+            pattern, ctx.read, file=file, lines=file.added_lines
+        )
         file_removed = _matches_on_lines(
-            pattern, ctx.read_base, file, file.removed_lines
+            pattern, ctx.read_base, file=file, lines=file.removed_lines
         )
         if file_added is None:
             warnings.append(f"{file.path}: current side unreadable")
@@ -98,6 +100,7 @@ def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
 def _matches_on_lines(
     pattern: re.Pattern[str],
     reader: Callable[..., str | None],
+    *,
     file: FileDiff,
     lines: AbstractSet[int],
 ) -> list[Occurrence] | None:

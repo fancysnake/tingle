@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -71,20 +72,24 @@ class MetricDraft:
 class ConfigStore(Protocol):
     """Reads and edits the file tingle's own configuration lives in."""
 
+    @abstractmethod
     def load_raw(
         self, root: Path, override: Path | None = None
     ) -> tuple[Path, dict[str, Any]]:
         """Locate and parse the configuration; raises ConfigNotFoundError."""
         ...
 
+    @abstractmethod
     def edit_target(self, root: Path) -> Path:
         """Return the file `tingle add` should write to, existing or not."""
         ...
 
+    @abstractmethod
     def append_metric(self, path: Path, metric: Mapping[str, Any]) -> None:
         """Append a metric entry, preserving existing formatting."""
         ...
 
+    @abstractmethod
     def write_starter(self, root: Path) -> Path:
         """Create the starter config; raises FileExistsError if present."""
         ...

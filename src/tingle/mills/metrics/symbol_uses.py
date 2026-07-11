@@ -68,10 +68,14 @@ def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
         if file.path.suffix != ".py":
             continue
         file_added, added_warnings = _side_occurrences(
-            ctx.read, file.path, parts, file.added_lines, "current"
+            ctx.read, file.path, parts=parts, touched=file.added_lines, side="current"
         )
         file_removed, removed_warnings = _side_occurrences(
-            ctx.read_base, file.path, parts, file.removed_lines, "base"
+            ctx.read_base,
+            file.path,
+            parts=parts,
+            touched=file.removed_lines,
+            side="base",
         )
         warnings.extend(added_warnings)
         warnings.extend(removed_warnings)
@@ -106,6 +110,7 @@ def validate_params(params: Mapping[str, Any]) -> list[str]:
 def _side_occurrences(
     reader: Callable[[PurePath], str | None],
     path: PurePath,
+    *,
     parts: tuple[str, ...],
     touched: AbstractSet[int],
     side: str,
@@ -163,18 +168,18 @@ def _collect_bindings(
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            _bind_plain_import(node, parts, bindings)
+            _bind_plain_import(node, parts, bindings=bindings)
         elif isinstance(node, ast.ImportFrom):
             if any(alias.name == "*" for alias in node.names):
                 has_star_import = True
             else:
-                import_lines.extend(_bind_from_import(node, parts, bindings))
+                import_lines.extend(_bind_from_import(node, parts, bindings=bindings))
 
     return bindings, import_lines, has_star_import
 
 
 def _bind_plain_import(
-    node: ast.Import, parts: tuple[str, ...], bindings: dict[str, tuple[str, ...]]
+    node: ast.Import, parts: tuple[str, ...], *, bindings: dict[str, tuple[str, ...]]
 ) -> None:
     for alias in node.names:
         module = tuple(alias.name.split("."))
@@ -188,7 +193,10 @@ def _bind_plain_import(
 
 
 def _bind_from_import(
-    node: ast.ImportFrom, parts: tuple[str, ...], bindings: dict[str, tuple[str, ...]]
+    node: ast.ImportFrom,
+    parts: tuple[str, ...],
+    *,
+    bindings: dict[str, tuple[str, ...]],
 ) -> list[int]:
     """Bind from-imported names; return lines that import the symbol itself."""
     module = tuple(node.module.split(".")) if node.module else ()

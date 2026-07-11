@@ -66,7 +66,7 @@ DIFF_REPORT = DiffReport(
 )
 
 
-def _grouped(name: str, group: str | None, value: int = 1) -> MetricOutcome:
+def _grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),

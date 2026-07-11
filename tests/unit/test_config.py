@@ -7,7 +7,7 @@ import pytest
 
 from tingle.mills.config import validate
 from tingle.pacts.config import Config, ConfigError
-from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
+from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, ParamSchema
 from tingle.specs.config import IMPLICIT_RANGE_INCLUDE, IMPLICIT_RANGE_NAME
 
 if TYPE_CHECKING:
@@ -31,9 +31,9 @@ METRIC_TYPES = {
     "regex_count": MetricType(
         name="regex_count",
         func=_noop,
-        required_params=("pattern",),
-        optional_params=("flags",),
-        validate_params=_reject_broken_pattern,
+        params=ParamSchema(
+            required=("pattern",), optional=("flags",), validate=_reject_broken_pattern
+        ),
     ),
     "file_count": MetricType(name="file_count", func=_noop),
 }

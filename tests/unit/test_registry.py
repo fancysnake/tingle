@@ -24,27 +24,27 @@ def test_names_match_keys() -> None:
 
 
 def test_param_specs() -> None:
-    assert METRIC_TYPES["regex_count"].required_params == ("pattern",)
-    assert METRIC_TYPES["regex_count"].primary_param == "pattern"
-    assert METRIC_TYPES["symbol_uses"].required_params == ("symbol",)
-    assert METRIC_TYPES["symbol_uses"].primary_param == "symbol"
-    assert METRIC_TYPES["toml_list_length"].required_params == ("key",)
-    assert METRIC_TYPES["toml_list_length"].optional_params == ("file",)
-    assert METRIC_TYPES["toml_table_array"].required_params == ("key",)
-    assert METRIC_TYPES["toml_table_array"].optional_params == (
+    assert METRIC_TYPES["regex_count"].params.required == ("pattern",)
+    assert METRIC_TYPES["regex_count"].params.primary == "pattern"
+    assert METRIC_TYPES["symbol_uses"].params.required == ("symbol",)
+    assert METRIC_TYPES["symbol_uses"].params.primary == "symbol"
+    assert METRIC_TYPES["toml_list_length"].params.required == ("key",)
+    assert METRIC_TYPES["toml_list_length"].params.optional == ("file",)
+    assert METRIC_TYPES["toml_table_array"].params.required == ("key",)
+    assert METRIC_TYPES["toml_table_array"].params.optional == (
         "file",
         "label",
         "explode",
     )
-    assert METRIC_TYPES["toml_table_array"].primary_param == "key"
-    assert METRIC_TYPES["ini_list_length"].required_params == (
+    assert METRIC_TYPES["toml_table_array"].params.primary == "key"
+    assert METRIC_TYPES["ini_list_length"].params.required == (
         "file",
         "section",
         "option",
     )
-    assert METRIC_TYPES["ini_list_length"].primary_param is None
-    assert METRIC_TYPES["file_count"].required_params == ()
-    assert METRIC_TYPES["line_count"].required_params == ()
+    assert METRIC_TYPES["ini_list_length"].params.primary is None
+    assert METRIC_TYPES["file_count"].params.required == ()
+    assert METRIC_TYPES["line_count"].params.required == ()
 
 
 def test_every_metric_type_has_a_diff_variant() -> None:

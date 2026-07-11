@@ -9,7 +9,7 @@ from tingle.pacts.metrics import MetricResult
 from tingle.pacts.report import MetricOutcome, RunReport
 
 
-def _outcome(name: str, group: str | None = None, value: int = 1) -> MetricOutcome:
+def _outcome(name: str, group: str | None = None, *, value: int = 1) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),

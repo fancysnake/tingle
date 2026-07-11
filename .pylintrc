@@ -25,7 +25,7 @@ clear-cache-post-run=no
 # A comma-separated list of package or module names from where C extensions may
 # be loaded. Extensions are loading into the active Python interpreter and may
 # run arbitrary code.
-extension-pkg-allow-list=
+extension-pkg-allow-list=lxml.etree
 
 # A comma-separated list of package or module names from where C extensions may
 # be loaded. Extensions are loading into the active Python interpreter and may
@@ -309,7 +309,7 @@ valid-metaclass-classmethod-first-arg=mcs
 
 # List of regular expressions of class ancestor names to ignore when counting
 # public methods (see R0903)
-exclude-too-few-public-methods=
+exclude-too-few-public-methods=.*Protocol
 
 # List of qualified class names to ignore when counting class parents (see
 # R0901)

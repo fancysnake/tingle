@@ -41,7 +41,7 @@ class MetricsServiceProtocol(Protocol):
         ...
 
     def diff(
-        self, config: Config, base: str, only: Collection[str] | None = None
+        self, config: Config, base: str, *, only: Collection[str] | None = None
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
         ...

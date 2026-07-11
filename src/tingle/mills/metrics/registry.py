@@ -23,53 +23,60 @@ from tingle.mills.metrics.regex_count import regex_count, regex_count_diff
 from tingle.mills.metrics.regex_count import validate_params as validate_regex_params
 from tingle.mills.metrics.symbol_uses import symbol_uses, symbol_uses_diff
 from tingle.mills.metrics.symbol_uses import validate_params as validate_symbol_params
-from tingle.pacts.metrics import MetricType
+from tingle.pacts.metrics import MetricType, ParamSchema
 
 METRIC_TYPES: dict[str, MetricType] = {
     "regex_count": MetricType(
         name="regex_count",
         func=regex_count,
-        required_params=("pattern",),
-        optional_params=("flags",),
-        primary_param="pattern",
-        validate_params=validate_regex_params,
+        params=ParamSchema(
+            required=("pattern",),
+            optional=("flags",),
+            primary="pattern",
+            validate=validate_regex_params,
+        ),
         description="Count regex matches in the files of the metric's ranges.",
         diff_func=regex_count_diff,
     ),
     "symbol_uses": MetricType(
         name="symbol_uses",
         func=symbol_uses,
-        required_params=("symbol",),
-        primary_param="symbol",
-        validate_params=validate_symbol_params,
+        params=ParamSchema(
+            required=("symbol",), primary="symbol", validate=validate_symbol_params
+        ),
         description="Count references to a function or class in Python files.",
         diff_func=symbol_uses_diff,
     ),
     "toml_list_length": MetricType(
         name="toml_list_length",
         func=toml_list_length,
-        required_params=("key",),
-        optional_params=("file",),
-        primary_param="key",
-        validate_params=validate_toml_params,
+        params=ParamSchema(
+            required=("key",),
+            optional=("file",),
+            primary="key",
+            validate=validate_toml_params,
+        ),
         description="Length of the list at a dotted key in a TOML file.",
         diff_func=toml_list_length_diff,
     ),
     "toml_table_array": MetricType(
         name="toml_table_array",
         func=toml_table_array,
-        required_params=("key",),
-        optional_params=("file", "label", "explode"),
-        primary_param="key",
-        validate_params=validate_toml_table_array_params,
+        params=ParamSchema(
+            required=("key",),
+            optional=("file", "label", "explode"),
+            primary="key",
+            validate=validate_toml_table_array_params,
+        ),
         description="Count entries of a TOML array of tables (e.g. mypy overrides).",
         diff_func=toml_table_array_diff,
     ),
     "ini_list_length": MetricType(
         name="ini_list_length",
         func=ini_list_length,
-        required_params=("file", "section", "option"),
-        validate_params=validate_ini_params,
+        params=ParamSchema(
+            required=("file", "section", "option"), validate=validate_ini_params
+        ),
         description="Number of entries in a comma/newline separated INI option.",
         diff_func=ini_list_length_diff,
     ),

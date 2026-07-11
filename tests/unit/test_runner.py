@@ -60,7 +60,7 @@ PROJECT = FakeProject({"a.py": "", "b.py": "", "notes.md": ""})
 def test_runs_metrics_and_reports_values() -> None:
     config = _config(MetricSpec(name="files", type="file_count", ranges=("python",)))
 
-    report = run(config, PROJECT, METRIC_TYPES)
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
 
     outcome = report.outcomes[0]
     assert outcome.result is not None
@@ -72,7 +72,7 @@ def test_runs_metrics_and_reports_values() -> None:
 def test_default_range_applies_when_none_given() -> None:
     config = _config(MetricSpec(name="files", type="file_count"))
 
-    report = run(config, PROJECT, METRIC_TYPES)
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
 
     outcome = report.outcomes[0]
     assert outcome.result is not None
@@ -86,7 +86,7 @@ def test_raising_metric_is_isolated() -> None:
         MetricSpec(name="files", type="file_count"),
     )
 
-    report = run(config, PROJECT, METRIC_TYPES)
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
 
     broken, files = report.outcomes
     assert broken.result is None
@@ -105,7 +105,7 @@ def test_empty_explicit_ranges_warn() -> None:
         default_range=PYTHON_RANGE,
     )
 
-    report = run(config, PROJECT, METRIC_TYPES)
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
 
     outcome = report.outcomes[0]
     assert outcome.result is not None
@@ -119,7 +119,7 @@ def test_only_filter_selects_metrics() -> None:
         MetricSpec(name="second", type="file_count"),
     )
 
-    report = run(config, PROJECT, METRIC_TYPES, only=["second"])
+    report = run(config, PROJECT, metric_types=METRIC_TYPES, only=["second"])
 
     assert [outcome.spec.name for outcome in report.outcomes] == ["second"]
 
@@ -128,6 +128,6 @@ def test_only_filter_rejects_unknown_names() -> None:
     config = _config(MetricSpec(name="files", type="file_count"))
 
     with pytest.raises(ConfigError) as excinfo:
-        run(config, PROJECT, METRIC_TYPES, only=["nope"])
+        run(config, PROJECT, metric_types=METRIC_TYPES, only=["nope"])
 
     assert 'unknown metric "nope"' in excinfo.value.errors

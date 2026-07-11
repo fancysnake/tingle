@@ -144,19 +144,22 @@ def _table_array_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult
         return _empty(f'{file}: value at "{key}" is not an array of tables')
 
     occurrences = _table_array_occurrences(
-        str(file), data, params.get("label"), explode=bool(params.get("explode", False))
+        str(file),
+        data,
+        label=params.get("label"),
+        explode=bool(params.get("explode", False)),
     )
     return MetricResult(value=len(occurrences), occurrences=occurrences)
 
 
 def _table_array_occurrences(
-    file: str, tables: list[Mapping[str, Any]], label: str | None, *, explode: bool
+    file: str, tables: list[Mapping[str, Any]], *, label: str | None, explode: bool
 ) -> tuple[Occurrence, ...]:
     """One occurrence per table, or (explode) one per label-list element."""
     occurrences: list[Occurrence] = []
     for index, table in enumerate(tables, start=1):
         if explode:
-            occurrences.extend(_exploded_entries(file, table, label, index))
+            occurrences.extend(_exploded_entries(file, table, label=label, index=index))
         else:
             note = _label_note(table, label) or f"#{index}"
             occurrences.append(Occurrence(path=file, note=note))
@@ -164,7 +167,7 @@ def _table_array_occurrences(
 
 
 def _exploded_entries(
-    file: str, table: Mapping[str, Any], label: str | None, index: int
+    file: str, table: Mapping[str, Any], *, label: str | None, index: int
 ) -> list[Occurrence]:
     if label is None or label not in table:
         return [Occurrence(path=file, note=f"#{index}")]

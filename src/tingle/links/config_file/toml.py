@@ -128,8 +128,8 @@ class TomlConfigStore(ConfigStore):
 
 
 def _parse(path: Path) -> dict[str, Any]:
-    try:
-        with path.open("rb") as fp:
+    with path.open("rb") as fp:
+        try:
             return tomllib.load(fp)
-    except tomllib.TOMLDecodeError as exc:
-        raise ConfigError([f"{path}: invalid TOML: {exc}"]) from exc
+        except tomllib.TOMLDecodeError as exc:
+            raise ConfigError([f"{path}: invalid TOML: {exc}"]) from exc

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 def run(
     config: Config,
     project: ProjectFiles,
+    *,
     metric_types: Mapping[str, MetricType],
     only: Collection[str] | None = None,
 ) -> RunReport:
@@ -40,7 +41,8 @@ def run(
         )
         try:
             result = metric_types[spec.type].func(context)
-        except Exception as exc:  # metric isolation: one failure must not stop the run
+        # metric isolation: one failure must not stop the run
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             outcomes.append(
                 MetricOutcome(
                     spec=spec,

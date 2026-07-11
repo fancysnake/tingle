@@ -15,7 +15,10 @@ if TYPE_CHECKING:
 
 
 def build_metric(
-    raw: Mapping[str, Any], metric_types: Mapping[str, MetricType], draft: MetricDraft
+    raw: Mapping[str, Any],
+    metric_types: Mapping[str, MetricType],
+    *,
+    draft: MetricDraft,
 ) -> dict[str, Any]:
     """Return the metric table to append, or raise ConfigError.
 
@@ -35,7 +38,8 @@ def build_metric(
 
     metric: dict[str, Any] = {
         "name": (
-            draft.name or _auto_name(existing_metrics, draft.type_name, draft.value)
+            draft.name
+            or _auto_name(existing_metrics, draft.type_name, value=draft.value)
         ),
         "type": draft.type_name,
     }
@@ -57,7 +61,7 @@ def _merge_params(
 ) -> dict[str, Any]:
     all_params: dict[str, Any] = dict(draft.params)
     if draft.value is not None:
-        primary = metric_types[draft.type_name].primary_param
+        primary = metric_types[draft.type_name].params.primary
         if primary is None:
             raise ConfigError(
                 [
@@ -73,7 +77,9 @@ def _merge_params(
     return all_params
 
 
-def _auto_name(existing_metrics: list[Any], type_name: str, value: str | None) -> str:
+def _auto_name(
+    existing_metrics: list[Any], type_name: str, *, value: str | None
+) -> str:
     base = f"{type_name}-{_slug(value)}" if value else type_name
     taken = {
         entry.get("name") for entry in existing_metrics if isinstance(entry, Mapping)

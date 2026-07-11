@@ -13,7 +13,7 @@ SYMBOL = "myapp.legacy.OldClient"
 
 
 def _run(
-    file: FileDiff, current: Mapping[str, str | None], base: Mapping[str, str | None]
+    file: FileDiff, current: Mapping[str, str | None], *, base: Mapping[str, str | None]
 ) -> DiffResult:
     return symbol_uses_diff(
         DiffMetricContext(
@@ -36,7 +36,7 @@ def test_counts_uses_on_added_lines() -> None:
         path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({4})
     )
 
-    result = _run(file, {"a.py": code}, {})
+    result = _run(file, {"a.py": code}, base={})
 
     assert result.added == 1
     assert result.removed == 0
@@ -50,7 +50,7 @@ def test_counts_uses_on_removed_lines_from_base() -> None:
         path=PurePath("a.py"), status=FileStatus.MODIFIED, removed_lines=frozenset({3})
     )
 
-    result = _run(file, {"a.py": "clean = 1\n"}, {"a.py": base_code})
+    result = _run(file, {"a.py": "clean = 1\n"}, base={"a.py": base_code})
 
     assert result.added == 0
     assert result.removed == 1
@@ -63,7 +63,7 @@ def test_import_line_counts_as_use() -> None:
         path=PurePath("a.py"), status=FileStatus.ADDED, added_lines=frozenset({1})
     )
 
-    result = _run(file, {"a.py": code}, {})
+    result = _run(file, {"a.py": code}, base={})
 
     assert result.added == 1
 
@@ -74,7 +74,7 @@ def test_untouched_uses_do_not_count() -> None:
         path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({4})
     )
 
-    result = _run(file, {"a.py": code}, {})
+    result = _run(file, {"a.py": code}, base={})
 
     assert result.added == 0
     assert result.net == 0
@@ -91,7 +91,7 @@ def test_base_syntax_error_warns_and_skips_side() -> None:
     result = _run(
         file,
         {"a.py": "from myapp.legacy import OldClient\n"},
-        {"a.py": "def broken(:\n"},
+        base={"a.py": "def broken(:\n"},
     )
 
     assert result.added == 1
@@ -104,7 +104,7 @@ def test_unreadable_current_side_warns() -> None:
         path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({1})
     )
 
-    result = _run(file, {}, {})
+    result = _run(file, {}, base={})
 
     assert result.added == 0
     assert "a.py: current side unreadable" in result.warnings
@@ -115,7 +115,7 @@ def test_non_python_files_ignored() -> None:
         path=PurePath("notes.md"), status=FileStatus.ADDED, added_lines=frozenset({1})
     )
 
-    result = _run(file, {"notes.md": "myapp.legacy.OldClient\n"}, {})
+    result = _run(file, {"notes.md": "myapp.legacy.OldClient\n"}, base={})
 
     assert result.net == 0
     assert result.warnings == ()
@@ -127,6 +127,6 @@ def test_details_show_per_file_net() -> None:
         path=PurePath("a.py"), status=FileStatus.ADDED, added_lines=frozenset({1})
     )
 
-    result = _run(file, {"a.py": code}, {})
+    result = _run(file, {"a.py": code}, base={})
 
     assert dict(result.details) == {"a.py": 1}

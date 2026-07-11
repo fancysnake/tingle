@@ -82,14 +82,21 @@ MetricFunction: TypeAlias = Callable[[MetricContext], MetricResult]
 
 
 @dataclass(frozen=True)
+class ParamSchema:
+    """A metric type's parameter contract: what `add` and validation read."""
+
+    required: tuple[str, ...] = ()
+    optional: tuple[str, ...] = ()
+    primary: str | None = None
+    validate: Callable[[Mapping[str, Any]], list[str]] | None = None
+
+
+@dataclass(frozen=True)
 class MetricType:
     """A metric type: dispatch target plus the data driving add/list/validation."""
 
     name: str
     func: MetricFunction
-    required_params: tuple[str, ...] = ()
-    optional_params: tuple[str, ...] = ()
-    primary_param: str | None = None
-    validate_params: Callable[[Mapping[str, Any]], list[str]] | None = None
+    params: ParamSchema = field(default_factory=ParamSchema)
     description: str = ""
     diff_func: DiffMetricFunction | None = None

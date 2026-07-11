@@ -298,7 +298,7 @@ def cobertura(report: RunReport) -> tuple[str, list[str]]:
             if outcome.result.occurrences or outcome.result.value:
                 excluded.append(outcome.spec.name)
             continue
-        total_lines += _cobertura_package(packages, outcome.spec.name, located)
+        total_lines += _cobertura_package(packages, outcome.spec.name, located=located)
 
     root = ET.Element(
         "coverage",
@@ -318,7 +318,7 @@ def cobertura(report: RunReport) -> tuple[str, list[str]]:
 
 
 def _cobertura_package(
-    packages: ET.Element, name: str, located: list[Occurrence]
+    packages: ET.Element, name: str, *, located: list[Occurrence]
 ) -> int:
     package = ET.SubElement(packages, "package", {"name": name, "line-rate": "0"})
     classes = ET.SubElement(package, "classes")

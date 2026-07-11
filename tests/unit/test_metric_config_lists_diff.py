@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 def _context(
     current: Mapping[str, str | None],
     base: Mapping[str, str | None],
+    *,
     params: Mapping[str, Any],
 ) -> DiffMetricContext:
     return DiffMetricContext(
@@ -33,7 +34,7 @@ def test_toml_delta_between_base_and_current() -> None:
     }
 
     result = toml_list_length_diff(
-        _context(current, base, {"key": "tool.ruff.lint.ignore"})
+        _context(current, base, params={"key": "tool.ruff.lint.ignore"})
     )
 
     assert result.net == 2
@@ -49,7 +50,7 @@ def test_toml_negative_delta() -> None:
     current = {"pyproject.toml": "[tool.ruff.lint]\nignore = []\n"}
 
     result = toml_list_length_diff(
-        _context(current, base, {"key": "tool.ruff.lint.ignore"})
+        _context(current, base, params={"key": "tool.ruff.lint.ignore"})
     )
 
     assert result.net == -2
@@ -61,7 +62,7 @@ def test_swapped_entries_show_both_sides() -> None:
     current = {"pyproject.toml": '[tool.ruff.lint]\nignore = ["E501", "D419"]\n'}
 
     result = toml_list_length_diff(
-        _context(current, base, {"key": "tool.ruff.lint.ignore"})
+        _context(current, base, params={"key": "tool.ruff.lint.ignore"})
     )
 
     assert result.net == 0
@@ -74,7 +75,7 @@ def test_duplicate_entries_document_net_vs_set_mismatch() -> None:
     current = {"pyproject.toml": '[tool.ruff.lint]\nignore = ["E501", "E501"]\n'}
 
     result = toml_list_length_diff(
-        _context(current, base, {"key": "tool.ruff.lint.ignore"})
+        _context(current, base, params={"key": "tool.ruff.lint.ignore"})
     )
 
     assert result.net == 1  # count-based
@@ -85,7 +86,7 @@ def test_toml_missing_base_is_zero_with_warning() -> None:
     current = {"pyproject.toml": '[tool.ruff.lint]\nignore = ["E501"]\n'}
 
     result = toml_list_length_diff(
-        _context(current, {}, {"key": "tool.ruff.lint.ignore"})
+        _context(current, {}, params={"key": "tool.ruff.lint.ignore"})
     )
 
     assert result.net == 1
@@ -107,7 +108,7 @@ def test_table_array_delta_added_and_removed() -> None:
     current = {"pyproject.toml": _overrides("foo.*", "baz.*")}
     params = {"key": "tool.mypy.overrides", "label": "module"}
 
-    result = toml_table_array_diff(_context(current, base, params))
+    result = toml_table_array_diff(_context(current, base, params=params))
 
     assert result.net == 0
     assert [o.note for o in result.added_occurrences] == ["baz.*"]
@@ -118,7 +119,7 @@ def test_table_array_missing_base_prefixes_warning() -> None:
     current = {"pyproject.toml": _overrides("foo.*")}
     params = {"key": "tool.mypy.overrides", "label": "module"}
 
-    result = toml_table_array_diff(_context(current, {}, params))
+    result = toml_table_array_diff(_context(current, {}, params=params))
 
     assert result.net == 1
     assert any(
@@ -132,7 +133,7 @@ def test_ini_delta() -> None:
     current = {".pylintrc": "[MESSAGES CONTROL]\ndisable = a,b,c\n"}
     params = {"file": ".pylintrc", "section": "MESSAGES CONTROL", "option": "disable"}
 
-    result = ini_list_length_diff(_context(current, base, params))
+    result = ini_list_length_diff(_context(current, base, params=params))
 
     assert result.net == 1
     assert dict(result.details) == {"base": 2, "current": 3}

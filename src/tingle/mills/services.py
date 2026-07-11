@@ -47,7 +47,7 @@ class ConfigService:
         The draft is validated against the merged existing config before
         anything is written.
         """
-        metric = build_metric(self.load_raw(cwd), self.metric_types, draft)
+        metric = build_metric(self.load_raw(cwd), self.metric_types, draft=draft)
         target = self.store.edit_target(cwd)
         self.store.append_metric(target, metric)
         return target, str(metric["name"])
@@ -68,11 +68,14 @@ class MetricsService:
     def run(self, config: Config, only: Collection[str] | None = None) -> RunReport:
         """Measure every selected metric over the whole project."""
         return run(
-            config, self.project_files(config.root), self.metric_types, only=only
+            config,
+            self.project_files(config.root),
+            metric_types=self.metric_types,
+            only=only,
         )
 
     def diff(
-        self, config: Config, base: str, only: Collection[str] | None = None
+        self, config: Config, base: str, *, only: Collection[str] | None = None
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
         runner = DiffRunner(

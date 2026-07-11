@@ -220,7 +220,7 @@ def _with_ranges(outcome: MetricOutcome, stat: str) -> str:
     return f"{ranges}  {stat}" if ranges else stat
 
 
-def _signed(value: int | None, style: str, sign: str = "+") -> str:
+def _signed(value: int | None, style: str, *, sign: str = "+") -> str:
     if value is None:
         return ""
     if value > 0:

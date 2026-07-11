@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, NoReturn
 
@@ -60,6 +61,16 @@ VersionOption = Annotated[
 ]
 
 
+@dataclass(frozen=True)
+class _MetricRequest:
+    """The selection options every metric command carries down to collection."""
+
+    diff: bool
+    base: str | None
+    config: Path | None
+    metrics: list[str] | None
+
+
 class CliGate:
     """The `tingle` command line, driven by the services it is handed."""
 
@@ -82,6 +93,7 @@ class CliGate:
     def _root(
         self,
         ctx: typer.Context,
+        *,
         _version: VersionOption = False,
         diff: DiffOption = False,
         base: BaseOption = None,
@@ -95,15 +107,17 @@ class CliGate:
         """
         if ctx.invoked_subcommand is not None:
             return
+        request = _MetricRequest(
+            diff=diff or base is not None, base=base, config=config, metrics=metric
+        )
         if sys.stdout.isatty():
-            self._interactive(diff or base is not None, base, config, metric)
+            self._interactive(request)
         else:
-            self._print_stat(
-                diff or base is not None, base, config, metric, json_out=False
-            )
+            self._print_stat(request, json_out=False)
 
     def stat(
         self,
+        *,
         json_out: JsonOption = False,
         diff: DiffOption = False,
         base: BaseOption = None,
@@ -111,12 +125,14 @@ class CliGate:
         metric: MetricOption = None,
     ) -> None:
         """Print the metric summary (values only)."""
-        self._print_stat(
-            diff or base is not None, base, config, metric, json_out=json_out
+        request = _MetricRequest(
+            diff=diff or base is not None, base=base, config=config, metrics=metric
         )
+        self._print_stat(request, json_out=json_out)
 
     def report(
         self,
+        *,
         json_out: JsonOption = False,
         cobertura: Annotated[
             bool,
@@ -137,8 +153,11 @@ class CliGate:
                 err=True,
             )
             raise typer.Exit(2)
+        request = _MetricRequest(
+            diff=diff or base is not None, base=base, config=config, metrics=metric
+        )
         if cobertura:
-            run_report = self._collect_run(config, metric)
+            run_report = self._collect_run(request)
             xml, excluded = render.cobertura(run_report)
             typer.echo(xml)
             for name in excluded:
@@ -149,8 +168,8 @@ class CliGate:
                 )
             self._finish_run(run_report)
             return
-        if diff or base is not None:
-            diff_report = self._collect_diff(base, config, metric)
+        if request.diff:
+            diff_report = self._collect_diff(request)
             if json_out:
                 typer.echo(render.diff_json(diff_report))
             else:
@@ -158,7 +177,7 @@ class CliGate:
                     self._stdout.print(line)
             self._finish_diff(diff_report)
         else:
-            run_report = self._collect_run(config, metric)
+            run_report = self._collect_run(request)
             if json_out:
                 typer.echo(render.run_json(run_report))
             else:
@@ -183,6 +202,7 @@ class CliGate:
         self,
         type_name: Annotated[str, typer.Argument(metavar="TYPE")],
         value: Annotated[str | None, typer.Argument(metavar="[VALUE]")] = None,
+        *,
         name: Annotated[
             str | None,
             typer.Option("--name", help="Metric name (auto-generated if omitted)."),
@@ -225,66 +245,50 @@ class CliGate:
             raise typer.Exit(2) from None
         typer.echo(f"Created {path}")
 
-    def _interactive(
-        self,
-        diff: bool,
-        base: str | None,
-        config_path: Path | None,
-        metrics: list[str] | None,
-    ) -> None:
+    def _interactive(self, request: _MetricRequest) -> None:
         """Run the metrics, then hand the report to the interactive TUI."""
         # imported lazily: textual is heavy and only needed on this path
-        from tingle.gates.tui.app import MetricsApp
+        from tingle.gates.tui.app import (  # pylint: disable=import-outside-toplevel
+            MetricsApp,
+        )
 
-        if diff:
-            diff_report = self._collect_diff(base, config_path, metrics)
+        if request.diff:
+            diff_report = self._collect_diff(request)
             MetricsApp(diff_report).run()
             self._finish_diff(diff_report)
         else:
-            run_report = self._collect_run(config_path, metrics)
+            run_report = self._collect_run(request)
             MetricsApp(run_report).run()
             self._finish_run(run_report)
 
-    def _print_stat(
-        self,
-        diff: bool,
-        base: str | None,
-        config_path: Path | None,
-        metrics: list[str] | None,
-        *,
-        json_out: bool,
-    ) -> None:
-        if diff:
-            diff_report = self._collect_diff(base, config_path, metrics)
+    def _print_stat(self, request: _MetricRequest, *, json_out: bool) -> None:
+        if request.diff:
+            diff_report = self._collect_diff(request)
             if json_out:
                 typer.echo(render.diff_json(diff_report))
             else:
                 self._stdout.print(render.diff_table(diff_report))
             self._finish_diff(diff_report)
         else:
-            run_report = self._collect_run(config_path, metrics)
+            run_report = self._collect_run(request)
             if json_out:
                 typer.echo(render.run_json(run_report))
             else:
                 self._stdout.print(render.report_table(run_report))
             self._finish_run(run_report)
 
-    def _collect_run(
-        self, config_path: Path | None, metrics: list[str] | None
-    ) -> RunReport:
-        config = self._load(config_path)
+    def _collect_run(self, request: _MetricRequest) -> RunReport:
+        config = self._load(request.config)
         try:
-            return self._services.metrics.run(config, only=metrics)
+            return self._services.metrics.run(config, only=request.metrics)
         except ConfigError as exc:
             self._config_failure(exc)
 
-    def _collect_diff(
-        self, base: str | None, config_path: Path | None, metrics: list[str] | None
-    ) -> DiffReport:
-        config = self._load(config_path)
+    def _collect_diff(self, request: _MetricRequest) -> DiffReport:
+        config = self._load(request.config)
         try:
             return self._services.metrics.diff(
-                config, base or config.diff_base or "main", only=metrics
+                config, request.base or config.diff_base or "main", only=request.metrics
             )
         except ConfigError as exc:
             self._config_failure(exc)
@@ -353,8 +357,8 @@ def _types_table() -> Table:
     for metric_type in sorted(METRIC_TYPES.values(), key=lambda t: t.name):
         table.add_row(
             metric_type.name,
-            ", ".join(metric_type.required_params),
-            ", ".join(metric_type.optional_params),
+            ", ".join(metric_type.params.required),
+            ", ".join(metric_type.params.optional),
             metric_type.description,
         )
     return table

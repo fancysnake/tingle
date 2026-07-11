@@ -37,7 +37,9 @@ def validate(
     )
 
     ranges = _validate_ranges(raw.get("ranges", {}), errors)
-    metrics = _validate_metrics(raw.get("metrics", []), metric_types, ranges, errors)
+    metrics = _validate_metrics(
+        raw.get("metrics", []), metric_types, ranges=ranges, errors=errors
+    )
     default_range = _resolve_default_range(ranges, errors)
     diff_base = _validate_diff(raw.get("diff", {}), errors)
 
@@ -68,14 +70,18 @@ def _validate_ranges(raw_ranges: object, errors: list[str]) -> dict[str, RangeSp
             f'{label}: unknown key "{key}"' for key in sorted(set(table) - _RANGE_KEYS)
         )
 
-        include = _string_list(table.get("include"), f"{label}: include", errors)
+        include = _string_list(
+            table.get("include"), label=f"{label}: include", errors=errors
+        )
         if include is not None and not include:
             errors.append(f"{label}: include must not be empty")
             include = None
         if "include" not in table:
             errors.append(f"{label}: missing include")
 
-        exclude = _string_list(table.get("exclude", []), f"{label}: exclude", errors)
+        exclude = _string_list(
+            table.get("exclude", []), label=f"{label}: exclude", errors=errors
+        )
 
         default = table.get("default", False)
         if not isinstance(default, bool):
@@ -95,6 +101,7 @@ def _validate_ranges(raw_ranges: object, errors: list[str]) -> dict[str, RangeSp
 def _validate_metrics(
     raw_metrics: object,
     metric_types: Mapping[str, MetricType],
+    *,
     ranges: Mapping[str, RangeSpec],
     errors: list[str],
 ) -> tuple[MetricSpec, ...]:
@@ -109,9 +116,11 @@ def _validate_metrics(
             errors.append(f"metrics[{index}]: must be a table")
             continue
 
-        name, label = _metric_name(table, index, seen_names, errors)
-        range_names = _metric_ranges(table, ranges, label, errors)
-        group = _metric_group(table, label, errors)
+        name, label = _metric_name(
+            table, index=index, seen_names=seen_names, errors=errors
+        )
+        range_names = _metric_ranges(table, ranges, label=label, errors=errors)
+        group = _metric_group(table, label=label, errors=errors)
         params = {
             key: value
             for key, value in table.items()
@@ -125,7 +134,7 @@ def _validate_metrics(
         if not isinstance(type_name, str) or type_name not in metric_types:
             errors.append(f"{label}: unknown type {type_name!r}")
             continue
-        _validate_params(metric_types[type_name], params, label, errors)
+        _validate_params(metric_types[type_name], params, label=label, errors=errors)
 
         if name is not None:
             metrics.append(
@@ -141,7 +150,7 @@ def _validate_metrics(
 
 
 def _metric_group(
-    table: Mapping[str, Any], label: str, errors: list[str]
+    table: Mapping[str, Any], *, label: str, errors: list[str]
 ) -> str | None:
     """Validate the optional `group`.
 
@@ -158,7 +167,7 @@ def _metric_group(
 
 
 def _metric_name(
-    table: Mapping[str, Any], index: int, seen_names: set[str], errors: list[str]
+    table: Mapping[str, Any], *, index: int, seen_names: set[str], errors: list[str]
 ) -> tuple[str | None, str]:
     """Validate a metric's name; return it (or None) plus the error label."""
     name = table.get("name")
@@ -183,6 +192,7 @@ def _metric_name(
 def _metric_ranges(
     table: Mapping[str, Any],
     ranges: Mapping[str, RangeSpec],
+    *,
     label: str,
     errors: list[str],
 ) -> tuple[str, ...]:
@@ -197,7 +207,7 @@ def _metric_ranges(
             return ()
         names: list[str] = [single]
     elif "ranges" in table:
-        listed = _string_list(table["ranges"], f"{label}: ranges", errors)
+        listed = _string_list(table["ranges"], label=f"{label}: ranges", errors=errors)
         if listed is None:
             return ()
         if not listed:
@@ -214,22 +224,19 @@ def _metric_ranges(
 
 
 def _validate_params(
-    metric_type: MetricType, params: Mapping[str, Any], label: str, errors: list[str]
+    metric_type: MetricType, params: Mapping[str, Any], *, label: str, errors: list[str]
 ) -> None:
-    known = set(metric_type.required_params) | set(metric_type.optional_params)
+    schema = metric_type.params
+    known = set(schema.required) | set(schema.optional)
     errors.extend(
         f'{label}: missing required param "{missing}"'
-        for missing in sorted(set(metric_type.required_params) - set(params))
+        for missing in sorted(set(schema.required) - set(params))
     )
     errors.extend(
         f'{label}: unknown param "{unknown}"' for unknown in sorted(set(params) - known)
     )
-    if metric_type.validate_params is not None and set(
-        metric_type.required_params
-    ) <= set(params):
-        errors.extend(
-            f"{label}: {problem}" for problem in metric_type.validate_params(params)
-        )
+    if schema.validate is not None and set(schema.required) <= set(params):
+        errors.extend(f"{label}: {problem}" for problem in schema.validate(params))
 
 
 def _validate_diff(raw_diff: object, errors: list[str]) -> str | None:
@@ -258,7 +265,7 @@ def _resolve_default_range(
     return RangeSpec(name=IMPLICIT_RANGE_NAME, include=IMPLICIT_RANGE_INCLUDE)
 
 
-def _string_list(value: object, label: str, errors: list[str]) -> list[str] | None:
+def _string_list(value: object, *, label: str, errors: list[str]) -> list[str] | None:
     if value is None:
         return None
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
