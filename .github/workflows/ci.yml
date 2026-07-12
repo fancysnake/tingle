@@ -15,7 +15,7 @@ jobs:
     env:
       MISE_PYTHON_VERSION: ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: jdx/mise-action@v2
       - run: mise exec -- poetry install
       - run: mise test:py
@@ -23,7 +23,7 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: jdx/mise-action@v2
       - run: mise exec -- poetry install
       - run: mise run lint:py
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # tingle check needs history to find the merge-base
       - uses: jdx/mise-action@v2
