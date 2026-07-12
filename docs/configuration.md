@@ -110,7 +110,7 @@ The ladder runs on the ratio of the value to its guide:
 | ------------------------ | ----- |
 | zero                     | 🎉    |
 | up to a quarter of the guide | 🦠 |
-| up to half of it         | ⚠️    |
+| up to half of it         | 🚧    |
 | up to the guide itself   | 🚨    |
 | up to twice the guide    | 🔥    |
 | more than twice it       | 💀    |

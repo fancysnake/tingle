@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Severity emoji: every value is led by how bad it is against a **guide** —
+- Severity emoji (🎉 🦠 🚧 🚨 🔥 💀): every value is led by how bad it is
+  against a **guide** —
   the point at which its debt has reached full size. Set it globally with
   `[display] guide` (default 100) or per metric with `guide`.
 - Group headers now carry what their metrics add up to, judged against the

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import unicodedata
+
 import pytest
+from rich.cells import cell_len
 
 from tingle.mills.display import effective_guide, group_summary, severity_emoji
 from tingle.pacts.config import DEFAULT_GUIDE, DisplaySpec, MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffResult
 from tingle.pacts.metrics import MetricResult
 from tingle.pacts.report import MetricOutcome
+from tingle.specs.display import EMOJI_BANDS, EMOJI_OVER, EMOJI_ZERO
 
 
 def _outcome(value: int, *, guide: int = 100) -> MetricOutcome:
@@ -63,8 +67,8 @@ def test_effective_guide_falls_back_to_the_default() -> None:
         (0, "🎉"),
         (1, "🦠"),
         (25, "🦠"),  # ratio 0.25 exactly: the band's ceiling is inclusive
-        (26, "⚠️"),
-        (50, "⚠️"),  # 0.50 exactly
+        (26, "🚧"),
+        (50, "🚧"),  # 0.50 exactly
         (51, "🚨"),
         (100, "🚨"),  # 1.00 exactly: at the guide, not yet past it
         (101, "🔥"),
@@ -141,3 +145,18 @@ def test_group_summary_diff_counts_churn_as_changed() -> None:
 
     assert summary.net == 0
     assert summary.changed
+
+
+def test_every_emoji_on_the_ladder_is_a_wide_single_codepoint() -> None:
+    """A terminal must draw each one in the two cells the width assumes.
+
+    The warning sign (U+26A0 U+FE0F) was not: a text-default character wearing
+    a variation selector, of neutral width, which terminals draw in one cell
+    and so clip in half.
+    """
+    ladder = [EMOJI_ZERO, EMOJI_OVER, *(emoji for _ceiling, emoji in EMOJI_BANDS)]
+
+    for emoji in ladder:
+        assert len(emoji) == 1, f"{emoji!r} is more than one codepoint"
+        assert unicodedata.east_asian_width(emoji) == "W", f"{emoji!r} is not wide"
+        assert cell_len(emoji) == 2, f"{emoji!r} does not occupy two cells"

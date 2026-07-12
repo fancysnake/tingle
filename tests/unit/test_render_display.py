@@ -125,8 +125,8 @@ def test_table_group_row_sums_the_group() -> None:
         )
     )
 
-    # 78 against a summed guide of 200 lands in the warning band
-    assert "⚠️ 78" in text
+    # 78 against a summed guide of 200 is more than a quarter of it, under half
+    assert "🚧 78" in text
 
 
 def test_table_stays_unchanged_when_nothing_is_grouped() -> None:
@@ -162,7 +162,7 @@ def test_listing_heading_carries_the_group_sum() -> None:
         )
     )
 
-    assert "## typing  ⚠️ 78" in text
+    assert "## typing  🚧 78" in text
 
 
 def test_listing_prints_a_metric_description() -> None:

@@ -589,7 +589,7 @@ def test_group_header_carries_the_sum_of_its_metrics() -> None:
             (group,) = _groups(app)
 
             assert "78" in group.title  # 61 + 17
-            assert "⚠️" in group.title  # against a summed guide of 200
+            assert "🚧" in group.title  # against a summed guide of 200
 
     asyncio.run(scenario())
 
