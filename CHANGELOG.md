@@ -9,32 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Severity emoji (🎉 🦠 🚧 🚨 🔥 💀): every value is led by how bad it is
-  against a **guide** —
-  the point at which its debt has reached full size. Set it globally with
-  `[display] guide` (default 100) or per metric with `guide`.
-- Group headers now carry what their metrics add up to, judged against the
-  sum of their guides. In the TUI, a group with nothing to show starts
-  folded; its header still reports the total, and a group holding an errored
-  metric never folds.
+- Severity emoji (🎉 🦠 🚧 🚨 🔥 💀) on every value, ranking it against a
+  **guide**: `[display] guide` globally (default 100), or `guide` per metric.
+- Group headers show the sum of their metrics, ranked against the summed
+  guides. In the TUI a group summing to zero starts folded, unless it holds
+  an errored metric.
 - `ignore_lines` on `regex_count` and `symbol_uses`: regexes matched against
-  the line a hit sits on, so uses that are not debt can be excused. `ANY` in
-  an assertion is debt; `"form": ANY`, standing in for something that cannot
-  be compared, is not.
-- `over_lines` on `file_count`: count only the files longer than the gate,
-  answering "how many files are over 1k lines". A diff counts crossings — a
-  file that grows past the gate is new debt though it already existed.
-- `description` on any metric, shown in `tingle report` and the JSON, and
-  writable with `tingle add --description`.
-- `tingle check` says so when it passes, instead of passing in silence: in a
-  CI log, no output cannot be told apart from a step that never ran.
+  the line a hit sits on, excusing hits that are not debt — `ANY` in an
+  assertion counts, `"form": ANY` does not.
+- `over_lines` on `file_count`: counts only files longer than the gate. In a
+  diff, a file growing past the gate is new debt, one refactored back under
+  it is debt paid off.
+- `description` on any metric, shown in `tingle report` and the JSON.
+  `tingle add --description` writes one.
+- `tingle check` prints a line when it passes, instead of exiting silently.
 
 ### Fixed
 
-- The TUI's scroll container no longer steals focus from the metric rows. A
-  click on the empty space below them — or on the way back to a terminal
-  window that had lost focus — left the arrow keys scrolling the view, and
-  only clicking a row would return the cursor.
+- TUI: clicking empty space no longer moves focus off the metric rows,
+  leaving the arrow keys scrolling instead of navigating.
 
 ## [0.1.0] - 2026-07-12
 
