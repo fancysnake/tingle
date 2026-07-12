@@ -18,6 +18,7 @@ from tingle.mills.metrics.counts import (
     file_count_diff,
     line_count,
     line_count_diff,
+    validate_count_params,
 )
 from tingle.mills.metrics.regex_count import regex_count, regex_count_diff
 from tingle.mills.metrics.regex_count import validate_params as validate_regex_params
@@ -86,7 +87,11 @@ METRIC_TYPES: dict[str, MetricType] = {
     "file_count": MetricType(
         name="file_count",
         func=file_count,
-        description="Number of files in the metric's ranges.",
+        params=ParamSchema(optional=("over_lines",), validate=validate_count_params),
+        description=(
+            "Number of files in the metric's ranges; with over_lines, only "
+            "those strictly longer than that many lines."
+        ),
         diff_func=file_count_diff,
     ),
     "line_count": MetricType(
