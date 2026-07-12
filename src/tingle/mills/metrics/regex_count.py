@@ -89,8 +89,7 @@ def _matches_on_lines(
     """Locate matches on the given line numbers; None when text is unreadable."""
     if not lines:
         return []
-    text = reader(file.path)
-    if text is None:
+    if (text := reader(file.path)) is None:
         return None
     return [
         Occurrence(path=str(file.path), line=lineno)

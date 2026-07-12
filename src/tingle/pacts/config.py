@@ -77,19 +77,15 @@ class ConfigStore(Protocol):
         self, root: Path, override: Path | None = None
     ) -> tuple[Path, dict[str, Any]]:
         """Locate and parse the configuration; raises ConfigNotFoundError."""
-        ...
 
     @abstractmethod
     def edit_target(self, root: Path) -> Path:
         """Return the file `tingle add` should write to, existing or not."""
-        ...
 
     @abstractmethod
     def append_metric(self, path: Path, metric: Mapping[str, Any]) -> None:
         """Append a metric entry, preserving existing formatting."""
-        ...
 
     @abstractmethod
     def write_starter(self, root: Path) -> Path:
         """Create the starter config; raises FileExistsError if present."""
-        ...

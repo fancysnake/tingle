@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
@@ -15,25 +16,25 @@ if TYPE_CHECKING:
 class ProjectFiles(Protocol):
     """Read-only view of the project tree."""
 
+    @abstractmethod
     def walk(self) -> Iterable[PurePath]:
         """Yield every file under the project root as a relative path."""
-        ...
 
+    @abstractmethod
     def read(self, path: PurePath) -> str | None:
         """Return file text, or None if missing, binary, or undecodable."""
-        ...
 
+    @abstractmethod
     def exists(self, path: PurePath) -> bool:
         """Return whether the file exists."""
-        ...
 
 
 class ProjectFilesFactory(Protocol):
     """Builds the project-tree view anchored at a root directory."""
 
+    @abstractmethod
     def __call__(self, root: Path) -> ProjectFiles:
         """Return a ProjectFiles rooted at `root`."""
-        ...
 
 
 @dataclass(frozen=True)

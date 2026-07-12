@@ -65,8 +65,7 @@ def _segment_regex(segment: str) -> str:
         elif char == "?":
             out.append("[^/]")
         elif char == "[":
-            closing = segment.find("]", index + 1)
-            if closing == -1:
+            if (closing := segment.find("]", index + 1)) == -1:
                 out.append(re.escape(char))
             else:
                 inner = segment[index + 1 : closing]

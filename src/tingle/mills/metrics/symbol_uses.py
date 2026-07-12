@@ -97,8 +97,7 @@ def _side_occurrences(
     """Locate occurrences starting on the touched lines of one diff side."""
     if not touched:
         return [], []
-    text = reader(path)
-    if text is None:
+    if (text := reader(path)) is None:
         return [], [f"{path}: {side} side unreadable"]
     try:
         tree = ast.parse(text)
@@ -165,10 +164,9 @@ def _bind_plain_import(
         if alias.asname is None:
             if module[0] == parts[0]:
                 bindings[module[0]] = parts[1:]
-        else:
-            suffix = _align_prefix(module, parts)
-            if suffix is not None:
-                bindings[alias.asname] = suffix
+            continue
+        if (suffix := _align_prefix(module, parts)) is not None:
+            bindings[alias.asname] = suffix
 
 
 def _bind_from_import(
@@ -183,8 +181,7 @@ def _bind_from_import(
     for alias in node.names:
         chain = (*module, alias.name)
         align = _align_prefix if node.level == 0 else _align_anywhere
-        suffix = align(chain, parts)
-        if suffix is not None:
+        if (suffix := align(chain, parts)) is not None:
             bindings[alias.asname or alias.name] = suffix
             if not suffix:
                 use_lines.append(node.lineno)

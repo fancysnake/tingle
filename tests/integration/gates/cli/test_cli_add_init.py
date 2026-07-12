@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-import pytest
 from typer.testing import CliRunner
 
 from tingle.gates.cli.typer import CliGate
@@ -14,12 +13,6 @@ if TYPE_CHECKING:
 
 runner = CliRunner()
 app = CliGate(Services()).app
-
-
-@pytest.fixture
-def workdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.chdir(tmp_path)
-    return tmp_path
 
 
 def test_add_creates_config_and_round_trips(workdir: Path) -> None:

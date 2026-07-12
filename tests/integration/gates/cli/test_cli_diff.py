@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from typing import TYPE_CHECKING
 
 import pytest
@@ -19,62 +18,6 @@ if TYPE_CHECKING:
 
 runner = CliRunner()
 app = CliGate(Services()).app
-
-CONFIG = """
-[ranges.python]
-include = ["src/**/*.py"]
-default = true
-
-[[metrics]]
-name = "noqa-comments"
-type = "regex_count"
-pattern = '#\\s*noqa'
-
-[[metrics]]
-name = "ruff-ignores"
-type = "toml_list_length"
-key = "tool.ruff.lint.ignore"
-"""
-
-BASE_PYPROJECT = '[tool.ruff.lint]\nignore = ["E501"]\n'
-BRANCH_PYPROJECT = '[tool.ruff.lint]\nignore = ["E501", "D203"]\n'
-
-
-@pytest.fixture(autouse=True)
-def isolated_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
-    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
-    monkeypatch.setenv("GIT_AUTHOR_NAME", "tingle-tests")
-    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "tests@tingle.invalid")
-    monkeypatch.setenv("GIT_COMMITTER_NAME", "tingle-tests")
-    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "tests@tingle.invalid")
-    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
-
-
-def _git(cwd: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
-
-
-@pytest.fixture
-def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Repo on branch `feature`: +2 committed noqa, +1 untracked, +1 ignore."""
-    repo = tmp_path / "repo"
-    src = repo / "src"
-    src.mkdir(parents=True)
-    _git(repo, "init", "-b", "main")
-    (repo / "tingle.toml").write_text(CONFIG)
-    (repo / "pyproject.toml").write_text(BASE_PYPROJECT)
-    (src / "a.py").write_text("x = 1  # noqa\n")
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-m", "base")
-    _git(repo, "checkout", "-b", "feature")
-    (src / "a.py").write_text("x = 1  # noqa\ny = 2  # noqa\nz = 3  # noqa\n")
-    (repo / "pyproject.toml").write_text(BRANCH_PYPROJECT)
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-m", "feature work")
-    (src / "new.py").write_text("w = 4  # noqa\n")  # untracked
-    monkeypatch.chdir(repo)
-    return repo
 
 
 @pytest.mark.usefixtures("repo")
@@ -192,11 +135,8 @@ def test_raising_diff_metric_exits_1_but_others_render(
     assert "error: ruff-ignores: RuntimeError: boom" in result.stderr
 
 
-def test_diff_outside_repo_exits_2(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    (tmp_path / "tingle.toml").write_text(CONFIG)
-    monkeypatch.chdir(tmp_path)
+def test_diff_outside_repo_exits_2(workdir: Path, config_text: str) -> None:
+    (workdir / "tingle.toml").write_text(config_text)
 
     result = runner.invoke(app, ["stat", "--diff"])
 

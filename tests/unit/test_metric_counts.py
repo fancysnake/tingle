@@ -37,7 +37,7 @@ def test_line_count_sums_lines_with_details() -> None:
 
     assert result.value == 3
     assert dict(result.details) == {"a.py": 2, "b.py": 1}
-    assert result.warnings == ()
+    assert not result.warnings
 
 
 def test_line_count_skips_unreadable_with_warning() -> None:

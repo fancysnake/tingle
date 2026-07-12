@@ -70,8 +70,7 @@ def _descend_toml(read: _Reader, params: Mapping[str, Any]) -> tuple[Any, str | 
     file = params.get("file", TOML_LIST_DEFAULT_FILE)
     key = params["key"]
 
-    text = read(PurePath(file))
-    if text is None:
+    if (text := read(PurePath(file))) is None:
         return None, f"{file}: not found or unreadable"
     try:
         data: Any = tomllib.loads(text)
@@ -214,8 +213,7 @@ def _ini_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
     section = params["section"]
     option = params["option"]
 
-    text = read(PurePath(file))
-    if text is None:
+    if (text := read(PurePath(file))) is None:
         return _empty(f"{file}: not found or unreadable")
 
     parser = configparser.ConfigParser()
@@ -226,8 +224,7 @@ def _ini_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
 
     if not parser.has_section(section):
         return _empty(f'{file}: section "{section}" not found')
-    value = parser.get(section, option, fallback=None)
-    if value is None:
+    if (value := parser.get(section, option, fallback=None)) is None:
         return _empty(f'{file}: option "{option}" not found in "{section}"')
 
     entries = [

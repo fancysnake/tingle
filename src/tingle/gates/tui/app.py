@@ -130,20 +130,17 @@ class MetricsApp(App[None]):
 
     def action_unfold(self) -> None:
         """Unfold (right arrow) the focused group/metric header."""
-        collapsible = self._focused_collapsible()
-        if collapsible is not None:
+        if (collapsible := self._focused_collapsible()) is not None:
             collapsible.collapsed = False
 
     def action_fold(self) -> None:
         """Fold (left arrow) the focused group/metric header."""
-        collapsible = self._focused_collapsible()
-        if collapsible is not None:
+        if (collapsible := self._focused_collapsible()) is not None:
             collapsible.collapsed = True
 
     def action_toggle_fold(self) -> None:
         """Toggle (space) the focused group/metric header."""
-        collapsible = self._focused_collapsible()
-        if collapsible is not None:
+        if (collapsible := self._focused_collapsible()) is not None:
             collapsible.collapsed = not collapsible.collapsed
 
     def action_toggle_fold_all(self) -> None:
@@ -154,8 +151,7 @@ class MetricsApp(App[None]):
         no group headers, so there the metric rows are the top level and
         fold instead. Unfolds only once nothing is left unfolded.
         """
-        headers = self._fold_all_targets()
-        if not headers:
+        if not (headers := self._fold_all_targets()):
             return
         collapsed = any(not header.collapsed for header in headers)
         # Folding hides any header nested in a group, and textual drops
@@ -174,14 +170,12 @@ class MetricsApp(App[None]):
 
     def _enclosing_header(self, headers: list[Collapsible]) -> Collapsible | None:
         """Find the fold-all target containing the focused widget, if any."""
-        focused = self.focused
-        if focused is None:
+        if (focused := self.focused) is None:
             return None
         return next((a for a in focused.ancestors_with_self if a in headers), None)
 
     def _focused_collapsible(self) -> Collapsible | None:
-        focused = self.focused
-        if focused is None:
+        if (focused := self.focused) is None:
             return None
         return next(
             (a for a in focused.ancestors_with_self if isinstance(a, Collapsible)), None

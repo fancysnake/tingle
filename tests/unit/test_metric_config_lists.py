@@ -67,7 +67,7 @@ def test_toml_list_length_counts_entries() -> None:
     )
 
     assert result.value == 3
-    assert result.warnings == ()
+    assert not result.warnings
     assert [str(o) for o in result.occurrences] == [
         "pyproject.toml: E501",
         "pyproject.toml: D203",
@@ -143,7 +143,7 @@ def test_toml_malformed_warns() -> None:
 
 
 def test_validate_toml_params() -> None:
-    assert validate_toml_params({"key": "tool.ruff.lint.ignore"}) == []
+    assert not validate_toml_params({"key": "tool.ruff.lint.ignore"})
     assert validate_toml_params({"key": ""}) == ["key must be a non-empty string"]
     assert validate_toml_params({"key": "x", "file": 5}) == ["file must be a string"]
 
@@ -157,7 +157,7 @@ def test_table_array_counts_tables_and_labels_them() -> None:
     )
 
     assert result.value == 3  # one per [[...]] block
-    assert result.warnings == ()
+    assert not result.warnings
     assert [str(o) for o in result.occurrences] == [
         "pyproject.toml: foo.*",
         "pyproject.toml: bar.baz, bar.qux",  # list label joined
@@ -189,8 +189,8 @@ def test_table_array_empty_is_zero_without_warning() -> None:
 
     # an empty array of tables vacuously satisfies "every element a table"
     assert result.value == 0
-    assert result.occurrences == ()
-    assert result.warnings == ()
+    assert not result.occurrences
+    assert not result.warnings
 
 
 def test_table_array_non_array_of_tables_warns() -> None:
@@ -231,7 +231,7 @@ def test_table_array_explode_fans_out_list_labels() -> None:
 
 def test_validate_table_array_params() -> None:
     ok = {"key": "tool.mypy.overrides", "label": "module"}
-    assert validate_toml_table_array_params(ok) == []
+    assert not validate_toml_table_array_params(ok)
     assert validate_toml_table_array_params({"key": ""}) == [
         "key must be a non-empty string"
     ]
@@ -255,7 +255,7 @@ def test_ini_list_length_splits_commas_and_newlines() -> None:
     )
 
     assert result.value == 3
-    assert result.warnings == ()
+    assert not result.warnings
     assert [o.note for o in result.occurrences] == [
         "too-many-arguments",
         "missing-docstring",
@@ -309,7 +309,7 @@ def test_ini_malformed_warns() -> None:
 
 
 def test_validate_ini_params() -> None:
-    assert validate_ini_params({"file": "a", "section": "b", "option": "c"}) == []
+    assert not validate_ini_params({"file": "a", "section": "b", "option": "c"})
     assert validate_ini_params({"file": 1, "section": "b", "option": "c"}) == [
         "file must be a string"
     ]

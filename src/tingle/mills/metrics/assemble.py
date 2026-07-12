@@ -36,8 +36,7 @@ def readable_files(
     for path in ctx.files:
         if suffix is not None and path.suffix != suffix:
             continue
-        text = ctx.read(path)
-        if text is None:
+        if (text := ctx.read(path)) is None:
             warnings.append(f"{path}: skipped (binary, unreadable, or missing)")
             continue
         yield path, text
@@ -72,8 +71,7 @@ def accumulate_diff(
         added.extend(file_added)
         removed.extend(file_removed)
         warnings.extend(file_warnings)
-        net = len(file_added) - len(file_removed)
-        if net:
+        if net := len(file_added) - len(file_removed):
             details[str(file.path)] = net
 
     return DiffResult(

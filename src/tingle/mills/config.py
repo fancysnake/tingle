@@ -127,8 +127,7 @@ def _validate_metrics(
             if key not in _METRIC_RESERVED_KEYS
         }
 
-        type_name = table.get("type")
-        if type_name is None:
+        if (type_name := table.get("type")) is None:
             errors.append(f"{label}: missing type")
             continue
         if not isinstance(type_name, str) or type_name not in metric_types:

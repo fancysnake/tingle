@@ -121,8 +121,7 @@ class GitCli:
             data = (self._root / path).read_bytes()
         except OSError:
             return ()
-        text = decode_text(data)
-        if text is None:
+        if (text := decode_text(data)) is None:
             return ()
         return range(1, len(text.splitlines()) + 1)
 

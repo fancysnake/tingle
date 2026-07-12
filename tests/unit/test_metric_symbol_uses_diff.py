@@ -118,7 +118,7 @@ def test_non_python_files_ignored() -> None:
     result = _run(file, {"notes.md": "myapp.legacy.OldClient\n"}, base={})
 
     assert result.net == 0
-    assert result.warnings == ()
+    assert not result.warnings
 
 
 def test_details_show_per_file_net() -> None:

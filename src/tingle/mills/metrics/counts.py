@@ -56,8 +56,7 @@ def line_count_diff(ctx: DiffMetricContext) -> DiffResult:
     for file in ctx.files:
         added += len(file.added_lines)
         removed += len(file.removed_lines)
-        net = len(file.added_lines) - len(file.removed_lines)
-        if net:
+        if net := len(file.added_lines) - len(file.removed_lines):
             details[str(file.path)] = net
     return DiffResult(
         net=added - removed, added=added, removed=removed, details=details

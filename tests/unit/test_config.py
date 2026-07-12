@@ -86,7 +86,7 @@ def test_valid_config() -> None:
     assert noqa.ranges == ("python",)
     assert dict(noqa.params) == {"pattern": "# noqa"}
     assert todo.ranges == ("python", "js")
-    assert files.ranges == ()
+    assert not files.ranges
 
 
 def test_no_default_falls_back_to_implicit_all_files() -> None:

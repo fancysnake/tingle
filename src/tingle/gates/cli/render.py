@@ -124,8 +124,7 @@ def run_listing(report: RunReport) -> list[Text]:
     sections = group_sections(report.outcomes)
     has_named = any(name is not None for name, _ in sections)
     for name, outcomes in sections:
-        heading = _section_heading(name, has_named=has_named)
-        if heading is not None:
+        if (heading := _section_heading(name, has_named=has_named)) is not None:
             lines.append(heading)
         for outcome in outcomes:
             if outcome.result is None:
@@ -177,8 +176,7 @@ def diff_listing(report: DiffReport) -> list[Text]:
     sections = group_sections(report.outcomes)
     has_named = any(name is not None for name, _ in sections)
     for name, outcomes in sections:
-        heading = _section_heading(name, has_named=has_named)
-        if heading is not None:
+        if (heading := _section_heading(name, has_named=has_named)) is not None:
             lines.append(heading)
         for outcome in outcomes:
             if outcome.result is None:
@@ -197,8 +195,7 @@ def diff_listing(report: DiffReport) -> list[Text]:
 
 
 def _diff_heading(outcome: DiffOutcome) -> Text:
-    result = outcome.result
-    if result is None:  # pragma: no cover - guarded by caller
+    if (result := outcome.result) is None:  # pragma: no cover - guarded by caller
         return Text("")
     impact = (
         f"+{result.added} / -{result.removed} (net {result.net:+d})"
@@ -263,8 +260,7 @@ def diff_json(report: DiffReport) -> str:
 
 
 def _diff_values(outcome: DiffOutcome) -> dict[str, Any]:
-    result = outcome.result
-    if result is None:
+    if (result := outcome.result) is None:
         return {
             "added": None,
             "removed": None,
@@ -299,8 +295,9 @@ def cobertura(report: RunReport) -> tuple[str, list[str]]:
     for outcome in report.outcomes:
         if outcome.result is None:
             continue
-        located = [o for o in outcome.result.occurrences if o.line is not None]
-        if not located:
+        if not (
+            located := [o for o in outcome.result.occurrences if o.line is not None]
+        ):
             if outcome.result.occurrences or outcome.result.value:
                 excluded.append(outcome.spec.name)
             continue

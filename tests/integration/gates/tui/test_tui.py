@@ -129,8 +129,7 @@ def test_collapsibles_start_collapsed_and_expand_in_place() -> None:
 
 
 def _focused_metric_id(app: MetricsApp) -> str | None:
-    focused = app.focused
-    if focused is None:
+    if (focused := app.focused) is None:
         return None
     collapsible = next(
         (a for a in focused.ancestors if isinstance(a, Collapsible)), None

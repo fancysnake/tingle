@@ -39,8 +39,7 @@ class DiffRunner:
         """Measure the branch impact against merge-base(base, HEAD)."""
         if only is not None:
             known = {spec.name for spec in self.config.metrics}
-            unknown = sorted(set(only) - known)
-            if unknown:
+            if unknown := sorted(set(only) - known):
                 raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
         branch_diff = self.diff_source.branch_diff(base)
@@ -51,8 +50,7 @@ class DiffRunner:
         for spec in self.config.metrics:
             if only is not None and spec.name not in only:
                 continue
-            diff_func = self.metric_types[spec.type].diff_func
-            if diff_func is None:
+            if (diff_func := self.metric_types[spec.type].diff_func) is None:
                 skipped.append(spec.name)
                 continue
             outcomes.append(

@@ -43,8 +43,8 @@ def test_param_specs() -> None:
         "option",
     )
     assert METRIC_TYPES["ini_list_length"].params.primary is None
-    assert METRIC_TYPES["file_count"].params.required == ()
-    assert METRIC_TYPES["line_count"].params.required == ()
+    assert not METRIC_TYPES["file_count"].params.required
+    assert not METRIC_TYPES["line_count"].params.required
 
 
 def test_every_metric_type_has_a_diff_variant() -> None:

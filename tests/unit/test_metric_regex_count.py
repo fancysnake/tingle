@@ -63,14 +63,14 @@ def test_empty_file_has_no_occurrences() -> None:
     result = regex_count(_context({"a.py": ""}, {"pattern": "TODO"}))
 
     assert result.value == 0
-    assert result.occurrences == ()
+    assert not result.occurrences
 
 
 def test_zero_matches_has_empty_details() -> None:
     result = regex_count(_context({"a.py": "clean\n"}, {"pattern": "TODO"}))
 
     assert result.value == 0
-    assert dict(result.details) == {}
+    assert not result.details
 
 
 def test_flags_are_applied() -> None:
@@ -89,7 +89,7 @@ def test_unreadable_file_warns() -> None:
 
 
 def test_validate_params_accepts_valid() -> None:
-    assert validate_params({"pattern": r"#\s*noqa", "flags": ["MULTILINE"]}) == []
+    assert not validate_params({"pattern": r"#\s*noqa", "flags": ["MULTILINE"]})
 
 
 def test_validate_params_rejects_bad_regex() -> None:

@@ -57,7 +57,7 @@ def test_load_raw_returns_empty_when_no_config_exists() -> None:
     store = MagicMock()
     store.load_raw.side_effect = ConfigNotFoundError("nope")
 
-    assert _config_service(store).load_raw(CWD) == {}
+    assert not _config_service(store).load_raw(CWD)
 
 
 def test_add_metric_appends_to_the_edit_target_and_returns_the_name() -> None:

@@ -42,7 +42,7 @@ def test_toml_delta_between_base_and_current() -> None:
     assert result.removed is None
     assert dict(result.details) == {"base": 1, "current": 3}
     assert [o.note for o in result.added_occurrences] == ["D203", "ANN101"]
-    assert result.removed_occurrences == ()
+    assert not result.removed_occurrences
 
 
 def test_toml_negative_delta() -> None:
@@ -79,7 +79,7 @@ def test_duplicate_entries_document_net_vs_set_mismatch() -> None:
     )
 
     assert result.net == 1  # count-based
-    assert result.added_occurrences == ()  # set-based: no new distinct entry
+    assert not result.added_occurrences  # set-based: no new distinct entry
 
 
 def test_toml_missing_base_is_zero_with_warning() -> None:

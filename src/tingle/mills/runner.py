@@ -24,8 +24,7 @@ def run(
     """Run every configured metric, isolating failures per metric."""
     if only is not None:
         known = {spec.name for spec in config.metrics}
-        unknown = sorted(set(only) - known)
-        if unknown:
+        if unknown := sorted(set(only) - known):
             raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
     walked = tuple(project.walk())

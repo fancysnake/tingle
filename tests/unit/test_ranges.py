@@ -54,4 +54,4 @@ def test_default_excludes_apply_to_every_range() -> None:
 def test_no_matches_returns_empty() -> None:
     spec = RangeSpec(name="python", include=("**/*.py",))
 
-    assert resolve(_paths("readme.md"), [spec]) == ()
+    assert not resolve(_paths("readme.md"), [spec])

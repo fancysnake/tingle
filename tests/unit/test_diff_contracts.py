@@ -37,9 +37,9 @@ def test_diff_result_value_delta_shape() -> None:
 
     assert result.added is None
     assert result.removed is None
-    assert dict(result.details) == {}
-    assert result.added_occurrences == ()
-    assert result.removed_occurrences == ()
+    assert not result.details
+    assert not result.added_occurrences
+    assert not result.removed_occurrences
 
 
 def test_metric_type_diff_func_defaults_to_none() -> None:
@@ -85,6 +85,6 @@ def test_diff_report_construction() -> None:
     )
 
     branch_diff = BranchDiff(base_ref="main", merge_base="abc123", files=())
-    assert branch_diff.files == ()
+    assert not branch_diff.files
     assert report.outcomes[0].total is not None
     assert report.outcomes[0].total.value == 10

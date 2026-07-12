@@ -39,7 +39,7 @@ def test_counts_only_on_added_lines() -> None:
     assert result.removed == 0
     assert result.net == 1
     assert [str(o) for o in result.added_occurrences] == ["a.py:2"]
-    assert result.removed_occurrences == ()
+    assert not result.removed_occurrences
 
 
 def test_removed_side_uses_base_content() -> None:
@@ -81,7 +81,7 @@ def test_modified_line_with_surviving_match_is_net_zero() -> None:
     assert result.added == 1
     assert result.removed == 1
     assert result.net == 0
-    assert dict(result.details) == {}
+    assert not result.details
 
 
 def test_multiple_matches_per_line() -> None:
@@ -132,4 +132,4 @@ def test_empty_line_sets_do_not_warn() -> None:
 
     result = regex_count_diff(_context((file,), {}, base={}, params={"pattern": "x"}))
 
-    assert result.warnings == ()
+    assert not result.warnings

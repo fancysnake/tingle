@@ -25,15 +25,15 @@ def test_range_spec_is_immutable() -> None:
 
 def test_metric_spec_defaults() -> None:
     spec = MetricSpec(name="noqa", type="regex_count")
-    assert spec.ranges == ()
-    assert dict(spec.params) == {}
+    assert not spec.ranges
+    assert not spec.params
 
 
 def test_metric_result_defaults() -> None:
     result = MetricResult(value=3)
-    assert dict(result.details) == {}
-    assert result.warnings == ()
-    assert result.occurrences == ()
+    assert not result.details
+    assert not result.warnings
+    assert not result.occurrences
 
 
 def test_occurrence_rendering() -> None:

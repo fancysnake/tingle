@@ -77,7 +77,7 @@ def test_unrelated_code_counts_zero() -> None:
     result = _run(code)
 
     assert result.value == 0
-    assert dict(result.details) == {}
+    assert not result.details
 
 
 def test_same_bare_name_without_import_counts_zero_in_dotted_mode() -> None:
@@ -118,7 +118,7 @@ def test_non_python_files_are_ignored() -> None:
     result = _run_files({"notes.md": "myapp.legacy.OldClient everywhere"})
 
     assert result.value == 0
-    assert result.warnings == ()
+    assert not result.warnings
 
 
 def test_details_are_per_file() -> None:
@@ -131,8 +131,8 @@ def test_details_are_per_file() -> None:
 
 
 def test_validate_params() -> None:
-    assert validate_params({"symbol": "pkg.mod.OldClient"}) == []
-    assert validate_params({"symbol": "OldClient"}) == []
-    assert validate_params({"symbol": ""}) != []
-    assert validate_params({"symbol": "not a name"}) != []
-    assert validate_params({"symbol": 5}) != []
+    assert not validate_params({"symbol": "pkg.mod.OldClient"})
+    assert not validate_params({"symbol": "OldClient"})
+    assert validate_params({"symbol": ""})
+    assert validate_params({"symbol": "not a name"})
+    assert validate_params({"symbol": 5})
