@@ -186,6 +186,52 @@ Approximations to know about:
   (`fetch-depth: 1`) will fail; fetch enough history or use
   `fetch-depth: 0`.
 
+## CI gate: `tingle check`
+
+`tingle check` is `stat --diff` with an opinion. It measures the same
+branch impact, then **exits 1 if the branch made things worse** — so a
+pull request that takes on debt fails the build. Output is trimmed to
+what CI needs: the metrics that grew, and only the lines the branch
+added.
+
+```console
+$ tingle check
+noqa-comment (regex_count): +2
+  + src/api/views.py:23
+  + src/api/views.py:41
+
+ruff-ignores (toml_list_length): +1
+  + pyproject.toml: D203
+
+$ echo $?
+1
+```
+
+Two policies decide what "worse" means:
+
+| Policy | Fails when |
+|---|---|
+| `sum` (default) | the metrics grow **in total** — paying off debt in one metric offsets taking it on in another |
+| `any` | **any single** metric grows, whatever else improved |
+
+```toml
+[check]
+policy = "sum"        # or "any"
+ignore = ["loc"]      # metrics that never fail the check
+```
+
+`ignore` names metrics that are expected to grow — lines of code, say.
+They take no part: they neither move the total nor fail the build, and
+they stay out of the output. A name that matches no configured metric is
+a config error, so a typo can't silently ignore nothing.
+
+`--policy sum|any` overrides the config for one run; `--base`,
+`--config`, and `--metric` work as they do on `stat`.
+
+Under `sum`, a metric can grow and the branch still pass — its added
+lines are still printed, because the trade is worth seeing even when it
+is allowed. A branch that worsens nothing prints nothing and exits 0.
+
 ## CLI
 
 - `tingle` — **interactive mode** on a terminal: a three-level accordion
@@ -205,6 +251,10 @@ Approximations to know about:
   `--base REF` (implies `--diff`), `--config PATH`, `--metric NAME`
   (repeatable filter). Diff JSON includes the resolved base ref and
   merge-base sha.
+- `tingle check` — the **CI gate**: measure the branch, exit 1 if it
+  worsened the metrics, and print only the lines it added under the
+  metrics that grew. Options: `--policy sum|any` (overrides `[check]
+  policy`), `--base REF`, `--config PATH`, `--metric NAME` (repeatable).
 - `tingle report` — the **full report**: every occurrence with file and
   line (`src/api/views.py:23`), or the actual list entries for the
   config-list metrics (`pyproject.toml: E501`). Same options as stat,
@@ -233,17 +283,22 @@ Migrating from ≤0.1: `tingle run` is now `tingle stat`, and `tingle diff`
 is `tingle stat --diff` (summary) or `tingle report --diff` (locations).
 
 **Exit codes**: `0` — metrics ran (warnings allowed); `1` — a metric
-function failed (the others still run and report); `2` — config or usage
-error. Metric *values* never affect the exit code: tingle measures, it
+function failed (the others still run and report), or `tingle check`
+judged the branch a regression; `2` — config or usage error. Outside of
+`check`, metric *values* never affect the exit code: tingle measures, it
 does not judge.
 
 ## CI example
 
 ```yaml
+- run: tingle check                             # fails the build on new debt
 - run: tingle stat --json > metrics.json
 - run: jq -r '.metrics[] | "\(.name)\t\(.value)"' metrics.json
 - run: tingle report --cobertura > tingle.xml   # e.g. GitLab MR annotations
 ```
+
+`check` needs the merge-base, so give it history: `fetch-depth: 0` on
+`actions/checkout`, or `GIT_DEPTH: 0` on GitLab.
 
 ## Development
 
