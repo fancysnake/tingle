@@ -72,6 +72,9 @@ for list metrics you see *which* rules changed.
 | `--config PATH` | path to the config file |
 | `--metric NAME` | run only the named metric (repeatable) |
 
+`--cobertura` reports the whole tree, so it cannot be combined with `--json`,
+`--diff`, or `--base`; doing so is a usage error.
+
 ## `tingle add`
 
 Append a metric to the config.
@@ -91,9 +94,23 @@ types](metrics.md).
 | `--group NAME` | group heading to show this metric under |
 | `--param key=value` | extra metric param (repeatable) |
 
+Without `--name`, the metric is named after its type and value
+(`regex_count-noqa`), with a `-2`, `-3`, … suffix if that name is taken.
+
 The new metric is validated against the merged config before anything is
 written. It targets `tingle.toml` (created if needed), or `[tool.tingle]` in
-`pyproject.toml` if that is where your config already lives.
+`pyproject.toml` if that is where your config already lives. Formatting and
+comments in the file are preserved.
+
+!!! note "`--param` values are strings"
+
+    Every `--param` value is written to the config as a string, so the params
+    that want a list or a boolean — `regex_count`'s `flags` and
+    `toml_table_array`'s `explode` — cannot be set this way. Add the metric
+    without them, then write them into the TOML by hand.
+
+Types with no positional param (`ini_list_length`, `file_count`,
+`line_count`) reject a `VALUE`; set what they need with `--param`.
 
 ## `tingle init`
 
@@ -115,7 +132,7 @@ List the configured metrics.
 |---|---|
 | `0` | metrics ran (warnings allowed) |
 | `1` | a metric function failed (the others still run and report), or `tingle check` judged the branch a regression |
-| `2` | config or usage error |
+| `2` | config error, usage error, or a diff that could not be produced (unknown base ref, no merge-base) |
 
 Outside of `check`, metric *values* never affect the exit code: tingle
 measures, it does not judge.
