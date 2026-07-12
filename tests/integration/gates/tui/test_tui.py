@@ -476,3 +476,73 @@ def test_quit_binding() -> None:
         assert app.return_value is None
 
     asyncio.run(scenario())
+
+
+def test_clicking_empty_space_does_not_steal_focus_from_the_rows() -> None:
+    """The scroll container must not take focus.
+
+    It used to: a click on the empty space below the rows -- which is where
+    a click landed when giving a blurred terminal window its focus back --
+    focused the container, and since the arrows are bound on NavCollapsible
+    and reach it only by bubbling from a focused header, they went back to
+    scrolling. Nothing but clicking a row would hand focus back.
+    """
+
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.click(VerticalScroll, offset=(40, 15))  # empty space
+            await pilot.pause()
+
+            assert _focused_metric_id(app) == "metric-0"  # focus stayed put
+
+            await pilot.press("down")
+            await pilot.pause()
+
+            assert _focused_metric_id(app) == "metric-1"  # arrows still navigate
+
+    asyncio.run(scenario())
+
+
+def test_the_view_still_scrolls_when_the_content_overflows() -> None:
+    """Losing focusability must not cost the container its scrolling.
+
+    It can no longer be scrolled by focusing it, so the view has to follow
+    the cursor instead -- which is how a row below the fold is reached.
+    """
+    tall = RunReport(
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        outcomes=(
+            MetricOutcome(
+                spec=MetricSpec(name="many", type="regex_count"),
+                range_names=(),
+                result=MetricResult(
+                    value=12,
+                    occurrences=tuple(
+                        Occurrence(path=f"src/f{n}.py", line=n) for n in range(12)
+                    ),
+                ),
+            ),
+            MetricOutcome(
+                spec=MetricSpec(name="below-the-fold", type="file_count"),
+                range_names=(),
+                result=MetricResult(value=5),
+            ),
+        ),
+    )
+
+    async def scenario() -> None:
+        app = MetricsApp(tall)
+        async with app.run_test(size=(80, 6)) as pilot:
+            scroll = app.query_one(VerticalScroll)
+            await pilot.press("right")  # unfold, pushing the next row off-screen
+            await pilot.pause()
+            assert scroll.max_scroll_y > 0  # the view really is too tall
+
+            await pilot.press("down")  # focus the row below the fold
+            await pilot.pause()
+
+            assert scroll.scroll_y > 0  # the view followed the cursor down
+
+    asyncio.run(scenario())

@@ -92,7 +92,13 @@ class MetricsApp(App[None]):
         sections = group_sections(self._outcomes)
         grouped = any(name is not None for name, _ in sections)
         index = 0
-        with VerticalScroll():
+        # can_focus=False: a click on the empty space below the rows -- or on
+        # the way back to a terminal window that lost focus -- would otherwise
+        # land on the scroll container and focus it. The arrows are bound on
+        # NavCollapsible and reach it only by bubbling from a focused header,
+        # so with the container holding focus they scroll instead of
+        # navigating, and nothing but clicking a row hands focus back.
+        with VerticalScroll(can_focus=False):
             for section, (name, outcomes) in enumerate(sections):
                 metrics: list[NavCollapsible] = []
                 for outcome in outcomes:
