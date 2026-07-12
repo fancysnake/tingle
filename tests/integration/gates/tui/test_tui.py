@@ -274,11 +274,12 @@ def test_grouped_report_nests_groups_and_metrics() -> None:
             metrics = [c for c in app.query(Collapsible) if "metric" in c.classes]
             assert len(groups) == 3  # typing, lint, (ungrouped)
             assert len(metrics) == 4
+            # each heading is the group's name, then what its metrics add up to
             titles = [group.title for group in groups]
-            assert "typing" in titles
-            assert "lint" in titles
-            assert "(ungrouped)" in titles
-            # groups open at rest, metric file-results closed
+            assert any(title.startswith("typing") for title in titles)
+            assert any(title.startswith("lint") for title in titles)
+            assert any(title.startswith("(ungrouped)") for title in titles)
+            # groups open at rest (none here sums to zero), metric results closed
             assert all(not group.collapsed for group in groups)
             assert all(metric.collapsed for metric in metrics)
 
@@ -544,5 +545,125 @@ def test_the_view_still_scrolls_when_the_content_overflows() -> None:
             await pilot.pause()
 
             assert scroll.scroll_y > 0  # the view followed the cursor down
+
+    asyncio.run(scenario())
+
+
+def _summed_report(*outcomes: MetricOutcome) -> RunReport:
+    return RunReport(
+        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=outcomes
+    )
+
+
+def _valued(name: str, group: str, value: int, *, guide: int = 100) -> MetricOutcome:
+    return MetricOutcome(
+        spec=MetricSpec(name=name, type="file_count", group=group),
+        range_names=(),
+        result=MetricResult(value=value),
+        guide=guide,
+    )
+
+
+def test_metric_rows_carry_their_severity_emoji() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(_summed_report(_valued("a", "g", 0), _valued("b", "g", 3)))
+        async with app.run_test():
+            titles = [c.title for c in app.query(Collapsible) if "metric" in c.classes]
+
+            assert any("🎉" in title for title in titles)
+            assert any("🦠" in title for title in titles)
+
+    asyncio.run(scenario())
+
+
+def test_group_header_carries_the_sum_of_its_metrics() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(
+            _summed_report(_valued("a", "lint", 61), _valued("b", "lint", 17))
+        )
+        async with app.run_test():
+            (group,) = _groups(app)
+
+            assert "78" in group.title  # 61 + 17
+            assert "⚠️" in group.title  # against a summed guide of 200
+
+    asyncio.run(scenario())
+
+
+def test_a_group_summing_to_zero_starts_folded() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(
+            _summed_report(
+                _valued("a", "clean", 0),
+                _valued("b", "clean", 0),
+                _valued("c", "dirty", 4),
+            )
+        )
+        async with app.run_test():
+            by_title = {group.title: group for group in _groups(app)}
+            clean = next(g for t, g in by_title.items() if t.startswith("clean"))
+            dirty = next(g for t, g in by_title.items() if t.startswith("dirty"))
+
+            assert clean.collapsed  # nothing to show, so it keeps out of the way
+            assert not dirty.collapsed
+
+    asyncio.run(scenario())
+
+
+def test_a_zero_group_holding_an_error_stays_open() -> None:
+    """An error is the one thing that must never be folded out of sight."""
+
+    async def scenario() -> None:
+        app = MetricsApp(
+            _summed_report(
+                _valued("fine", "g", 0),
+                MetricOutcome(
+                    spec=MetricSpec(name="boom", type="file_count", group="g"),
+                    range_names=(),
+                    error="ValueError: boom",
+                ),
+            )
+        )
+        async with app.run_test():
+            (group,) = _groups(app)
+
+            assert not group.collapsed
+
+    asyncio.run(scenario())
+
+
+def test_an_unchanged_diff_group_starts_folded() -> None:
+    """A branch that moved nothing here has nothing to say, whatever it stands on."""
+    report = DiffReport(
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        base_ref="main",
+        merge_base="abc123",
+        outcomes=(
+            DiffOutcome(
+                spec=MetricSpec(name="still", type="file_count", group="quiet"),
+                range_names=(),
+                result=DiffResult(net=0, added=0, removed=0),
+                total=MetricResult(value=40),  # standing debt, but untouched
+            ),
+            DiffOutcome(
+                spec=MetricSpec(name="moved", type="file_count", group="loud"),
+                range_names=(),
+                result=DiffResult(net=1, added=1, removed=0),
+                total=MetricResult(value=2),
+            ),
+        ),
+    )
+
+    async def scenario() -> None:
+        app = MetricsApp(report)
+        async with app.run_test():
+            by_title = {group.title: group for group in _groups(app)}
+            quiet = next(g for t, g in by_title.items() if t.startswith("quiet"))
+            loud = next(g for t, g in by_title.items() if t.startswith("loud"))
+
+            assert quiet.collapsed
+            assert not loud.collapsed
+            assert "40" in quiet.title  # the debt is still reported on the header
 
     asyncio.run(scenario())

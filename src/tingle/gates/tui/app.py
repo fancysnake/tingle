@@ -15,6 +15,7 @@ from tingle.gates.cli.render import (
     group_sections,
     occurrence_lines,
 )
+from tingle.mills.display import group_summary, severity_emoji
 from tingle.pacts.diff import DiffOutcome
 
 if TYPE_CHECKING:
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
     from textual.app import ComposeResult
 
     from tingle.pacts.diff import DiffReport
-    from tingle.pacts.report import MetricOutcome, RunReport
+    from tingle.pacts.report import GroupSummary, MetricOutcome, RunReport
 
 
 class NavCollapsible(Collapsible):
@@ -112,10 +113,11 @@ class MetricsApp(App[None]):
                     )
                     index += 1
                 if grouped:
+                    summary = group_summary(outcomes)
                     yield NavCollapsible(
                         *metrics,
-                        title=_group_title(name),
-                        collapsed=False,
+                        title=_group_title(name, summary),
+                        collapsed=_starts_folded(summary),
                         id=f"group-{section}",
                         classes="group",
                     )
@@ -197,8 +199,31 @@ def _column_width(names: Iterable[str]) -> int:
     return max((len(name) for name in names), default=0)
 
 
-def _group_title(name: str | None) -> str:
-    return _escape(name) if name is not None else "(ungrouped)"
+def _group_title(name: str | None, summary: GroupSummary) -> str:
+    """Render the group's name, then what its metrics add up to.
+
+    A diff shows the net beside the standing total, since a group's header
+    has to answer both "what did the branch do" and "where does it stand".
+    """
+    label = _escape(name) if name is not None else "(ungrouped)"
+    stat = f"{severity_emoji(summary.value, summary.guide)} [b]{summary.value}[/b]"
+    if summary.net is not None:
+        return f"{label}  net {_net(summary.net)} of {stat}"
+    return f"{label}  {stat}"
+
+
+def _starts_folded(summary: GroupSummary) -> bool:
+    """Fold a group with nothing to show, unless it is hiding an error.
+
+    A run's group is empty when it measured nothing at all; a branch's when
+    it moved nothing. An error is never folded away -- it is the one thing
+    the reader most needs to see.
+    """
+    if summary.has_error:
+        return False
+    if summary.net is not None:
+        return not summary.changed
+    return summary.value == 0
 
 
 def _stats(outcome: MetricOutcome | DiffOutcome) -> str:
@@ -207,12 +232,17 @@ def _stats(outcome: MetricOutcome | DiffOutcome) -> str:
             return "[red]ERROR[/red]"
         added = _signed(outcome.result.added, "red")
         removed = _signed(outcome.result.removed, "green", sign="-")
-        total = outcome.total.value if outcome.total else "?"
         net = _net(outcome.result.net)
-        return f"{added} / {removed} (net {net} of {total})"
+        if outcome.total is None:
+            return f"{added} / {removed} (net {net} of ?)"
+        # the emoji ranks the standing debt, which is what the total is
+        emoji = severity_emoji(outcome.total.value, outcome.guide)
+        return f"{added} / {removed} (net {net} of {emoji} {outcome.total.value})"
     if outcome.result is None:
         return _with_ranges(outcome, "[red]ERROR[/red]")
-    return _with_ranges(outcome, f"[b]{outcome.result.value}[/b]")
+    value = outcome.result.value
+    emoji = severity_emoji(value, outcome.guide)
+    return _with_ranges(outcome, f"{emoji} [b]{value}[/b]")
 
 
 def _with_ranges(outcome: MetricOutcome, stat: str) -> str:
