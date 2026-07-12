@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
+from importlib import metadata
 from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
 
-from tingle import __version__
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 from tingle.mills.metrics.registry import METRIC_TYPES
@@ -49,7 +49,7 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_version() -> None:
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert __version__ in result.output
+    assert result.output.strip() == f"tingle {metadata.version('tingle')}"
 
 
 def test_help() -> None:
