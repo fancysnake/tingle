@@ -4,12 +4,21 @@ version = "0.1.0"
 description = "Constant refactoring monitoring tool"
 authors = [{ name = "Radosław Ganczarek", email = "radoslaw@ganczarek.in" }]
 license = { text = "MIT" }
+readme = "README.md"
 requires-python = ">=3.11,<4.0"
+keywords = ["metrics", "refactoring", "technical-debt", "code-quality", "linting", "ci"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
 ]
 dependencies = [
     "typer (>=0.16.0,<1.0.0)",
@@ -17,6 +26,13 @@ dependencies = [
     "tomlkit (>=0.13.0,<1.0.0)",
     "textual (>=8.2.8,<9.0.0)",
 ]
+
+[project.urls]
+Homepage = "https://fancysnake.github.io/tingle/"
+Documentation = "https://fancysnake.github.io/tingle/"
+Repository = "https://github.com/fancysnake/tingle"
+Changelog = "https://github.com/fancysnake/tingle/blob/main/CHANGELOG.md"
+Issues = "https://github.com/fancysnake/tingle/issues"
 
 [project.scripts]
 tingle = "tingle.inits.cli:run"
