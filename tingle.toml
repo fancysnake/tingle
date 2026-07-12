@@ -2,6 +2,10 @@
 include = ["src/**/*.py", "tests/**/*.py"]
 default = true
 
+# A branch may take on debt in one metric if it pays off as much elsewhere.
+[check]
+policy = "sum"
+
 # Formatting
 
 [[metrics]]

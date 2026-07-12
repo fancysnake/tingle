@@ -9,7 +9,8 @@ if TYPE_CHECKING:
     from collections.abc import Collection
     from pathlib import Path
 
-    from tingle.pacts.config import Config, MetricDraft
+    from tingle.pacts.check import CheckVerdict
+    from tingle.pacts.config import CheckPolicy, Config, MetricDraft
     from tingle.pacts.diff import DiffReport
     from tingle.pacts.report import RunReport
 
@@ -46,6 +47,17 @@ class MetricsServiceProtocol(Protocol):
         self, config: Config, base: str, *, only: Collection[str] | None = None
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
+
+    @abstractmethod
+    def check(
+        self,
+        config: Config,
+        base: str,
+        *,
+        only: Collection[str] | None = None,
+        policy: CheckPolicy | None = None,
+    ) -> tuple[DiffReport, CheckVerdict]:
+        """Measure the branch, then judge it; `policy` overrides the config."""
 
 
 class ServicesProtocol(Protocol):

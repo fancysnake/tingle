@@ -5,7 +5,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
-from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
+from tingle.pacts.config import (
+    CheckPolicy,
+    CheckSpec,
+    Config,
+    ConfigError,
+    MetricSpec,
+    RangeSpec,
+)
 from tingle.specs.config import (
     IMPLICIT_RANGE_INCLUDE,
     IMPLICIT_RANGE_NAME,
@@ -17,8 +24,9 @@ if TYPE_CHECKING:
 
     from tingle.pacts.metrics import MetricType
 
-_TOP_LEVEL_KEYS = frozenset({"ranges", "metrics", "diff"})
+_TOP_LEVEL_KEYS = frozenset({"ranges", "metrics", "diff", "check"})
 _DIFF_KEYS = frozenset({"base"})
+_CHECK_KEYS = frozenset({"policy", "ignore"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
 _METRIC_RESERVED_KEYS = frozenset({"name", "type", "range", "ranges", "group"})
 
@@ -42,6 +50,7 @@ def validate(
     )
     default_range = _resolve_default_range(ranges, errors)
     diff_base = _validate_diff(raw.get("diff", {}), errors)
+    check = _validate_check(raw.get("check", {}), metrics=metrics, errors=errors)
 
     if errors:
         raise ConfigError(errors)
@@ -52,6 +61,7 @@ def validate(
         metrics=metrics,
         default_range=default_range,
         diff_base=diff_base,
+        check=check,
     )
 
 
@@ -250,6 +260,44 @@ def _validate_diff(raw_diff: object, errors: list[str]) -> str | None:
         errors.append("[diff]: base must be a string")
         return None
     return base
+
+
+def _validate_check(
+    raw_check: object, *, metrics: tuple[MetricSpec, ...], errors: list[str]
+) -> CheckSpec:
+    """Validate the optional `[check]` section.
+
+    `ignore` is checked against the configured metric names, so a typo
+    fails at load instead of silently ignoring nothing.
+    """
+    if not isinstance(raw_check, Mapping):
+        errors.append("[check] must be a table")
+        return CheckSpec()
+    errors.extend(
+        f'[check]: unknown key "{key}"' for key in sorted(set(raw_check) - _CHECK_KEYS)
+    )
+    policy = _check_policy(raw_check.get("policy"), errors)
+    ignore = _string_list(
+        raw_check.get("ignore", []), label="[check]: ignore", errors=errors
+    )
+    known = {spec.name for spec in metrics}
+    errors.extend(
+        f'[check]: unknown metric "{name}" in ignore'
+        for name in ignore or []
+        if name not in known
+    )
+    return CheckSpec(policy=policy, ignore=tuple(ignore or ()))
+
+
+def _check_policy(policy: object, errors: list[str]) -> CheckPolicy:
+    if policy is None:
+        return CheckPolicy.SUM
+    by_value = {member.value: member for member in CheckPolicy}
+    if not isinstance(policy, str) or policy not in by_value:
+        allowed = ", ".join(by_value)
+        errors.append(f"[check]: policy must be one of: {allowed}")
+        return CheckPolicy.SUM
+    return by_value[policy]
 
 
 def _resolve_default_range(

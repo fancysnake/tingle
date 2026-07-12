@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `tingle check` — the CI gate: measures the branch like `stat --diff`,
+  then exits 1 if it worsened the metrics, printing only the lines the
+  branch added under the metrics that grew (no removed lines, no summary
+  table, nothing unchanged). Configured by a new `[check]` section:
+  `policy = "sum"` (default — fails when the metrics grow in total, so
+  paying off one metric can offset another) or `policy = "any"` (fails
+  when any single metric grows), plus `ignore = [...]` for metrics that
+  are expected to grow and should never fail the build. `--policy`
+  overrides the config for one run; `--base`, `--config`, and `--metric`
+  work as on `stat`.
 - Occurrences: every metric now reports where its hits are — file and
   line for `regex_count`/`symbol_uses`, file names for `file_count`,
   and the actual list entries for `toml_list_length`/`ini_list_length`.

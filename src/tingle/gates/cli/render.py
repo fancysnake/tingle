@@ -9,9 +9,12 @@ from xml.etree import ElementTree as ET
 from rich.table import Table
 from rich.text import Text
 
+from tingle.pacts.config import CheckPolicy
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from tingle.pacts.check import CheckVerdict
     from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
     from tingle.pacts.metrics import MetricResult, Occurrence
     from tingle.pacts.report import MetricOutcome, RunReport
@@ -203,6 +206,40 @@ def _diff_heading(outcome: DiffOutcome) -> Text:
         else f"net {result.net:+d}"
     )
     return Text(f"{outcome.spec.name} ({outcome.spec.type}): {impact}", style="bold")
+
+
+def check_listing(verdict: CheckVerdict) -> list[Text]:
+    """List the worsened metrics and, under each, only what the branch added.
+
+    Nothing else: no removed occurrences, no unchanged metrics, no
+    summary table. What a CI log should show is the debt to answer for.
+    """
+    lines: list[Text] = []
+    for outcome in verdict.worsened:
+        if (result := outcome.result) is None:  # pragma: no cover - never worsened
+            continue
+        lines.append(
+            Text(
+                f"{outcome.spec.name} ({outcome.spec.type}): +{result.net}",
+                style="bold red",
+            )
+        )
+        lines.extend(
+            Text(f"  + {occurrence}", style="red")
+            for occurrence in result.added_occurrences
+        )
+        if not result.added_occurrences:
+            lines.append(Text("  (no located additions)", style="dim"))
+        lines.append(Text(""))
+    return lines
+
+
+def check_reason(verdict: CheckVerdict) -> str:
+    """One line saying which policy failed the branch, and by how much."""
+    if verdict.policy is CheckPolicy.SUM:
+        return f"check failed: metrics grew by a net +{verdict.net_total} (policy: sum)"
+    grown = ", ".join(outcome.spec.name for outcome in verdict.worsened)
+    return f"check failed: {grown} grew (policy: any)"
 
 
 def run_json(report: RunReport) -> str:
