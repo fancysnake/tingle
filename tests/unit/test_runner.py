@@ -6,7 +6,14 @@ from typing import TYPE_CHECKING
 import pytest
 
 from tingle.mills.runner import run
-from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
+from tingle.pacts.config import (
+    DEFAULT_GUIDE,
+    Config,
+    ConfigError,
+    DisplaySpec,
+    MetricSpec,
+    RangeSpec,
+)
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 if TYPE_CHECKING:
@@ -131,3 +138,55 @@ def test_only_filter_rejects_unknown_names() -> None:
         run(config, PROJECT, metric_types=METRIC_TYPES, only=["nope"])
 
     assert 'unknown metric "nope"' in excinfo.value.errors
+
+
+def _config_with_display(display: DisplaySpec, *metrics: MetricSpec) -> Config:
+    return Config(
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        ranges={"python": PYTHON_RANGE},
+        metrics=metrics,
+        default_range=PYTHON_RANGE,
+        display=display,
+    )
+
+
+def test_outcome_carries_the_global_guide_when_the_metric_sets_none() -> None:
+    config = _config_with_display(
+        DisplaySpec(guide=25), MetricSpec(name="files", type="file_count")
+    )
+
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
+
+    assert report.outcomes[0].guide == 25
+
+
+def test_outcome_carries_the_metric_guide_over_the_global_one() -> None:
+    config = _config_with_display(
+        DisplaySpec(guide=25), MetricSpec(name="files", type="file_count", guide=5)
+    )
+
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
+
+    assert report.outcomes[0].guide == 5
+
+
+def test_outcome_falls_back_to_the_default_guide() -> None:
+    config = _config(MetricSpec(name="files", type="file_count"))
+
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
+
+    assert report.outcomes[0].guide == DEFAULT_GUIDE
+
+
+def test_a_failed_metric_still_carries_its_guide() -> None:
+    """The error row is rendered like any other, so it needs a guide too."""
+    config = _config_with_display(
+        DisplaySpec(guide=25), MetricSpec(name="bad", type="boom", guide=7)
+    )
+
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
+
+    outcome = report.outcomes[0]
+    assert outcome.error is not None
+    assert outcome.guide == 7

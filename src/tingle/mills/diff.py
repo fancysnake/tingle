@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from tingle.mills.display import effective_guide
 from tingle.mills.ranges import resolve
 from tingle.mills.runner import ranges_for
 from tingle.pacts.config import Config, ConfigError, MetricSpec
@@ -75,6 +76,7 @@ class DiffRunner:
         walked: tuple[PurePath, ...],
     ) -> DiffOutcome:
         range_specs, range_names = ranges_for(spec, self.config)
+        guide = effective_guide(spec, self.config.display)
         diff_context = DiffMetricContext(
             files=_filter_files(branch_diff.files, range_specs),
             read=self.project.read,
@@ -96,10 +98,13 @@ class DiffRunner:
             )
         except Exception as exc:  # pylint: disable=broad-exception-caught
             return DiffOutcome(
-                spec=spec, range_names=range_names, error=f"{type(exc).__name__}: {exc}"
+                spec=spec,
+                range_names=range_names,
+                error=f"{type(exc).__name__}: {exc}",
+                guide=guide,
             )
         return DiffOutcome(
-            spec=spec, range_names=range_names, result=result, total=total
+            spec=spec, range_names=range_names, result=result, total=total, guide=guide
         )
 
 

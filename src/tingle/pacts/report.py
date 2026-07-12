@@ -36,3 +36,23 @@ class RunReport:
     root: Path
     source: Path
     outcomes: tuple[MetricOutcome, ...]
+
+
+@dataclass(frozen=True)
+class GroupSummary:
+    """What a group of metrics adds up to, for its header.
+
+    `value` is the group's standing debt and `guide` the sum of the guides
+    it is judged against, so a group takes its emoji off the same ladder a
+    metric does. Errored metrics add to neither -- there is no number to
+    add -- but they do raise `has_error`, which keeps a group holding an
+    error from being folded away.
+
+    `net` and `changed` describe a branch and stay None/False for a run.
+    """
+
+    value: int
+    guide: int
+    has_error: bool = False
+    net: int | None = None
+    changed: bool = False
