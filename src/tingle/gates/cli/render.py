@@ -282,6 +282,21 @@ def check_listing(verdict: CheckVerdict) -> list[Text]:
     return lines
 
 
+def check_success(verdict: CheckVerdict, base: str) -> Text:
+    """Say the branch passed, so a green CI log cannot read as a step that never ran.
+
+    The mirror of `check_reason`, which explains the failing side. A passing
+    check printed nothing at all before, which is indistinguishable from
+    tingle not having run.
+    """
+    metrics = "metric" if verdict.judged == 1 else "metrics"
+    against = f"{verdict.judged} {metrics} against {base}"
+    if verdict.net_total < 0:
+        paid = -verdict.net_total
+        return Text(f"🎉 no new debt, and {paid} paid off: {against}", style="green")
+    return Text(f"🎉 no new debt: {against}", style="green")
+
+
 def check_reason(verdict: CheckVerdict) -> str:
     """One line saying which policy failed the branch, and by how much."""
     if verdict.policy is CheckPolicy.SUM:

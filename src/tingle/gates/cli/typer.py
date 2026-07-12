@@ -173,6 +173,8 @@ class CliGate:
         if verdict.failed:
             typer.echo(render.check_reason(verdict), err=True)
             raise typer.Exit(1)
+        # say so: silence would be indistinguishable from a step that never ran
+        self._stdout.print(render.check_success(verdict, report.base_ref))
 
     def report(
         self,

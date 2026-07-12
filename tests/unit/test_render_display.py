@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
 from tingle.gates.cli.render import (
+    check_success,
     diff_json,
     diff_listing,
     diff_table,
@@ -13,10 +15,14 @@ from tingle.gates.cli.render import (
     run_json,
     run_listing,
 )
-from tingle.pacts.config import MetricSpec
+from tingle.pacts.check import CheckVerdict
+from tingle.pacts.config import CheckPolicy, MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 from tingle.pacts.metrics import MetricResult
 from tingle.pacts.report import MetricOutcome, RunReport
+
+if TYPE_CHECKING:
+    from rich.text import Text
 
 
 def _outcome(
@@ -84,8 +90,8 @@ def _rendered(renderable: object) -> str:
     return console.export_text()
 
 
-def _plain(lines: list[object]) -> str:
-    return "\n".join(line.plain for line in lines)  # type: ignore[attr-defined]
+def _plain(lines: list[Text]) -> str:
+    return "\n".join(line.plain for line in lines)
 
 
 def test_table_values_carry_their_severity_emoji() -> None:
@@ -239,3 +245,32 @@ def test_diff_json_carries_guide_and_description() -> None:
 
     assert payload["metrics"][0]["guide"] == 7
     assert payload["metrics"][0]["description"] is None
+
+
+def _verdict(*, net_total: int, judged: int, failed: bool = False) -> CheckVerdict:
+    return CheckVerdict(
+        policy=CheckPolicy.SUM,
+        worsened=(),
+        net_total=net_total,
+        failed=failed,
+        judged=judged,
+    )
+
+
+def test_a_passing_check_says_so() -> None:
+    """Silence in a CI log cannot be told apart from a step that never ran."""
+    line = check_success(_verdict(net_total=0, judged=12), "main")
+
+    assert line.plain == "🎉 no new debt: 12 metrics against main"
+
+
+def test_a_passing_check_reports_debt_paid_off() -> None:
+    line = check_success(_verdict(net_total=-3, judged=12), "main")
+
+    assert line.plain == "🎉 no new debt, and 3 paid off: 12 metrics against main"
+
+
+def test_a_single_judged_metric_is_not_pluralised() -> None:
+    line = check_success(_verdict(net_total=0, judged=1), "develop")
+
+    assert line.plain == "🎉 no new debt: 1 metric against develop"

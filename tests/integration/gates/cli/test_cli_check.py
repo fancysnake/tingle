@@ -44,7 +44,12 @@ def test_only_added_lines_are_printed(repo: Path) -> None:
     assert "Total" not in result.output
 
 
-def test_clean_branch_passes_silently(repo: Path) -> None:
+def test_a_clean_branch_says_so(repo: Path) -> None:
+    """A passing check must say so.
+
+    It printed nothing at all before, which in a CI log cannot be told apart
+    from a step that never ran.
+    """
     (repo / "src" / "new.py").unlink()
     (repo / "src" / "a.py").write_text("x = 1  # noqa\n")
     (repo / "pyproject.toml").write_text('[tool.ruff.lint]\nignore = ["E501"]\n')
@@ -52,7 +57,18 @@ def test_clean_branch_passes_silently(repo: Path) -> None:
     result = runner.invoke(app, ["check"])
 
     assert result.exit_code == 0
-    assert result.output.strip() == ""
+    assert "🎉 no new debt" in result.output
+    assert "against main" in result.output
+    # and it still lists nothing: there is no debt to answer for
+    assert not any(line.lstrip().startswith("+") for line in result.output.splitlines())
+
+
+@pytest.mark.usefixtures("repo")
+def test_a_failing_check_says_nothing_about_success() -> None:
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 1
+    assert "🎉" not in result.output
 
 
 def test_sum_policy_lets_a_gain_offset_a_loss(repo: Path) -> None:
@@ -119,7 +135,9 @@ def test_ignoring_every_grown_metric_passes(repo: Path) -> None:
     result = runner.invoke(app, ["check"])
 
     assert result.exit_code == 0
-    assert result.output.strip() == ""
+    # nothing to answer for, and the ignored metrics are not even counted
+    assert "🎉 no new debt" in result.output
+    assert "noqa-comments" not in result.output
 
 
 @pytest.mark.usefixtures("repo")

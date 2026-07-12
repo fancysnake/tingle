@@ -80,8 +80,11 @@ def test_ignore_lines_searches_anywhere_in_the_line() -> None:
 
 
 def test_regex_count_ignores_matching_lines() -> None:
-    text = "import os  # noqa: F401\nx = 1  # noqa: E501\n"
-    ctx = _context({"a.py": text}, {"pattern": r"#\s*noqa", "ignore_lines": [r"F401"]})
+    # The sample marker is invented on purpose. tingle measures its own
+    # suppression comments, and sample data in a test must not be counted as
+    # the project's debt -- the fixture would be taken for the real thing.
+    text = "import os  # hush: F401\nx = 1  # hush: E501\n"
+    ctx = _context({"a.py": text}, {"pattern": r"#\s*hush", "ignore_lines": [r"F401"]})
 
     result = regex_count(ctx)
 
@@ -151,7 +154,7 @@ def test_diff_without_ignores_counts_both_sides() -> None:
 
 
 def test_regex_count_diff_filters_the_added_side() -> None:
-    current = {"a.py": "x = 1  # noqa: F401\n"}
+    current = {"a.py": "x = 1  # hush: F401\n"}
     files = (
         FileDiff(
             path=PurePath("a.py"), status=FileStatus.ADDED, added_lines=frozenset({1})
@@ -161,7 +164,7 @@ def test_regex_count_diff_filters_the_added_side() -> None:
         current,
         base={},
         files=files,
-        params={"pattern": r"#\s*noqa", "ignore_lines": [r"F401"]},
+        params={"pattern": r"#\s*hush", "ignore_lines": [r"F401"]},
     )
 
     assert regex_count_diff(ctx).added == 0
