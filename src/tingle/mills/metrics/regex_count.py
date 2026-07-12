@@ -9,14 +9,17 @@ from typing import TYPE_CHECKING, Any
 from tingle.mills.metrics.assemble import (
     FileFindings,
     accumulate_diff,
-    located_result,
-    readable_files,
+    compile_ignores,
+    drop_ignored,
+    located_metric,
+    validate_ignores,
 )
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from collections.abc import Set as AbstractSet
+    from pathlib import PurePath
 
     from tingle.pacts.diff import DiffMetricContext, DiffResult, FileDiff
 
@@ -30,19 +33,15 @@ def regex_count(ctx: MetricContext) -> MetricResult:
     located at the line where it starts.
     """
     pattern = _compile(ctx.params)
-    details: dict[str, int] = {}
-    warnings: list[str] = []
-    occurrences: list[Occurrence] = []
-    for path, text in readable_files(ctx, warnings):
+
+    def find(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
         line_starts = _line_starts(text)
-        found = [
+        return [
             Occurrence(path=str(path), line=bisect_right(line_starts, match.start()))
             for match in pattern.finditer(text)
-        ]
-        if found:
-            details[str(path)] = len(found)
-            occurrences.extend(found)
-    return located_result(occurrences, details=details, warnings=warnings)
+        ], []
+
+    return located_metric(ctx, find=find)
 
 
 def _line_starts(text: str) -> list[int]:
@@ -61,12 +60,15 @@ def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
     the two can disagree for such patterns.
     """
     pattern = _compile(ctx.params)
+    ignores = compile_ignores(ctx.params)
 
     def per_file(file: FileDiff) -> FileFindings:
         warnings: list[str] = []
-        added = _matches_on_lines(pattern, ctx.read, file=file, lines=file.added_lines)
+        added = _matches_on_lines(
+            pattern, ctx.read, file=file, lines=file.added_lines, ignores=ignores
+        )
         removed = _matches_on_lines(
-            pattern, ctx.read_base, file=file, lines=file.removed_lines
+            pattern, ctx.read_base, file=file, lines=file.removed_lines, ignores=ignores
         )
         if added is None:
             warnings.append(f"{file.path}: current side unreadable")
@@ -85,23 +87,33 @@ def _matches_on_lines(
     *,
     file: FileDiff,
     lines: AbstractSet[int],
+    ignores: tuple[re.Pattern[str], ...],
 ) -> list[Occurrence] | None:
-    """Locate matches on the given line numbers; None when text is unreadable."""
+    """Locate matches on the given line numbers; None when text is unreadable.
+
+    Each side is filtered against its own text, so a line the metric
+    ignores on the branch is equally ignored in the base and the net
+    stays honest.
+    """
     if not lines:
         return []
     if (text := reader(file.path)) is None:
         return None
-    return [
-        Occurrence(path=str(file.path), line=lineno)
-        for lineno, line in enumerate(text.splitlines(), start=1)
-        if lineno in lines
-        for _ in pattern.finditer(line)
-    ]
+    return drop_ignored(
+        [
+            Occurrence(path=str(file.path), line=lineno)
+            for lineno, line in enumerate(text.splitlines(), start=1)
+            if lineno in lines
+            for _ in pattern.finditer(line)
+        ],
+        text=text,
+        patterns=ignores,
+    )
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
-    """Check that `pattern` compiles and `flags` names are known."""
-    errors: list[str] = []
+    """Check that `pattern` compiles, `flags` are known, and ignores compile."""
+    errors: list[str] = validate_ignores(params)
 
     pattern = params.get("pattern")
     if not isinstance(pattern, str):

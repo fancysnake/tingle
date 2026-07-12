@@ -31,7 +31,7 @@ METRIC_TYPES: dict[str, MetricType] = {
         func=regex_count,
         params=ParamSchema(
             required=("pattern",),
-            optional=("flags",),
+            optional=("flags", "ignore_lines"),
             primary="pattern",
             validate=validate_regex_params,
         ),
@@ -42,7 +42,10 @@ METRIC_TYPES: dict[str, MetricType] = {
         name="symbol_uses",
         func=symbol_uses,
         params=ParamSchema(
-            required=("symbol",), primary="symbol", validate=validate_symbol_params
+            required=("symbol",),
+            optional=("ignore_lines",),
+            primary="symbol",
+            validate=validate_symbol_params,
         ),
         description="Count references to a function or class in Python files.",
         diff_func=symbol_uses_diff,
