@@ -16,3 +16,19 @@ EXTRA_PATHS = ""
 
 [task_config]
 includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"]
+
+# the docs group is optional, so the `enter` hook's plain `poetry install`
+# does not provide mkdocs; every docs task pulls it in first.
+[tasks."docs:_install"]
+hide = true
+run = "poetry install --with docs"
+
+[tasks."docs:serve"]
+depends = ["docs:_install"]
+description = "Serve the documentation site locally with live reload"
+run = "poetry run mkdocs serve"
+
+[tasks."docs:build"]
+depends = ["docs:_install"]
+description = "Build the documentation site (fails on broken links)"
+run = "poetry run mkdocs build --strict"
