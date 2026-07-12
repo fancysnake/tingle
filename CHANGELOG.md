@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uncovered.
 - `tingle stat` — the compact summary table (`--json`, `--diff`,
   `--base`).
+- `--diff [--base REF]` on `stat` and `report` — measure the impact of the
+  current branch against the merge-base with a base branch (diff-cover
+  style). Line-scoped metrics (`regex_count`, `symbol_uses`, `line_count`,
+  `file_count`) count occurrences on added vs removed lines; value metrics
+  (`toml_list_length`, `ini_list_length`) report the delta between the
+  merge-base and now. Colored table (added red, removed green) with a
+  Total column; JSON output includes the resolved base ref and merge-base
+  sha. Base branch: `--base` flag > `[diff] base` config key > `main`, with
+  `origin/<base>` fallback. Uncommitted changes count; untracked files
+  count as fully added.
 - Interactive mode: bare `tingle` on a terminal opens a three-level
   accordion (textual) of group → metric → file results, navigated with
   the arrow keys (`↑`/`↓` between headers, `→` unfold, `←` fold, Space to
@@ -40,28 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING**: `tingle run` and `tingle diff` are removed. Use
-  `tingle stat` and `tingle stat --diff` / `tingle report --diff`.
+- **BREAKING**: `tingle run` is removed. Use `tingle stat`.
 - New runtime dependency: textual (interactive mode).
-
 - Support Python 3.11 through 3.14 (previously 3.14 only): PEP 695 type
   aliases replaced with `TypeAlias`, lazy annotations enabled everywhere,
   and range globs matched by tingle's own translator instead of
   `PurePath.full_match` (3.13+). CI runs the test matrix on all four
   versions.
-
-### Added
-
-- `tingle diff` — measure the impact of the current branch against the
-  merge-base with a base branch (diff-cover style). Line-scoped metrics
-  (`regex_count`, `symbol_uses`, `line_count`, `file_count`) count
-  occurrences on added vs removed lines; value metrics
-  (`toml_list_length`, `ini_list_length`) report the delta between the
-  merge-base and now. Colored table (added red, removed green) with a
-  Total column; JSON output includes the resolved base ref and
-  merge-base sha. Base branch: `--base` flag > `[diff] base` config key
-  > `main`, with `origin/<base>` fallback. Uncommitted changes count;
-  untracked files count as fully added.
 
 ## [0.1.0] - 2026-07-06
 
