@@ -4,6 +4,7 @@ All git invocations run with cwd at the tingle project root, hardened
 against user diff configuration (external diff drivers, prefix and
 quoting settings). Filenames containing newlines are unsupported.
 """
+
 from __future__ import annotations
 
 import os
@@ -13,12 +14,11 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
+from tingle.links.text import decode_text
 from tingle.pacts.diff import BranchDiff, DiffSourceError, FileDiff, FileStatus
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-_BINARY_SNIFF_BYTES = 8192
 
 _DIFF_ARGS = (
     "-c",
@@ -60,9 +60,7 @@ class GitCli:
         diff_files = _parse_diff(self._run(*_DIFF_ARGS, merge_base))
         untracked = self._untracked_files(seen={diff.path for diff in diff_files})
         return BranchDiff(
-            base_ref=base_ref,
-            merge_base=merge_base,
-            files=(*diff_files, *untracked),
+            base_ref=base_ref, merge_base=merge_base, files=(*diff_files, *untracked)
         )
 
     def read_base(self, path: PurePath) -> str | None:
@@ -74,7 +72,7 @@ class GitCli:
         result = self._git("show", blob_ref)
         if result.returncode != 0:
             return None
-        return _decode_blob(result.stdout)
+        return decode_text(result.stdout)
 
     def _resolve_ref(self, base: str) -> str:
         for candidate in (base, f"origin/{base}"):
@@ -123,8 +121,7 @@ class GitCli:
             data = (self._root / path).read_bytes()
         except OSError:
             return ()
-        text = _decode_blob(data)
-        if text is None:
+        if (text := decode_text(data)) is None:
             return ()
         return range(1, len(text.splitlines()) + 1)
 
@@ -217,15 +214,6 @@ def _decode(data: bytes) -> str:
     except UnicodeDecodeError as exc:
         msg = f"git produced non-UTF-8 output: {exc}"
         raise DiffSourceError(msg) from exc
-
-
-def _decode_blob(data: bytes) -> str | None:
-    if b"\0" in data[:_BINARY_SNIFF_BYTES]:
-        return None
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
 
 
 def _stderr(result: subprocess.CompletedProcess[bytes]) -> str:

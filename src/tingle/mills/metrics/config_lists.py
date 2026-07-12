@@ -3,6 +3,7 @@
 These are the generic building blocks for counting ignored lint rules:
 point them at whatever config file and key/option a linter actually uses.
 """
+
 from __future__ import annotations
 
 import configparser
@@ -34,8 +35,7 @@ def ini_list_length_diff(ctx: DiffMetricContext) -> DiffResult:
 
 
 def _delta(
-    count: Callable[[_Reader, Mapping[str, Any]], MetricResult],
-    ctx: DiffMetricContext,
+    count: Callable[[_Reader, Mapping[str, Any]], MetricResult], ctx: DiffMetricContext
 ) -> DiffResult:
     base = count(ctx.read_base, ctx.params)
     current = count(ctx.read, ctx.params)
@@ -60,9 +60,7 @@ def _delta(
     )
 
 
-def _descend_toml(
-    read: _Reader, params: Mapping[str, Any]
-) -> tuple[Any, str | None]:
+def _descend_toml(read: _Reader, params: Mapping[str, Any]) -> tuple[Any, str | None]:
     """Load `file`, walk to the dotted `key`; return (value, warning).
 
     On any failure the value is None and the warning explains it; on
@@ -72,8 +70,7 @@ def _descend_toml(
     file = params.get("file", TOML_LIST_DEFAULT_FILE)
     key = params["key"]
 
-    text = read(PurePath(file))
-    if text is None:
+    if (text := read(PurePath(file))) is None:
         return None, f"{file}: not found or unreadable"
     try:
         data: Any = tomllib.loads(text)
@@ -96,9 +93,7 @@ def _toml_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
         return _empty(warning)
 
     if isinstance(data, list):
-        return MetricResult(
-            value=len(data), occurrences=_entries(file, data)
-        )
+        return MetricResult(value=len(data), occurrences=_entries(file, data))
     if isinstance(data, Mapping) and all(
         isinstance(value, list) for value in data.values()
     ):
@@ -150,24 +145,20 @@ def _table_array_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult
     occurrences = _table_array_occurrences(
         str(file),
         data,
-        params.get("label"),
+        label=params.get("label"),
         explode=bool(params.get("explode", False)),
     )
     return MetricResult(value=len(occurrences), occurrences=occurrences)
 
 
 def _table_array_occurrences(
-    file: str,
-    tables: list[Mapping[str, Any]],
-    label: str | None,
-    *,
-    explode: bool,
+    file: str, tables: list[Mapping[str, Any]], *, label: str | None, explode: bool
 ) -> tuple[Occurrence, ...]:
     """One occurrence per table, or (explode) one per label-list element."""
     occurrences: list[Occurrence] = []
     for index, table in enumerate(tables, start=1):
         if explode:
-            occurrences.extend(_exploded_entries(file, table, label, index))
+            occurrences.extend(_exploded_entries(file, table, label=label, index=index))
         else:
             note = _label_note(table, label) or f"#{index}"
             occurrences.append(Occurrence(path=file, note=note))
@@ -175,7 +166,7 @@ def _table_array_occurrences(
 
 
 def _exploded_entries(
-    file: str, table: Mapping[str, Any], label: str | None, index: int
+    file: str, table: Mapping[str, Any], *, label: str | None, index: int
 ) -> list[Occurrence]:
     if label is None or label not in table:
         return [Occurrence(path=file, note=f"#{index}")]
@@ -222,8 +213,7 @@ def _ini_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
     section = params["section"]
     option = params["option"]
 
-    text = read(PurePath(file))
-    if text is None:
+    if (text := read(PurePath(file))) is None:
         return _empty(f"{file}: not found or unreadable")
 
     parser = configparser.ConfigParser()
@@ -234,8 +224,7 @@ def _ini_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:
 
     if not parser.has_section(section):
         return _empty(f'{file}: section "{section}" not found')
-    value = parser.get(section, option, fallback=None)
-    if value is None:
+    if (value := parser.get(section, option, fallback=None)) is None:
         return _empty(f'{file}: option "{option}" not found in "{section}"')
 
     entries = [
@@ -257,9 +246,7 @@ def validate_ini_params(params: Mapping[str, Any]) -> list[str]:
 
 def _entries(file: str, values: list[Any]) -> tuple[Occurrence, ...]:
     """List entries as occurrences, keeping the file's own order."""
-    return tuple(
-        Occurrence(path=str(file), note=str(entry)) for entry in values
-    )
+    return tuple(Occurrence(path=str(file), note=str(entry)) for entry in values)
 
 
 def _empty(warning: str) -> MetricResult:

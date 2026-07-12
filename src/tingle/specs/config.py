@@ -1,4 +1,5 @@
 """Invariants of tingle configuration."""
+
 from __future__ import annotations
 
 import re

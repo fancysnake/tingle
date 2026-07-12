@@ -1,12 +1,14 @@
 """Contracts between the metric runner and metric functions."""
+
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
 if TYPE_CHECKING:
-    from pathlib import PurePath
+    from pathlib import Path, PurePath
 
     from tingle.pacts.diff import DiffMetricFunction
 
@@ -14,17 +16,25 @@ if TYPE_CHECKING:
 class ProjectFiles(Protocol):
     """Read-only view of the project tree."""
 
+    @abstractmethod
     def walk(self) -> Iterable[PurePath]:
         """Yield every file under the project root as a relative path."""
-        ...
 
+    @abstractmethod
     def read(self, path: PurePath) -> str | None:
         """Return file text, or None if missing, binary, or undecodable."""
-        ...
 
+    @abstractmethod
     def exists(self, path: PurePath) -> bool:
         """Return whether the file exists."""
-        ...
+
+
+class ProjectFilesFactory(Protocol):
+    """Builds the project-tree view anchored at a root directory."""
+
+    @abstractmethod
+    def __call__(self, root: Path) -> ProjectFiles:
+        """Return a ProjectFiles rooted at `root`."""
 
 
 @dataclass(frozen=True)
@@ -73,14 +83,21 @@ MetricFunction: TypeAlias = Callable[[MetricContext], MetricResult]
 
 
 @dataclass(frozen=True)
+class ParamSchema:
+    """A metric type's parameter contract: what `add` and validation read."""
+
+    required: tuple[str, ...] = ()
+    optional: tuple[str, ...] = ()
+    primary: str | None = None
+    validate: Callable[[Mapping[str, Any]], list[str]] | None = None
+
+
+@dataclass(frozen=True)
 class MetricType:
     """A metric type: dispatch target plus the data driving add/list/validation."""
 
     name: str
     func: MetricFunction
-    required_params: tuple[str, ...] = ()
-    optional_params: tuple[str, ...] = ()
-    primary_param: str | None = None
-    validate_params: Callable[[Mapping[str, Any]], list[str]] | None = None
+    params: ParamSchema = field(default_factory=ParamSchema)
     description: str = ""
     diff_func: DiffMetricFunction | None = None

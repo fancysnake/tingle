@@ -1,6 +1,8 @@
 """File and line counting metrics."""
+
 from __future__ import annotations
 
+from tingle.mills.metrics.assemble import readable_files
 from tingle.pacts.diff import DiffMetricContext, DiffResult, FileStatus
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
@@ -18,11 +20,7 @@ def line_count(ctx: MetricContext) -> MetricResult:
     total = 0
     details: dict[str, int] = {}
     warnings: list[str] = []
-    for path in ctx.files:
-        text = ctx.read(path)
-        if text is None:
-            warnings.append(f"{path}: skipped (binary, unreadable, or missing)")
-            continue
+    for path, text in readable_files(ctx, warnings):
         lines = len(text.splitlines())
         details[str(path)] = lines
         total += lines
@@ -58,8 +56,7 @@ def line_count_diff(ctx: DiffMetricContext) -> DiffResult:
     for file in ctx.files:
         added += len(file.added_lines)
         removed += len(file.removed_lines)
-        net = len(file.added_lines) - len(file.removed_lines)
-        if net:
+        if net := len(file.added_lines) - len(file.removed_lines):
             details[str(file.path)] = net
     return DiffResult(
         net=added - removed, added=added, removed=removed, details=details

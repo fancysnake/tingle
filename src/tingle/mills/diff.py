@@ -1,4 +1,5 @@
 """Execute configured metrics against a branch diff."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -38,11 +39,8 @@ class DiffRunner:
         """Measure the branch impact against merge-base(base, HEAD)."""
         if only is not None:
             known = {spec.name for spec in self.config.metrics}
-            unknown = sorted(set(only) - known)
-            if unknown:
-                raise ConfigError(
-                    [f'unknown metric "{name}"' for name in unknown]
-                )
+            if unknown := sorted(set(only) - known):
+                raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
         branch_diff = self.diff_source.branch_diff(base)
         walked = tuple(self.project.walk())
@@ -52,11 +50,12 @@ class DiffRunner:
         for spec in self.config.metrics:
             if only is not None and spec.name not in only:
                 continue
-            diff_func = self.metric_types[spec.type].diff_func
-            if diff_func is None:
+            if (diff_func := self.metric_types[spec.type].diff_func) is None:
                 skipped.append(spec.name)
                 continue
-            outcomes.append(self._outcome(spec, diff_func, branch_diff, walked))
+            outcomes.append(
+                self._outcome(spec, diff_func, branch_diff=branch_diff, walked=walked)
+            )
 
         return DiffReport(
             root=self.config.root,
@@ -71,6 +70,7 @@ class DiffRunner:
         self,
         spec: MetricSpec,
         diff_func: DiffMetricFunction,
+        *,
         branch_diff: BranchDiff,
         walked: tuple[PurePath, ...],
     ) -> DiffOutcome:
@@ -88,13 +88,15 @@ class DiffRunner:
             params=spec.params,
         )
         try:
-            result = diff_func(diff_context)
-            total = self.metric_types[spec.type].func(total_context)
-        except Exception as exc:  # metric isolation: a failure must not stop the run
+            # metric isolation: a failure must not stop the run, so any
+            # exception a metric function raises is caught and reported
+            result, total = (
+                diff_func(diff_context),
+                self.metric_types[spec.type].func(total_context),
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             return DiffOutcome(
-                spec=spec,
-                range_names=range_names,
-                error=f"{type(exc).__name__}: {exc}",
+                spec=spec, range_names=range_names, error=f"{type(exc).__name__}: {exc}"
             )
         return DiffOutcome(
             spec=spec, range_names=range_names, result=result, total=total

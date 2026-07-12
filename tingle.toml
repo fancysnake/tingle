@@ -1,33 +1,68 @@
-# tingle measuring itself
 [ranges.python]
 include = ["src/**/*.py", "tests/**/*.py"]
 default = true
 
+# Formatting
+
 [[metrics]]
-name = "noqa-comments"
+name = "fmt-comment"
 type = "regex_count"
-group = "lint"
+group = "formatting"
+pattern = '#\s*fmt'
+
+[[metrics]]
+name = "taplo-comment"
+type = "regex_count"
+group = "formatting"
+pattern = '#\s*taplo:'
+
+[[metrics]]
+name = "codespell-comment"
+type = "regex_count"
+group = "formatting"
+pattern = '#\s*codespell:ignore'
+
+[[metrics]]
+name = "ruff-format-ignore"
+type = "toml_list_length"
+group = "formatting"
+key = "tool.ruff.format.ignore"
+
+[[metrics]]
+name = "noqa-comment"
+type = "regex_count"
+group = "linting"
 pattern = '#\s*noqa'
 
 [[metrics]]
 name = "ruff-ignores"
 type = "toml_list_length"
-group = "lint"
+group = "linting"
 key = "tool.ruff.lint.ignore"
+
 
 [[metrics]]
 name = "ruff-per-file-ignores"
 type = "toml_list_length"
-group = "lint"
+group = "linting"
 key = "tool.ruff.lint.per-file-ignores"
+
+
+[[metrics]]
+name = "pylint-comment"
+type = "regex_count"
+group = "linting"
+pattern = '#\s*pylint:'
 
 [[metrics]]
 name = "pylint-disables"
 type = "ini_list_length"
-group = "lint"
+group = "linting"
 file = ".pylintrc"
 section = "MESSAGES CONTROL"
 option = "disable"
+
+# typing
 
 [[metrics]]
 name = "type-ignores"
@@ -41,13 +76,3 @@ type = "toml_table_array"
 group = "typing"
 key = "tool.mypy.overrides"
 label = "module"
-
-[[metrics]]
-name = "python-loc"
-type = "line_count"
-group = "size"
-
-[[metrics]]
-name = "python-files"
-type = "file_count"
-group = "size"

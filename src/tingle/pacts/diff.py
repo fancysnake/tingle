@@ -1,6 +1,8 @@
 """Contracts for diff-scoped metric runs (`tingle diff`)."""
+
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -52,13 +54,21 @@ class BranchDiff:
 class DiffSource(Protocol):
     """Produces branch diffs and base-side file contents."""
 
+    @abstractmethod
     def branch_diff(self, base: str) -> BranchDiff:
         """Diff the working tree against merge-base(base, HEAD)."""
-        ...
 
+    @abstractmethod
     def read_base(self, path: PurePath) -> str | None:
         """Return base-side file text, or None if missing/binary/undecodable."""
-        ...
+
+
+class DiffSourceFactory(Protocol):
+    """Builds the branch-diff provider anchored at a project root."""
+
+    @abstractmethod
+    def __call__(self, root: Path) -> DiffSource:
+        """Return a DiffSource rooted at `root`."""
 
 
 @dataclass(frozen=True)

@@ -1,4 +1,5 @@
 """Execute configured metrics and collect a RunReport."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -16,14 +17,14 @@ if TYPE_CHECKING:
 def run(
     config: Config,
     project: ProjectFiles,
+    *,
     metric_types: Mapping[str, MetricType],
     only: Collection[str] | None = None,
 ) -> RunReport:
     """Run every configured metric, isolating failures per metric."""
     if only is not None:
         known = {spec.name for spec in config.metrics}
-        unknown = sorted(set(only) - known)
-        if unknown:
+        if unknown := sorted(set(only) - known):
             raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
     walked = tuple(project.walk())
@@ -35,14 +36,12 @@ def run(
         range_specs, range_names = ranges_for(spec, config)
         files = resolve(walked, range_specs)
         context = MetricContext(
-            files=files,
-            read=project.read,
-            exists=project.exists,
-            params=spec.params,
+            files=files, read=project.read, exists=project.exists, params=spec.params
         )
         try:
             result = metric_types[spec.type].func(context)
-        except Exception as exc:  # metric isolation: one failure must not stop the run
+        # metric isolation: one failure must not stop the run
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             outcomes.append(
                 MetricOutcome(
                     spec=spec,

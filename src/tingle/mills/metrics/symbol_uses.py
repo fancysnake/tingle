@@ -4,18 +4,26 @@ Static analysis only: re-exports, string references, and getattr are
 invisible. Bare symbols count every same-named name/attribute in scope.
 An occurrence is attributed to the line where the reference starts.
 """
+
 from __future__ import annotations
 
 import ast
 from typing import TYPE_CHECKING, Any
 
-from tingle.pacts.diff import DiffMetricContext, DiffResult
+from tingle.mills.metrics.assemble import (
+    FileFindings,
+    accumulate_diff,
+    located_result,
+    readable_files,
+)
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from collections.abc import Set as AbstractSet
     from pathlib import PurePath
+
+    from tingle.pacts.diff import DiffMetricContext, DiffResult, FileDiff
 
 
 def symbol_uses(ctx: MetricContext) -> MetricResult:
@@ -25,13 +33,7 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
     warnings: list[str] = []
     occurrences: list[Occurrence] = []
 
-    for path in ctx.files:
-        if path.suffix != ".py":
-            continue
-        text = ctx.read(path)
-        if text is None:
-            warnings.append(f"{path}: skipped (binary, unreadable, or missing)")
-            continue
+    for path, text in readable_files(ctx, warnings, suffix=".py"):
         try:
             tree = ast.parse(text)
         except SyntaxError as exc:
@@ -40,56 +42,36 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
 
         lines, star_fallback = _occurrence_lines(tree, parts)
         if star_fallback:
-            warnings.append(
-                f"{path}: star import: falling back to bare-name counting"
-            )
+            warnings.append(f"{path}: star import: falling back to bare-name counting")
         if lines:
             details[str(path)] = len(lines)
             occurrences.extend(
                 Occurrence(path=str(path), line=line) for line in sorted(lines)
             )
 
-    return MetricResult(
-        value=len(occurrences),
-        details=details,
-        warnings=tuple(warnings),
-        occurrences=tuple(occurrences),
-    )
+    return located_result(occurrences, details=details, warnings=warnings)
 
 
 def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
     """Count references on lines the branch added vs lines it removed."""
     parts = tuple(ctx.params["symbol"].split("."))
-    added_occurrences: list[Occurrence] = []
-    removed_occurrences: list[Occurrence] = []
-    details: dict[str, int] = {}
-    warnings: list[str] = []
 
-    for file in ctx.files:
+    def per_file(file: FileDiff) -> FileFindings:
         if file.path.suffix != ".py":
-            continue
-        file_added, added_warnings = _side_occurrences(
-            ctx.read, file.path, parts, file.added_lines, "current"
+            return [], [], []
+        added, added_warnings = _side_occurrences(
+            ctx.read, file.path, parts=parts, touched=file.added_lines, side="current"
         )
-        file_removed, removed_warnings = _side_occurrences(
-            ctx.read_base, file.path, parts, file.removed_lines, "base"
+        removed, removed_warnings = _side_occurrences(
+            ctx.read_base,
+            file.path,
+            parts=parts,
+            touched=file.removed_lines,
+            side="base",
         )
-        warnings.extend(added_warnings)
-        warnings.extend(removed_warnings)
-        added_occurrences.extend(file_added)
-        removed_occurrences.extend(file_removed)
-        if len(file_added) - len(file_removed):
-            details[str(file.path)] = len(file_added) - len(file_removed)
+        return added, removed, [*added_warnings, *removed_warnings]
 
-    return DiffResult(
-        net=len(added_occurrences) - len(removed_occurrences),
-        added=len(added_occurrences),
-        removed=len(removed_occurrences),
-        details=details,
-        warnings=tuple(warnings),
-        added_occurrences=tuple(added_occurrences),
-        removed_occurrences=tuple(removed_occurrences),
-    )
+    return accumulate_diff(ctx.files, per_file)
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
@@ -107,6 +89,7 @@ def validate_params(params: Mapping[str, Any]) -> list[str]:
 def _side_occurrences(
     reader: Callable[[PurePath], str | None],
     path: PurePath,
+    *,
     parts: tuple[str, ...],
     touched: AbstractSet[int],
     side: str,
@@ -114,8 +97,7 @@ def _side_occurrences(
     """Locate occurrences starting on the touched lines of one diff side."""
     if not touched:
         return [], []
-    text = reader(path)
-    if text is None:
+    if (text := reader(path)) is None:
         return [], [f"{path}: {side} side unreadable"]
     try:
         tree = ast.parse(text)
@@ -135,9 +117,7 @@ def _side_occurrences(
     return found, warnings
 
 
-def _occurrence_lines(
-    tree: ast.AST, parts: tuple[str, ...]
-) -> tuple[list[int], bool]:
+def _occurrence_lines(tree: ast.AST, parts: tuple[str, ...]) -> tuple[list[int], bool]:
     """Line numbers of every occurrence; flag = star-import fallback used."""
     if len(parts) == 1:
         return _bare_occurrences(tree, parts[0]), False
@@ -166,33 +146,33 @@ def _collect_bindings(
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            _bind_plain_import(node, parts, bindings)
+            _bind_plain_import(node, parts, bindings=bindings)
         elif isinstance(node, ast.ImportFrom):
             if any(alias.name == "*" for alias in node.names):
                 has_star_import = True
             else:
-                import_lines.extend(_bind_from_import(node, parts, bindings))
+                import_lines.extend(_bind_from_import(node, parts, bindings=bindings))
 
     return bindings, import_lines, has_star_import
 
 
 def _bind_plain_import(
-    node: ast.Import, parts: tuple[str, ...], bindings: dict[str, tuple[str, ...]]
+    node: ast.Import, parts: tuple[str, ...], *, bindings: dict[str, tuple[str, ...]]
 ) -> None:
     for alias in node.names:
         module = tuple(alias.name.split("."))
         if alias.asname is None:
             if module[0] == parts[0]:
                 bindings[module[0]] = parts[1:]
-        else:
-            suffix = _align_prefix(module, parts)
-            if suffix is not None:
-                bindings[alias.asname] = suffix
+            continue
+        if (suffix := _align_prefix(module, parts)) is not None:
+            bindings[alias.asname] = suffix
 
 
 def _bind_from_import(
     node: ast.ImportFrom,
     parts: tuple[str, ...],
+    *,
     bindings: dict[str, tuple[str, ...]],
 ) -> list[int]:
     """Bind from-imported names; return lines that import the symbol itself."""
@@ -200,11 +180,8 @@ def _bind_from_import(
     use_lines: list[int] = []
     for alias in node.names:
         chain = (*module, alias.name)
-        if node.level == 0:
-            suffix = _align_prefix(chain, parts)
-        else:
-            suffix = _align_anywhere(chain, parts)
-        if suffix is not None:
+        align = _align_prefix if node.level == 0 else _align_anywhere
+        if (suffix := align(chain, parts)) is not None:
             bindings[alias.asname or alias.name] = suffix
             if not suffix:
                 use_lines.append(node.lineno)

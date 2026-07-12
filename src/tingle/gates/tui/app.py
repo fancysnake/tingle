@@ -1,4 +1,5 @@
 """Interactive terminal UI over run and diff reports (textual adapter)."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
@@ -7,6 +8,7 @@ from textual.app import App
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.widgets import Collapsible, Footer, Header, Static
+from textual.widgets.collapsible import CollapsibleTitle
 
 from tingle.gates.cli.render import (
     diff_occurrence_lines,
@@ -24,6 +26,29 @@ if TYPE_CHECKING:
     from tingle.pacts.report import MetricOutcome, RunReport
 
 
+class NavCollapsible(Collapsible):
+    """A `Collapsible` that steers the accordion with the arrow keys.
+
+    The bindings live here rather than on the app because keys bubble up
+    from the focused `CollapsibleTitle`: this widget is its parent, so it
+    is offered the arrows before the enclosing `VerticalScroll` can claim
+    them for scrolling. Binding them on the app would need `priority`,
+    which is checked app-down and would swallow the arrows the command
+    palette's own result list needs.
+    """
+
+    BINDINGS: ClassVar = [
+        Binding("up", "app.focus_metric(-1)", "Prev"),
+        Binding("down", "app.focus_metric(1)", "Next"),
+        Binding("left", "app.fold", "Fold"),
+        Binding("right", "app.unfold", "Unfold"),
+        Binding("k", "app.focus_metric(-1)", "Prev", show=False),
+        Binding("j", "app.focus_metric(1)", "Next", show=False),
+        Binding("h", "app.fold", "Fold", show=False),
+        Binding("l", "app.unfold", "Unfold", show=False),
+    ]
+
+
 class MetricsApp(App[None]):
     """Three-level accordion: group -> metric -> file results.
 
@@ -39,21 +64,13 @@ class MetricsApp(App[None]):
     CSS = """
     Collapsible.group > CollapsibleTitle { text-style: bold; }
     """
-    # letters, not arrows: the arrow keys stay free for the command
-    # palette's own list (our priority bindings would otherwise swallow
-    # them), and letters need no priority since the scroll container only
-    # binds the arrows. hjkl are the shown hints; wasd alias the same
-    # actions for a non-vim hand position.
+    # navigation lives on NavCollapsible, not here: an app-level arrow
+    # binding would have to be priority to beat the scroll container, and
+    # priority bindings are checked app-down, stealing the arrows from the
+    # command palette.
     BINDINGS: ClassVar = [
-        Binding("k", "focus_metric(-1)", "Prev"),
-        Binding("j", "focus_metric(1)", "Next"),
-        Binding("h", "fold", "Fold"),
-        Binding("l", "unfold", "Unfold"),
         Binding("space", "toggle_fold", "Toggle"),
-        Binding("w", "focus_metric(-1)", "Prev", show=False),
-        Binding("s", "focus_metric(1)", "Next", show=False),
-        Binding("a", "fold", "Fold", show=False),
-        Binding("d", "unfold", "Unfold", show=False),
+        Binding("f", "toggle_fold_all", "Fold all"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -77,10 +94,10 @@ class MetricsApp(App[None]):
         index = 0
         with VerticalScroll():
             for section, (name, outcomes) in enumerate(sections):
-                metrics: list[Collapsible] = []
+                metrics: list[NavCollapsible] = []
                 for outcome in outcomes:
                     metrics.append(
-                        Collapsible(
+                        NavCollapsible(
                             *_detail_widgets(outcome),
                             title=self._title(outcome),
                             id=f"metric-{index}",
@@ -89,7 +106,7 @@ class MetricsApp(App[None]):
                     )
                     index += 1
                 if grouped:
-                    yield Collapsible(
+                    yield NavCollapsible(
                         *metrics,
                         title=_group_title(name),
                         collapsed=False,
@@ -112,30 +129,56 @@ class MetricsApp(App[None]):
             self.screen.focus_next("CollapsibleTitle")
 
     def action_unfold(self) -> None:
-        """Unfold (l) the focused group/metric header."""
-        collapsible = self._focused_collapsible()
-        if collapsible is not None:
+        """Unfold (right arrow) the focused group/metric header."""
+        if (collapsible := self._focused_collapsible()) is not None:
             collapsible.collapsed = False
 
     def action_fold(self) -> None:
-        """Fold (h) the focused group/metric header."""
-        collapsible = self._focused_collapsible()
-        if collapsible is not None:
+        """Fold (left arrow) the focused group/metric header."""
+        if (collapsible := self._focused_collapsible()) is not None:
             collapsible.collapsed = True
 
     def action_toggle_fold(self) -> None:
         """Toggle (space) the focused group/metric header."""
-        collapsible = self._focused_collapsible()
-        if collapsible is not None:
+        if (collapsible := self._focused_collapsible()) is not None:
             collapsible.collapsed = not collapsible.collapsed
 
+    def action_toggle_fold_all(self) -> None:
+        """Fold/unfold every group (f), leaving file results as they are.
+
+        Groups are the headers that hold metric rows, so this collapses
+        the listing to its group titles and back. A groupless report has
+        no group headers, so there the metric rows are the top level and
+        fold instead. Unfolds only once nothing is left unfolded.
+        """
+        if not (headers := self._fold_all_targets()):
+            return
+        collapsed = any(not header.collapsed for header in headers)
+        # Folding hides any header nested in a group, and textual drops
+        # focus along with it. The arrows live on NavCollapsible, so an
+        # unfocused app has no arrows to focus anything again -- park the
+        # cursor on the enclosing header, which stays visible.
+        landing = self._enclosing_header(headers) or headers[0]
+        for header in headers:
+            header.collapsed = collapsed
+        if collapsed:
+            landing.query_one(CollapsibleTitle).focus()
+
+    def _fold_all_targets(self) -> list[Collapsible]:
+        groups = list(self.query(".group").results(Collapsible))
+        return groups or list(self.query(".metric").results(Collapsible))
+
+    def _enclosing_header(self, headers: list[Collapsible]) -> Collapsible | None:
+        """Find the fold-all target containing the focused widget, if any."""
+        if (focused := self.focused) is None:
+            return None
+        return next((a for a in focused.ancestors_with_self if a in headers), None)
+
     def _focused_collapsible(self) -> Collapsible | None:
-        focused = self.focused
-        if focused is None:
+        if (focused := self.focused) is None:
             return None
         return next(
-            (a for a in focused.ancestors_with_self if isinstance(a, Collapsible)),
-            None,
+            (a for a in focused.ancestors_with_self if isinstance(a, Collapsible)), None
         )
 
     def _title(self, outcome: MetricOutcome | DiffOutcome) -> str:
@@ -171,7 +214,7 @@ def _with_ranges(outcome: MetricOutcome, stat: str) -> str:
     return f"{ranges}  {stat}" if ranges else stat
 
 
-def _signed(value: int | None, style: str, sign: str = "+") -> str:
+def _signed(value: int | None, style: str, *, sign: str = "+") -> str:
     if value is None:
         return ""
     if value > 0:
@@ -195,8 +238,9 @@ def _escape(text: str) -> str:
 def _detail_widgets(outcome: MetricOutcome | DiffOutcome) -> list[Static]:
     if outcome.result is None:
         return [Static("[dim](metric failed; see the summary above)[/dim]")]
-    if isinstance(outcome, DiffOutcome):
-        lines = diff_occurrence_lines(outcome.result)
-    else:
-        lines = occurrence_lines(outcome.result)
+    lines = (
+        diff_occurrence_lines(outcome.result)
+        if isinstance(outcome, DiffOutcome)
+        else occurrence_lines(outcome.result)
+    )
     return [Static(line) for line in lines]

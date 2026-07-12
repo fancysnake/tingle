@@ -1,4 +1,5 @@
 """Building and validating a new metric entry for `tingle add`."""
+
 from __future__ import annotations
 
 import re
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 def build_metric(
     raw: Mapping[str, Any],
     metric_types: Mapping[str, MetricType],
+    *,
     draft: MetricDraft,
 ) -> dict[str, Any]:
     """Return the metric table to append, or raise ConfigError.
@@ -35,8 +37,10 @@ def build_metric(
     all_params = _merge_params(draft, metric_types)
 
     metric: dict[str, Any] = {
-        "name": draft.name
-        or _auto_name(existing_metrics, draft.type_name, draft.value),
+        "name": (
+            draft.name
+            or _auto_name(existing_metrics, draft.type_name, value=draft.value)
+        ),
         "type": draft.type_name,
     }
     if draft.group is not None:
@@ -57,7 +61,7 @@ def _merge_params(
 ) -> dict[str, Any]:
     all_params: dict[str, Any] = dict(draft.params)
     if draft.value is not None:
-        primary = metric_types[draft.type_name].primary_param
+        primary = metric_types[draft.type_name].params.primary
         if primary is None:
             raise ConfigError(
                 [
@@ -74,13 +78,11 @@ def _merge_params(
 
 
 def _auto_name(
-    existing_metrics: list[Any], type_name: str, value: str | None
+    existing_metrics: list[Any], type_name: str, *, value: str | None
 ) -> str:
     base = f"{type_name}-{_slug(value)}" if value else type_name
     taken = {
-        entry.get("name")
-        for entry in existing_metrics
-        if isinstance(entry, Mapping)
+        entry.get("name") for entry in existing_metrics if isinstance(entry, Mapping)
     }
     candidate = base
     counter = 2
