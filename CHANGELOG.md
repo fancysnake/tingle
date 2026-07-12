@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line for `regex_count`/`symbol_uses`, file names for `file_count`,
   and the actual list entries for `toml_list_length`/`ini_list_length`.
   Diff results carry signed added/removed occurrences (list metrics
-  show *which* entries changed). JSON output always includes them.
+  show *which* entries changed). `report --json` includes them and the
+  per-file `details`; `stat --json` stays values-only, like its table.
 - `tingle report` — the full occurrence listing (`--json`, `--diff`,
   `--base`), plus `--cobertura`: Cobertura XML for CI consumers
   (GitLab, Jenkins, diff-cover) marking each occurrence line as

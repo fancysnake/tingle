@@ -242,8 +242,27 @@ def check_reason(verdict: CheckVerdict) -> str:
     return f"check failed: {grown} grew (policy: any)"
 
 
+def stat_json(report: RunReport) -> str:
+    """Machine-readable run summary: values only, as the stat table."""
+    return _run_json(report, detailed=False)
+
+
 def run_json(report: RunReport) -> str:
-    """Machine-readable full run, occurrences included."""
+    """Machine-readable full run, occurrences and details included."""
+    return _run_json(report, detailed=True)
+
+
+def stat_diff_json(report: DiffReport) -> str:
+    """Machine-readable branch diff summary: values only."""
+    return _diff_json(report, detailed=False)
+
+
+def diff_json(report: DiffReport) -> str:
+    """Machine-readable branch diff, occurrences and details included."""
+    return _diff_json(report, detailed=True)
+
+
+def _run_json(report: RunReport, *, detailed: bool) -> str:
     return json.dumps(
         {
             "root": str(report.root),
@@ -255,10 +274,7 @@ def run_json(report: RunReport) -> str:
                     "group": outcome.spec.group,
                     "ranges": list(outcome.range_names),
                     "value": outcome.result.value if outcome.result else None,
-                    "details": dict(outcome.result.details) if outcome.result else {},
-                    "occurrences": _occurrences_json(
-                        outcome.result.occurrences if outcome.result else ()
-                    ),
+                    **(_run_details(outcome) if detailed else {}),
                     "warnings": list(outcome.result.warnings) if outcome.result else [],
                     "error": outcome.error,
                 }
@@ -269,8 +285,7 @@ def run_json(report: RunReport) -> str:
     )
 
 
-def diff_json(report: DiffReport) -> str:
-    """Machine-readable branch diff, occurrences included."""
+def _diff_json(report: DiffReport, *, detailed: bool) -> str:
     return json.dumps(
         {
             "root": str(report.root),
@@ -284,6 +299,7 @@ def diff_json(report: DiffReport) -> str:
                     "group": outcome.spec.group,
                     "ranges": list(outcome.range_names),
                     **_diff_values(outcome),
+                    **(_diff_details(outcome) if detailed else {}),
                     "total": outcome.total.value if outcome.total else None,
                     "warnings": list(outcome.result.warnings) if outcome.result else [],
                     "error": outcome.error,
@@ -296,20 +312,24 @@ def diff_json(report: DiffReport) -> str:
     )
 
 
+def _run_details(outcome: MetricOutcome) -> dict[str, Any]:
+    result = outcome.result
+    return {
+        "details": dict(result.details) if result else {},
+        "occurrences": _occurrences_json(result.occurrences if result else ()),
+    }
+
+
 def _diff_values(outcome: DiffOutcome) -> dict[str, Any]:
     if (result := outcome.result) is None:
-        return {
-            "added": None,
-            "removed": None,
-            "net": None,
-            "details": {},
-            "added_occurrences": [],
-            "removed_occurrences": [],
-        }
+        return {"added": None, "removed": None, "net": None}
+    return {"added": result.added, "removed": result.removed, "net": result.net}
+
+
+def _diff_details(outcome: DiffOutcome) -> dict[str, Any]:
+    if (result := outcome.result) is None:
+        return {"details": {}, "added_occurrences": [], "removed_occurrences": []}
     return {
-        "added": result.added,
-        "removed": result.removed,
-        "net": result.net,
         "details": dict(result.details),
         "added_occurrences": _occurrences_json(result.added_occurrences),
         "removed_occurrences": _occurrences_json(result.removed_occurrences),

@@ -306,14 +306,14 @@ class CliGate:
         if request.diff:
             diff_report = self._collect_diff(request)
             if json_out:
-                typer.echo(render.diff_json(diff_report))
+                typer.echo(render.stat_diff_json(diff_report))
             else:
                 self._stdout.print(render.diff_table(diff_report))
             self._finish_diff(diff_report)
         else:
             run_report = self._collect_run(request)
             if json_out:
-                typer.echo(render.run_json(run_report))
+                typer.echo(render.stat_json(run_report))
             else:
                 self._stdout.print(render.report_table(run_report))
             self._finish_run(run_report)
