@@ -244,8 +244,9 @@ def _escape(text: str) -> str:
 def _detail_widgets(outcome: MetricOutcome | DiffOutcome) -> list[Static]:
     if outcome.result is None:
         return [Static("[dim](metric failed; see the summary above)[/dim]")]
-    if isinstance(outcome, DiffOutcome):
-        lines = diff_occurrence_lines(outcome.result)
-    else:
-        lines = occurrence_lines(outcome.result)
+    lines = (
+        diff_occurrence_lines(outcome.result)
+        if isinstance(outcome, DiffOutcome)
+        else occurrence_lines(outcome.result)
+    )
     return [Static(line) for line in lines]

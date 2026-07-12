@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
+from tingle.links.text import decode_text
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-_BINARY_SNIFF_BYTES = 8192
 
 
 class LocalProjectFiles:
@@ -34,12 +34,7 @@ class LocalProjectFiles:
             data = (self._root / path).read_bytes()
         except OSError:
             return None
-        if b"\0" in data[:_BINARY_SNIFF_BYTES]:
-            return None
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError:
-            return None
+        return decode_text(data)
 
     def exists(self, path: PurePath) -> bool:
         """Return whether the file exists under the root."""

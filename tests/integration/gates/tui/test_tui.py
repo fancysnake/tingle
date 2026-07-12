@@ -9,15 +9,14 @@ from textual.command import CommandList, CommandPalette
 from textual.containers import VerticalScroll
 from textual.widgets import Collapsible, Input, Static
 
-if TYPE_CHECKING:
-    from textual.pilot import Pilot
-
 from tingle.gates.tui.app import MetricsApp, NavCollapsible
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
 from tingle.pacts.report import MetricOutcome, RunReport
 
+if TYPE_CHECKING:
+    from textual.pilot import Pilot
 RUN_REPORT = RunReport(
     root=Path("/proj"),
     source=Path("/proj/tingle.toml"),

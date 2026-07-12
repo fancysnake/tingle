@@ -99,18 +99,23 @@ def diff_table(report: DiffReport) -> Table:
     table.add_column("Total", justify="right")
     for _name, outcomes in sections:
         for outcome in outcomes:
-            if outcome.result is None:
-                cells = ("", "", "[red]ERROR[/]", "")
-            else:
-                cells = (
-                    _added_cell(outcome.result.added),
-                    _removed_cell(outcome.result.removed),
-                    _net_cell(outcome.result.net),
-                    str(outcome.total.value) if outcome.total else "",
-                )
             group = (outcome.spec.group or "",) if grouped else ()
-            table.add_row(*group, outcome.spec.name, outcome.spec.type, *cells)
+            table.add_row(
+                *group, outcome.spec.name, outcome.spec.type, *_diff_cells(outcome)
+            )
     return table
+
+
+def _diff_cells(outcome: DiffOutcome) -> tuple[str, str, str, str]:
+    """Render the added/removed/net/total cells of one diff row."""
+    if outcome.result is None:
+        return ("", "", "[red]ERROR[/]", "")
+    return (
+        _added_cell(outcome.result.added),
+        _removed_cell(outcome.result.removed),
+        _net_cell(outcome.result.net),
+        str(outcome.total.value) if outcome.total else "",
+    )
 
 
 def run_listing(report: RunReport) -> list[Text]:
@@ -195,10 +200,11 @@ def _diff_heading(outcome: DiffOutcome) -> Text:
     result = outcome.result
     if result is None:  # pragma: no cover - guarded by caller
         return Text("")
-    if result.added is not None and result.removed is not None:
-        impact = f"+{result.added} / -{result.removed} (net {result.net:+d})"
-    else:
-        impact = f"net {result.net:+d}"
+    impact = (
+        f"+{result.added} / -{result.removed} (net {result.net:+d})"
+        if result.added is not None and result.removed is not None
+        else f"net {result.net:+d}"
+    )
     return Text(f"{outcome.spec.name} ({outcome.spec.type}): {impact}", style="bold")
 
 

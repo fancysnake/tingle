@@ -10,13 +10,20 @@ from __future__ import annotations
 import ast
 from typing import TYPE_CHECKING, Any
 
-from tingle.pacts.diff import DiffMetricContext, DiffResult
+from tingle.mills.metrics.assemble import (
+    FileFindings,
+    accumulate_diff,
+    located_result,
+    readable_files,
+)
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from collections.abc import Set as AbstractSet
     from pathlib import PurePath
+
+    from tingle.pacts.diff import DiffMetricContext, DiffResult, FileDiff
 
 
 def symbol_uses(ctx: MetricContext) -> MetricResult:
@@ -26,13 +33,7 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
     warnings: list[str] = []
     occurrences: list[Occurrence] = []
 
-    for path in ctx.files:
-        if path.suffix != ".py":
-            continue
-        text = ctx.read(path)
-        if text is None:
-            warnings.append(f"{path}: skipped (binary, unreadable, or missing)")
-            continue
+    for path, text in readable_files(ctx, warnings, suffix=".py"):
         try:
             tree = ast.parse(text)
         except SyntaxError as exc:
@@ -48,51 +49,29 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
                 Occurrence(path=str(path), line=line) for line in sorted(lines)
             )
 
-    return MetricResult(
-        value=len(occurrences),
-        details=details,
-        warnings=tuple(warnings),
-        occurrences=tuple(occurrences),
-    )
+    return located_result(occurrences, details=details, warnings=warnings)
 
 
 def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
     """Count references on lines the branch added vs lines it removed."""
     parts = tuple(ctx.params["symbol"].split("."))
-    added_occurrences: list[Occurrence] = []
-    removed_occurrences: list[Occurrence] = []
-    details: dict[str, int] = {}
-    warnings: list[str] = []
 
-    for file in ctx.files:
+    def per_file(file: FileDiff) -> FileFindings:
         if file.path.suffix != ".py":
-            continue
-        file_added, added_warnings = _side_occurrences(
+            return [], [], []
+        added, added_warnings = _side_occurrences(
             ctx.read, file.path, parts=parts, touched=file.added_lines, side="current"
         )
-        file_removed, removed_warnings = _side_occurrences(
+        removed, removed_warnings = _side_occurrences(
             ctx.read_base,
             file.path,
             parts=parts,
             touched=file.removed_lines,
             side="base",
         )
-        warnings.extend(added_warnings)
-        warnings.extend(removed_warnings)
-        added_occurrences.extend(file_added)
-        removed_occurrences.extend(file_removed)
-        if len(file_added) - len(file_removed):
-            details[str(file.path)] = len(file_added) - len(file_removed)
+        return added, removed, [*added_warnings, *removed_warnings]
 
-    return DiffResult(
-        net=len(added_occurrences) - len(removed_occurrences),
-        added=len(added_occurrences),
-        removed=len(removed_occurrences),
-        details=details,
-        warnings=tuple(warnings),
-        added_occurrences=tuple(added_occurrences),
-        removed_occurrences=tuple(removed_occurrences),
-    )
+    return accumulate_diff(ctx.files, per_file)
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
@@ -203,10 +182,8 @@ def _bind_from_import(
     use_lines: list[int] = []
     for alias in node.names:
         chain = (*module, alias.name)
-        if node.level == 0:
-            suffix = _align_prefix(chain, parts)
-        else:
-            suffix = _align_anywhere(chain, parts)
+        align = _align_prefix if node.level == 0 else _align_anywhere
+        suffix = align(chain, parts)
         if suffix is not None:
             bindings[alias.asname or alias.name] = suffix
             if not suffix:

@@ -6,14 +6,19 @@ import re
 from bisect import bisect_right
 from typing import TYPE_CHECKING, Any
 
-from tingle.pacts.diff import DiffMetricContext, DiffResult
+from tingle.mills.metrics.assemble import (
+    FileFindings,
+    accumulate_diff,
+    located_result,
+    readable_files,
+)
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from collections.abc import Set as AbstractSet
 
-    from tingle.pacts.diff import FileDiff
+    from tingle.pacts.diff import DiffMetricContext, DiffResult, FileDiff
 
 _FLAGS = {"IGNORECASE": re.IGNORECASE, "MULTILINE": re.MULTILINE, "DOTALL": re.DOTALL}
 
@@ -28,11 +33,7 @@ def regex_count(ctx: MetricContext) -> MetricResult:
     details: dict[str, int] = {}
     warnings: list[str] = []
     occurrences: list[Occurrence] = []
-    for path in ctx.files:
-        text = ctx.read(path)
-        if text is None:
-            warnings.append(f"{path}: skipped (binary, unreadable, or missing)")
-            continue
+    for path, text in readable_files(ctx, warnings):
         line_starts = _line_starts(text)
         found = [
             Occurrence(path=str(path), line=bisect_right(line_starts, match.start()))
@@ -41,12 +42,7 @@ def regex_count(ctx: MetricContext) -> MetricResult:
         if found:
             details[str(path)] = len(found)
             occurrences.extend(found)
-    return MetricResult(
-        value=len(occurrences),
-        details=details,
-        warnings=tuple(warnings),
-        occurrences=tuple(occurrences),
-    )
+    return located_result(occurrences, details=details, warnings=warnings)
 
 
 def _line_starts(text: str) -> list[int]:
@@ -65,36 +61,22 @@ def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
     the two can disagree for such patterns.
     """
     pattern = _compile(ctx.params)
-    added_occurrences: list[Occurrence] = []
-    removed_occurrences: list[Occurrence] = []
-    details: dict[str, int] = {}
-    warnings: list[str] = []
-    for file in ctx.files:
-        file_added = _matches_on_lines(
-            pattern, ctx.read, file=file, lines=file.added_lines
-        )
-        file_removed = _matches_on_lines(
+
+    def per_file(file: FileDiff) -> FileFindings:
+        warnings: list[str] = []
+        added = _matches_on_lines(pattern, ctx.read, file=file, lines=file.added_lines)
+        removed = _matches_on_lines(
             pattern, ctx.read_base, file=file, lines=file.removed_lines
         )
-        if file_added is None:
+        if added is None:
             warnings.append(f"{file.path}: current side unreadable")
-            file_added = []
-        if file_removed is None:
+            added = []
+        if removed is None:
             warnings.append(f"{file.path}: base side unreadable")
-            file_removed = []
-        added_occurrences.extend(file_added)
-        removed_occurrences.extend(file_removed)
-        if len(file_added) - len(file_removed):
-            details[str(file.path)] = len(file_added) - len(file_removed)
-    return DiffResult(
-        net=len(added_occurrences) - len(removed_occurrences),
-        added=len(added_occurrences),
-        removed=len(removed_occurrences),
-        details=details,
-        warnings=tuple(warnings),
-        added_occurrences=tuple(added_occurrences),
-        removed_occurrences=tuple(removed_occurrences),
-    )
+            removed = []
+        return added, removed, warnings
+
+    return accumulate_diff(ctx.files, per_file)
 
 
 def _matches_on_lines(
