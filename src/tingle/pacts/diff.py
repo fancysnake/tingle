@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
+from tingle.pacts.config import DEFAULT_GUIDE
+
 if TYPE_CHECKING:
     from pathlib import Path, PurePath
 
@@ -104,13 +106,17 @@ DiffMetricFunction: TypeAlias = Callable[[DiffMetricContext], DiffResult]
 
 @dataclass(frozen=True)
 class DiffOutcome:
-    """Diff result of one metric plus the current full-repo total."""
+    """Diff result of one metric plus the current full-repo total.
+
+    `guide` is already resolved, as on MetricOutcome.
+    """
 
     spec: MetricSpec
     range_names: tuple[str, ...]
     result: DiffResult | None = None
     total: MetricResult | None = None
     error: str | None = None
+    guide: int = DEFAULT_GUIDE
 
 
 @dataclass(frozen=True)

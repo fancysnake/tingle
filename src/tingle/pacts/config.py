@@ -12,6 +12,10 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+#: Value a metric is judged against when neither it nor [display] sets a guide.
+DEFAULT_GUIDE = 100
+
+
 class ConfigNotFoundError(Exception):
     """No tingle.toml file or [tool.tingle] section could be found."""
 
@@ -36,14 +40,32 @@ class RangeSpec:
 
 
 @dataclass(frozen=True)
+class DisplaySpec:
+    """The `[display]` settings: how measured values are presented.
+
+    `guide` is the value a metric is judged against — the point at which
+    its debt is considered to have reached full size. Metrics override it
+    individually; this is the fallback for those that do not.
+    """
+
+    guide: int = DEFAULT_GUIDE
+
+
+@dataclass(frozen=True)
 class MetricSpec:
-    """One configured metric. Empty `ranges` means the default range applies."""
+    """One configured metric. Empty `ranges` means the default range applies.
+
+    A `guide` of None inherits the one from `[display]`; the runner
+    resolves that fallback, so nothing downstream repeats it.
+    """
 
     name: str
     type: str
     ranges: tuple[str, ...] = ()
     params: Mapping[str, Any] = field(default_factory=dict)
     group: str | None = None
+    guide: int | None = None
+    description: str | None = None
 
 
 class CheckPolicy(StrEnum):
@@ -81,6 +103,7 @@ class Config:
     default_range: RangeSpec
     diff_base: str | None = None
     check: CheckSpec = field(default_factory=CheckSpec)
+    display: DisplaySpec = field(default_factory=DisplaySpec)
 
 
 @dataclass(frozen=True)
@@ -93,6 +116,7 @@ class MetricDraft:
     ranges: tuple[str, ...] = ()
     params: Mapping[str, str] = field(default_factory=dict)
     group: str | None = None
+    description: str | None = None
 
 
 class ConfigStore(Protocol):

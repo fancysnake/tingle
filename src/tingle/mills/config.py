@@ -10,6 +10,7 @@ from tingle.pacts.config import (
     CheckSpec,
     Config,
     ConfigError,
+    DisplaySpec,
     MetricSpec,
     RangeSpec,
 )
@@ -24,11 +25,17 @@ if TYPE_CHECKING:
 
     from tingle.pacts.metrics import MetricType
 
-_TOP_LEVEL_KEYS = frozenset({"ranges", "metrics", "diff", "check"})
+_TOP_LEVEL_KEYS = frozenset({"ranges", "metrics", "diff", "check", "display"})
 _DIFF_KEYS = frozenset({"base"})
 _CHECK_KEYS = frozenset({"policy", "ignore"})
+_DISPLAY_KEYS = frozenset({"guide"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
-_METRIC_RESERVED_KEYS = frozenset({"name", "type", "range", "ranges", "group"})
+# `guide` and `description` are tingle's own, so they must not reach a
+# metric function as params; `ignore_lines` is a real param of the types
+# that support it, and is deliberately absent here.
+_METRIC_RESERVED_KEYS = frozenset(
+    {"name", "type", "range", "ranges", "group", "guide", "description"}
+)
 
 
 def validate(
@@ -51,6 +58,7 @@ def validate(
     default_range = _resolve_default_range(ranges, errors)
     diff_base = _validate_diff(raw.get("diff", {}), errors)
     check = _validate_check(raw.get("check", {}), metrics=metrics, errors=errors)
+    display = _validate_display(raw.get("display", {}), errors)
 
     if errors:
         raise ConfigError(errors)
@@ -62,6 +70,7 @@ def validate(
         default_range=default_range,
         diff_base=diff_base,
         check=check,
+        display=display,
     )
 
 
@@ -126,36 +135,82 @@ def _validate_metrics(
             errors.append(f"metrics[{index}]: must be a table")
             continue
 
-        name, label = _metric_name(
-            table, index=index, seen_names=seen_names, errors=errors
+        named = _metric_name(table, index=index, seen_names=seen_names, errors=errors)
+        spec = _metric_spec(
+            table, metric_types, named=named, ranges=ranges, errors=errors
         )
-        range_names = _metric_ranges(table, ranges, label=label, errors=errors)
-        group = _metric_group(table, label=label, errors=errors)
-        params = {
-            key: value
-            for key, value in table.items()
-            if key not in _METRIC_RESERVED_KEYS
-        }
-
-        if (type_name := table.get("type")) is None:
-            errors.append(f"{label}: missing type")
-            continue
-        if not isinstance(type_name, str) or type_name not in metric_types:
-            errors.append(f"{label}: unknown type {type_name!r}")
-            continue
-        _validate_params(metric_types[type_name], params, label=label, errors=errors)
-
-        if name is not None:
-            metrics.append(
-                MetricSpec(
-                    name=name,
-                    type=type_name,
-                    ranges=range_names,
-                    params=params,
-                    group=group,
-                )
-            )
+        if spec is not None:
+            metrics.append(spec)
     return tuple(metrics)
+
+
+def _metric_spec(
+    table: Mapping[str, Any],
+    metric_types: Mapping[str, MetricType],
+    *,
+    named: tuple[str | None, str],
+    ranges: Mapping[str, RangeSpec],
+    errors: list[str],
+) -> MetricSpec | None:
+    """Validate one metric's table; None when it is too broken to build.
+
+    `named` is the metric's validated name (None when unusable) and the
+    label errors are reported under, as returned by `_metric_name`.
+
+    Everything independent of the type is checked before the type itself,
+    so a metric with an unknown type still reports its other problems --
+    this validator's promise is every problem in one pass.
+    """
+    name, label = named
+    range_names = _metric_ranges(table, ranges, label=label, errors=errors)
+    group = _metric_group(table, label=label, errors=errors)
+    guide = _metric_guide(table, label=label, errors=errors)
+    description = _metric_description(table, label=label, errors=errors)
+    params = {
+        key: value for key, value in table.items() if key not in _METRIC_RESERVED_KEYS
+    }
+
+    if (type_name := table.get("type")) is None:
+        errors.append(f"{label}: missing type")
+        return None
+    if not isinstance(type_name, str) or type_name not in metric_types:
+        errors.append(f"{label}: unknown type {type_name!r}")
+        return None
+    _validate_params(metric_types[type_name], params, label=label, errors=errors)
+
+    if name is None:
+        return None
+    return MetricSpec(
+        name=name,
+        type=type_name,
+        ranges=range_names,
+        params=params,
+        group=group,
+        guide=guide,
+        description=description,
+    )
+
+
+def _metric_guide(
+    table: Mapping[str, Any], *, label: str, errors: list[str]
+) -> int | None:
+    """Validate the optional per-metric `guide`; None inherits [display]."""
+    if "guide" not in table:
+        return None
+    return _positive_int(table["guide"], label=f"{label}: guide", errors=errors)
+
+
+def _metric_description(
+    table: Mapping[str, Any], *, label: str, errors: list[str]
+) -> str | None:
+    """Validate the optional `description`: free prose, but not empty."""
+    if "description" not in table:
+        return None
+    description = table["description"]
+    if not isinstance(description, str) or not description:
+        errors.append(f"{label}: description must be a non-empty string")
+        return None
+    return description
 
 
 def _metric_group(
@@ -298,6 +353,33 @@ def _check_policy(policy: object, errors: list[str]) -> CheckPolicy:
         errors.append(f"[check]: policy must be one of: {allowed}")
         return CheckPolicy.SUM
     return by_value[policy]
+
+
+def _validate_display(raw_display: object, errors: list[str]) -> DisplaySpec:
+    """Validate the optional `[display]` section."""
+    if not isinstance(raw_display, Mapping):
+        errors.append("[display] must be a table")
+        return DisplaySpec()
+    errors.extend(
+        f'[display]: unknown key "{key}"'
+        for key in sorted(set(raw_display) - _DISPLAY_KEYS)
+    )
+    if "guide" not in raw_display:
+        return DisplaySpec()
+    guide = _positive_int(raw_display["guide"], label="[display]: guide", errors=errors)
+    return DisplaySpec() if guide is None else DisplaySpec(guide=guide)
+
+
+def _positive_int(value: object, *, label: str, errors: list[str]) -> int | None:
+    """Validate a guide: a whole number above zero, so a ratio can divide by it.
+
+    `bool` is a subclass of `int`, so `guide = true` would otherwise pass
+    as the integer 1.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        errors.append(f"{label} must be a positive integer")
+        return None
+    return value
 
 
 def _resolve_default_range(
