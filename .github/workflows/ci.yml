@@ -29,7 +29,7 @@ jobs:
       - run: mise run lint:py
 
   # advisory: reports the branch's debt without blocking the merge
-  metrics:
+  tingle:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

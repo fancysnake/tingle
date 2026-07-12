@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "typer (>=0.16.0,<1.0.0)",
-    "rich (>=13.0.0,<15.0.0)",
+    "rich (>=13.0.0,<16.0.0)",
     "tomlkit (>=0.13.0,<1.0.0)",
     "textual (>=8.2.8,<9.0.0)",
 ]
@@ -54,6 +54,8 @@ pylint = "^4.0.6"
 
 # optional: the test/quality CI jobs do not need the docs toolchain.
 # `mise run docs:build` and `docs:serve` install it on demand.
+deptry = "^0.25.1"
+pip-audit = "^2.10.1"
 [tool.poetry.group.docs]
 optional = true
 

@@ -70,7 +70,7 @@ name: Metrics
 on: [pull_request]
 
 jobs:
-  metrics:
+  tingle:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,7 +98,7 @@ the branch worsens the metrics — so the number is visible in the checks list
 blocked. This is how tingle's own CI runs it.
 
 ```yaml
-  metrics:
+  tingle:
     runs-on: ubuntu-latest
     continue-on-error: true     # report, but never block the merge
     steps:
