@@ -45,7 +45,8 @@ BaseOption = Annotated[
     str | None,
     typer.Option(
         "--base",
-        help="Base branch for --diff (default: [diff] base in the config,"
+        # rich reads [diff] as a markup tag and swallows it; \[ escapes it
+        help="Base branch for --diff (default: \\[diff] base in the config,"
         " then 'main'). Implies --diff.",
     ),
 ]
@@ -53,7 +54,7 @@ PolicyOption = Annotated[
     str | None,
     typer.Option(
         "--policy",
-        help="Override [check] policy: 'sum' fails when the metrics grow in"
+        help="Override \\[check] policy: 'sum' fails when the metrics grow in"
         " total, 'any' fails when a single metric grows.",
     ),
 ]
@@ -161,7 +162,7 @@ class CliGate:
         request = _MetricRequest(diff=True, base=base, config=config, metrics=metric)
         loaded = self._load(config)
         report, verdict = self._collect_check(
-            loaded, request, self._parse_policy(policy)
+            loaded, request, policy=self._parse_policy(policy)
         )
         for line in render.check_listing(verdict):
             self._stdout.print(line)
@@ -336,7 +337,7 @@ class CliGate:
             self._diff_failure(exc)
 
     def _collect_check(
-        self, config: Config, request: _MetricRequest, policy: CheckPolicy | None
+        self, config: Config, request: _MetricRequest, *, policy: CheckPolicy | None
     ) -> tuple[DiffReport, CheckVerdict]:
         try:
             return self._services.metrics.check(

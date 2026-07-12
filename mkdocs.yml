@@ -1,0 +1,82 @@
+site_name: tingle
+site_description: Code metrics for the era of constant refactoring.
+site_url: https://fancysnake.github.io/tingle/
+repo_url: https://github.com/fancysnake/tingle
+repo_name: fancysnake/tingle
+edit_uri: edit/main/docs/
+copyright: MIT licensed
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - content.action.edit
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Guide:
+      - Configuration: configuration.md
+      - Metric types: metrics.md
+      - Branch impact: diff.md
+      - CI gate: check.md
+  - Reference:
+      - CLI: cli.md
+      - Changelog: changelog.md
+  - Contributing: contributing.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      # lets docs/changelog.md include the repo's CHANGELOG.md verbatim
+      base_path: [.]
+      check_paths: true
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/fancysnake/tingle
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/tingle/
+
+# every internal link must resolve; docs:build runs with --strict
+validation:
+  links:
+    absolute_links: relative_to_docs
+    unrecognized_links: warn

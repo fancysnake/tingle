@@ -79,7 +79,7 @@ def test_any_passes_when_nothing_grew() -> None:
     )
 
     assert not verdict.failed
-    assert verdict.worsened == ()
+    assert not verdict.worsened
 
 
 def test_worsened_lists_every_grown_metric_whatever_the_policy() -> None:
@@ -100,7 +100,7 @@ def test_ignored_metric_neither_fails_nor_counts() -> None:
     )
 
     assert verdict.net_total == -1
-    assert verdict.worsened == ()
+    assert not verdict.worsened
     assert not verdict.failed
 
 
@@ -120,4 +120,4 @@ def test_empty_report_passes() -> None:
 
     assert verdict.net_total == 0
     assert not verdict.failed
-    assert verdict.worsened == ()
+    assert not verdict.worsened
