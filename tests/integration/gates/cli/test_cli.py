@@ -96,11 +96,12 @@ def test_report_lists_occurrences() -> None:
     result = runner.invoke(app, ["report"])
 
     assert result.exit_code == 0
-    assert "noqa-comments (regex_count): 3" in result.output
+    # the value is led by how bad it is against the metric's guide (default 100)
+    assert "noqa-comments (regex_count): 🦠 3" in result.output
     assert "src/a.py:1" in result.output
     assert "src/a.py:2" in result.output
     assert "src/b.py:1" in result.output
-    assert "python-files (file_count): 2" in result.output
+    assert "python-files (file_count): 🦠 2" in result.output
 
 
 @pytest.mark.usefixtures("project")

@@ -9,6 +9,7 @@ from xml.etree import ElementTree as ET
 from rich.table import Table
 from rich.text import Text
 
+from tingle.mills.display import group_summary, severity_emoji
 from tingle.pacts.config import CheckPolicy
 
 if TYPE_CHECKING:
@@ -47,17 +48,26 @@ def _in_section_order(outcomes: Sequence[_Outcome]) -> list[_Outcome]:
     return [outcome for _name, group in group_sections(outcomes) for outcome in group]
 
 
-def _section_heading(name: str | None, *, has_named: bool) -> Text | None:
+def _section_heading(
+    name: str | None, outcomes: Sequence[_Outcome], *, has_named: bool
+) -> Text | None:
     """Bold heading for a section, or None to preserve headingless output.
 
     The sole ungrouped section, when no named group exists, keeps today's
     heading-free output and returns None.
     """
-    if name is not None:
-        return Text(f"## {name}", style="bold")
-    if has_named:
-        return Text("## (ungrouped)", style="bold")
-    return None
+    if name is None and not has_named:
+        return None
+    summary = group_summary(outcomes)
+    stat = _valued(summary.value, summary.guide)
+    return Text(f"## {_group_label(name)}  {stat}", style="bold")
+
+
+def _description_line(outcome: _Outcome) -> Text | None:
+    """Return the metric's own words about what it measures, if it has any."""
+    if (description := outcome.spec.description) is None:
+        return None
+    return Text(f"  {description}", style="dim italic")
 
 
 def report_table(report: RunReport) -> Table:
@@ -71,12 +81,18 @@ def report_table(report: RunReport) -> Table:
     table.add_column("Type")
     table.add_column("Ranges")
     table.add_column("Value", justify="right")
-    for _name, outcomes in sections:
+    for name, outcomes in sections:
+        if grouped:
+            table.add_row(
+                f"[b]{_group_label(name)}[/b]", "", "", "", _group_value(outcomes)
+            )
         for outcome in outcomes:
             value = (
-                "[red]ERROR[/]" if outcome.result is None else str(outcome.result.value)
+                "[red]ERROR[/]"
+                if outcome.result is None
+                else _valued(outcome.result.value, outcome.guide)
             )
-            group = (outcome.spec.group or "",) if grouped else ()
+            group = ("",) if grouped else ()
             table.add_row(
                 *group,
                 outcome.spec.name,
@@ -85,6 +101,21 @@ def report_table(report: RunReport) -> Table:
                 value,
             )
     return table
+
+
+def _valued(value: int, guide: int) -> str:
+    """Render a measured number, led by how bad it is against its guide."""
+    return f"{severity_emoji(value, guide)} {value}"
+
+
+def _group_label(name: str | None) -> str:
+    return name if name is not None else "(ungrouped)"
+
+
+def _group_value(outcomes: Sequence[_Outcome]) -> str:
+    """Render the group's summed value, judged against its summed guides."""
+    summary = group_summary(outcomes)
+    return f"[b]{_valued(summary.value, summary.guide)}[/b]"
 
 
 def diff_table(report: DiffReport) -> Table:
@@ -100,9 +131,21 @@ def diff_table(report: DiffReport) -> Table:
     table.add_column("Removed", justify="right")
     table.add_column("Net", justify="right")
     table.add_column("Total", justify="right")
-    for _name, outcomes in sections:
+    for name, outcomes in sections:
+        if grouped:
+            summary = group_summary(outcomes)
+            table.add_row(
+                f"[b]{_group_label(name)}[/b]",
+                "",
+                "",
+                "",
+                "",
+                _net_cell(summary.net or 0),
+                # the standing debt, not the net: a net of zero is not no debt
+                f"[b]{_valued(summary.value, summary.guide)}[/b]",
+            )
         for outcome in outcomes:
-            group = (outcome.spec.group or "",) if grouped else ()
+            group = ("",) if grouped else ()
             table.add_row(
                 *group, outcome.spec.name, outcome.spec.type, *_diff_cells(outcome)
             )
@@ -117,7 +160,7 @@ def _diff_cells(outcome: DiffOutcome) -> tuple[str, str, str, str]:
         _added_cell(outcome.result.added),
         _removed_cell(outcome.result.removed),
         _net_cell(outcome.result.net),
-        str(outcome.total.value) if outcome.total else "",
+        _valued(outcome.total.value, outcome.guide) if outcome.total else "",
     )
 
 
@@ -127,7 +170,9 @@ def run_listing(report: RunReport) -> list[Text]:
     sections = group_sections(report.outcomes)
     has_named = any(name is not None for name, _ in sections)
     for name, outcomes in sections:
-        if (heading := _section_heading(name, has_named=has_named)) is not None:
+        if (
+            heading := _section_heading(name, outcomes, has_named=has_named)
+        ) is not None:
             lines.append(heading)
         for outcome in outcomes:
             if outcome.result is None:
@@ -139,13 +184,12 @@ def run_listing(report: RunReport) -> list[Text]:
                 )
                 lines.append(Text(""))
                 continue
+            stat = _valued(outcome.result.value, outcome.guide)
             lines.append(
-                Text(
-                    f"{outcome.spec.name} ({outcome.spec.type}): "
-                    f"{outcome.result.value}",
-                    style="bold",
-                )
+                Text(f"{outcome.spec.name} ({outcome.spec.type}): {stat}", style="bold")
             )
+            if (description := _description_line(outcome)) is not None:
+                lines.append(description)
             lines.extend(occurrence_lines(outcome.result))
             lines.append(Text(""))
     return lines
@@ -179,7 +223,9 @@ def diff_listing(report: DiffReport) -> list[Text]:
     sections = group_sections(report.outcomes)
     has_named = any(name is not None for name, _ in sections)
     for name, outcomes in sections:
-        if (heading := _section_heading(name, has_named=has_named)) is not None:
+        if (
+            heading := _section_heading(name, outcomes, has_named=has_named)
+        ) is not None:
             lines.append(heading)
         for outcome in outcomes:
             if outcome.result is None:
@@ -192,6 +238,8 @@ def diff_listing(report: DiffReport) -> list[Text]:
                 lines.append(Text(""))
                 continue
             lines.append(_diff_heading(outcome))
+            if (description := _description_line(outcome)) is not None:
+                lines.append(description)
             lines.extend(diff_occurrence_lines(outcome.result))
             lines.append(Text(""))
     return lines
@@ -272,6 +320,8 @@ def _run_json(report: RunReport, *, detailed: bool) -> str:
                     "name": outcome.spec.name,
                     "type": outcome.spec.type,
                     "group": outcome.spec.group,
+                    "description": outcome.spec.description,
+                    "guide": outcome.guide,
                     "ranges": list(outcome.range_names),
                     "value": outcome.result.value if outcome.result else None,
                     **(_run_details(outcome) if detailed else {}),
@@ -297,6 +347,8 @@ def _diff_json(report: DiffReport, *, detailed: bool) -> str:
                     "name": outcome.spec.name,
                     "type": outcome.spec.type,
                     "group": outcome.spec.group,
+                    "description": outcome.spec.description,
+                    "guide": outcome.guide,
                     "ranges": list(outcome.range_names),
                     **_diff_values(outcome),
                     **(_diff_details(outcome) if detailed else {}),
