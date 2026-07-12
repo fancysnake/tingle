@@ -36,7 +36,7 @@ The compact summary — values only.
 
 | Option | Meaning |
 |---|---|
-| `--json` | machine-readable output; diff JSON includes the resolved base ref and merge-base sha |
+| `--json` | machine-readable output; values only, no occurrences or per-file details (use [`report --json`](#tingle-report) for those); diff JSON includes the resolved base ref and merge-base sha |
 | `--diff` | measure the current branch's impact instead |
 | `--base REF` | base branch for `--diff` (implies `--diff`) |
 | `--config PATH` | path to the config file |
@@ -65,7 +65,7 @@ for list metrics you see *which* rules changed.
 
 | Option | Meaning |
 |---|---|
-| `--json` | machine-readable output |
+| `--json` | machine-readable output, occurrences and per-file details included |
 | `--cobertura` | Cobertura XML, each occurrence line marked uncovered — GitLab MR widgets, Jenkins, and diff-cover consume it directly (line-scoped metrics only; others are noted on stderr) |
 | `--diff` | measure the current branch's impact instead |
 | `--base REF` | base branch for `--diff` (implies `--diff`) |

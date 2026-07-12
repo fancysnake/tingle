@@ -77,7 +77,7 @@ def test_stat_table() -> None:
 
 
 @pytest.mark.usefixtures("project")
-def test_stat_json_includes_occurrences() -> None:
+def test_stat_json_is_values_only() -> None:
     result = runner.invoke(app, ["stat", "--json"])
 
     assert result.exit_code == 0
@@ -86,12 +86,8 @@ def test_stat_json_includes_occurrences() -> None:
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
     noqa = metrics["noqa-comments"]
     assert noqa["value"] == 3
-    assert noqa["details"] == {"src/a.py": 2, "src/b.py": 1}
-    assert noqa["occurrences"] == [
-        {"file": "src/a.py", "line": 1, "note": None},
-        {"file": "src/a.py", "line": 2, "note": None},
-        {"file": "src/b.py", "line": 1, "note": None},
-    ]
+    assert "occurrences" not in noqa
+    assert "details" not in noqa
     assert metrics["python-files"]["value"] == 2
 
 
@@ -108,11 +104,20 @@ def test_report_lists_occurrences() -> None:
 
 
 @pytest.mark.usefixtures("project")
-def test_report_json_matches_stat_json() -> None:
-    stat = runner.invoke(app, ["stat", "--json"])
-    report = runner.invoke(app, ["report", "--json"])
+def test_report_json_includes_occurrences() -> None:
+    result = runner.invoke(app, ["report", "--json"])
 
-    assert json.loads(stat.stdout) == json.loads(report.stdout)
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    metrics = {entry["name"]: entry for entry in payload["metrics"]}
+    noqa = metrics["noqa-comments"]
+    assert noqa["value"] == 3
+    assert noqa["details"] == {"src/a.py": 2, "src/b.py": 1}
+    assert noqa["occurrences"] == [
+        {"file": "src/a.py", "line": 1, "note": None},
+        {"file": "src/a.py", "line": 2, "note": None},
+        {"file": "src/b.py", "line": 1, "note": None},
+    ]
 
 
 @pytest.mark.usefixtures("project")

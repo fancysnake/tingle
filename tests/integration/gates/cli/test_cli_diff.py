@@ -32,7 +32,7 @@ def test_stat_diff_table() -> None:
 
 
 @pytest.mark.usefixtures("repo")
-def test_stat_diff_json_includes_occurrences() -> None:
+def test_stat_diff_json_is_values_only() -> None:
     result = runner.invoke(app, ["stat", "--json", "--diff"])
 
     assert result.exit_code == 0
@@ -44,6 +44,24 @@ def test_stat_diff_json_includes_occurrences() -> None:
     noqa = metrics["noqa-comments"]
     assert noqa["added"] == 3
     assert noqa["net"] == 3
+    assert noqa["total"] == 4
+    assert "added_occurrences" not in noqa
+    assert "removed_occurrences" not in noqa
+    assert "details" not in noqa
+
+    assert metrics["ruff-ignores"]["net"] == 1
+
+
+@pytest.mark.usefixtures("repo")
+def test_report_diff_json_includes_occurrences() -> None:
+    result = runner.invoke(app, ["report", "--json", "--diff"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    metrics = {entry["name"]: entry for entry in payload["metrics"]}
+
+    noqa = metrics["noqa-comments"]
+    assert noqa["added"] == 3
     assert noqa["total"] == 4
     assert {"file": "src/a.py", "line": 2, "note": None} in noqa["added_occurrences"]
     assert {"file": "src/new.py", "line": 1, "note": None} in noqa["added_occurrences"]
