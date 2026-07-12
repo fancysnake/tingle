@@ -1,50 +1,57 @@
-# Current Task: metric groups + toml_table_array (+ TUI accordion)
+# Current Task: `tingle check` (CI gate)
 
 **Status**: Feature complete — implemented, verified, and committed on
-`feature/report-and-tui` (branched from main). Awaiting review/merge
-decision. Builds on the earlier full-report + interactive-mode work on
-the same branch (see git history).
+`feature/check-command` (branched from main). Awaiting review/merge
+decision.
 
-## Done (this round)
+Note: the previous task (metric groups + toml_table_array + TUI
+accordion) is on `feature/report-and-tui` and is still awaiting its own
+merge decision. This branch does not depend on it.
 
-0. TUI redesign: the interactive view is now an **accordion**, not a
-   sortable table. Sorting/columns removed; `↑`/`↓` move between headers,
-   Enter/click expands a metric's occurrences in place.
-1. `MetricSpec.group` / `MetricDraft.group`; `group` reserved config key;
-   validated as a non-empty string (never leaks into `params`).
-2. `group_sections` reshape helper (first-appearance order, ungrouped
-   last) driving every human view: `##` headings in the report listing,
-   a `Group` column in the summary tables (only when a group is used, so
-   groupless output is byte-identical), and an additive `group` JSON key.
-3. TUI 3-level accordion: group → metric → file results. Groups expanded
-   at rest; each group and metric folds/unfolds independently (↑/↓ move
-   between headers, → unfold, ← fold, Space/Enter/click toggle; hjkl
-   alias the moves). `f` folds/unfolds every group at once. The arrow
-   bindings live on a `NavCollapsible` widget, not the app, so the
-   command palette on `p` keeps its own arrows.
-   Groupless config falls back to a flat accordion.
-4. `toml_table_array` metric type + diff variant: count entries of a TOML
-   array of tables (e.g. `[[tool.mypy.overrides]]`), `label` describes
-   each occurrence, `explode = true` fans a list label out per element.
-   Shares load+descend with `toml_list_length` via `_descend_toml`.
-5. Wiring registration + `tingle add --group` (group written after
-   `type` for readable diffs).
-6. Dogfood (`tingle.toml` grouped into lint/typing/size + a
-   `mypy-overrides` metric) and docs (README metric-type table, Groups
-   section, CLI notes; CHANGELOG additive entries).
+## Done
+
+1. `[check]` config section: `policy` (`sum` | `any`) and `ignore`.
+   `CheckPolicy` is a `StrEnum` mirroring the existing `FileStatus`
+   idiom; `CheckSpec` carries the pair on `Config`. Validation follows
+   `[diff]`: problems are collected, not raised one at a time. Names in
+   `ignore` are checked against the configured metrics, so a typo fails
+   at load instead of silently ignoring nothing.
+2. `mills/check.py::judge` — a pure function over the `DiffReport` that
+   `--diff` already produces, so the gate is a policy layer, not a
+   second way to measure. Ignored metrics move neither the total nor the
+   verdict; errored metrics are left to the caller (a metric that could
+   not be measured is no evidence either way).
+3. `MetricsService.check` (one call per use case) and the `tingle check`
+   command. Prints only the added occurrences under the metrics that
+   grew; exits 1 when the policy says the branch worsened things.
+   `--policy` overrides the config for a run.
+4. Docs (README section, CLI entry, CI example, corrected exit-code
+   paragraph; CHANGELOG) and dogfood (`[check] policy = "sum"` in
+   `tingle.toml`).
+
+## Semantics
+
+- `sum` (default): fails when the metrics grow **in total** — debt paid
+  off in one metric offsets debt taken on in another.
+- `any`: fails when **any single** metric grows.
+- Under `sum` a metric can grow and the branch still pass; its added
+  lines are printed anyway, because the trade is worth seeing even when
+  allowed. A branch that worsens nothing prints nothing and exits 0.
 
 ## Verification
 
-258 tests green: `ruff check` (select=ALL), `mypy` (strict, 3.11),
-`lint-imports`. Run via `mise exec -- pytest` / `ruff` / `mypy` /
-`lint-imports`. Dogfood: `tingle stat` shows the Group column and the
-three sections; `mypy-overrides` reads 0 with a "key not found" warning
-(the repo has no `[[tool.mypy.overrides]]` yet — a truthful baseline).
+314 tests green: `ruff check`, `black --check`, `mypy` (strict),
+`lint-imports`. Run via `mise exec --`. **Formatting is black, not
+`ruff format`** — the two disagree.
 
-## Notes
+Dogfood: `tingle check --base main` on this branch exits 0 silently;
+with two debt lines planted in a source file it exits 1 and prints just
+those two lines with their locations.
 
-- Groups are presentation-only: values, occurrences, warnings unchanged.
-- JSON gains an additive `group` key (null when unset); the compact
-  tables gain a `Group` column only when a group exists.
-- Plan doc: `PLAN_METRIC_GROUPS.md` (Step 3 revised to the approved
-  3-level accordion instead of the original DataTable Group column).
+## Known, deliberately left alone
+
+`--diff` (and so `check`) prints a warning twice when a config key is
+missing on **both** the base and current side — once with a `base side:`
+prefix. Root cause: `mills/metrics/config_lists.py::_delta` concatenates
+both sides' warnings unconditionally. Pre-existing, not introduced by
+`check`; reviewed with the human and kept as is.
