@@ -11,7 +11,6 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from tingle import __version__
 from tingle.gates.cli import render
 from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.pacts.config import (
@@ -62,7 +61,11 @@ PolicyOption = Annotated[
 
 def _show_version(value: bool) -> None:
     if value:
-        typer.echo(f"tingle {__version__}")
+        # importlib.metadata pulls in the email parser, so it is imported here
+        # rather than at module level: only --version pays for it.
+        from importlib import metadata  # pylint: disable=import-outside-toplevel
+
+        typer.echo(f"tingle {metadata.version('tingle')}")
         raise typer.Exit
 
 

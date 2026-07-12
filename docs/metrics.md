@@ -15,7 +15,9 @@ installed version, and works without a config file.
 | `line_count` | — | lines in the range's files |
 
 The **positional** param is what `tingle add TYPE VALUE` binds its `VALUE`
-argument to. Everything else is set with `--param key=value`, repeatable.
+argument to. Everything else is set with `--param key=value`, repeatable —
+except the two params that are not strings, `flags` and `explode`, which
+[`add` cannot write](cli.md#tingle-add): put those in the TOML yourself.
 
 ## `regex_count`
 

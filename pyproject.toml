@@ -3,7 +3,8 @@ name = "tingle"
 version = "0.1.0"
 description = "Constant refactoring monitoring tool"
 authors = [{ name = "Radosław Ganczarek", email = "radoslaw@ganczarek.in" }]
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.11,<4.0"
 keywords = ["metrics", "refactoring", "technical-debt", "code-quality", "linting", "ci"]
@@ -11,7 +12,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

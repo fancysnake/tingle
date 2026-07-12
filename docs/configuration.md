@@ -33,10 +33,16 @@ pattern = '\bTODO\b'
 
 ## Ranges
 
-A range is a named file set: `include` globs minus `exclude` globs.
+A range is a named file set: `include` globs minus `exclude` globs. The globs
+are matched against the whole path relative to the project root, with the
+usual pathlib meaning: `*`, `?`, and `[abc]` stay inside one path segment,
+and `**` spans any number of segments.
 
 `.git/`, `.venv/`, `__pycache__/`, `node_modules/`, `dist/`, `.tox/`, and
 `.mise/` are always excluded.
+
+A metric whose ranges match no file at all is not an error — it reports 0 and
+warns `ranges matched no files`, which is what a typo in a glob looks like.
 
 At most one range may set `default = true`; it applies to metrics that
 specify neither `range` nor `ranges`. With no default range configured, such
