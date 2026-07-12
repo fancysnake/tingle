@@ -555,7 +555,7 @@ def _summed_report(*outcomes: MetricOutcome) -> RunReport:
     )
 
 
-def _valued(name: str, group: str, value: int, *, guide: int = 100) -> MetricOutcome:
+def _valued(name: str, group: str, *, value: int, guide: int = 100) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
@@ -566,7 +566,9 @@ def _valued(name: str, group: str, value: int, *, guide: int = 100) -> MetricOut
 
 def test_metric_rows_carry_their_severity_emoji() -> None:
     async def scenario() -> None:
-        app = MetricsApp(_summed_report(_valued("a", "g", 0), _valued("b", "g", 3)))
+        app = MetricsApp(
+            _summed_report(_valued("a", "g", value=0), _valued("b", "g", value=3))
+        )
         async with app.run_test():
             titles = [c.title for c in app.query(Collapsible) if "metric" in c.classes]
 
@@ -579,7 +581,9 @@ def test_metric_rows_carry_their_severity_emoji() -> None:
 def test_group_header_carries_the_sum_of_its_metrics() -> None:
     async def scenario() -> None:
         app = MetricsApp(
-            _summed_report(_valued("a", "lint", 61), _valued("b", "lint", 17))
+            _summed_report(
+                _valued("a", "lint", value=61), _valued("b", "lint", value=17)
+            )
         )
         async with app.run_test():
             (group,) = _groups(app)
@@ -594,9 +598,9 @@ def test_a_group_summing_to_zero_starts_folded() -> None:
     async def scenario() -> None:
         app = MetricsApp(
             _summed_report(
-                _valued("a", "clean", 0),
-                _valued("b", "clean", 0),
-                _valued("c", "dirty", 4),
+                _valued("a", "clean", value=0),
+                _valued("b", "clean", value=0),
+                _valued("c", "dirty", value=4),
             )
         )
         async with app.run_test():
@@ -616,7 +620,7 @@ def test_a_zero_group_holding_an_error_stays_open() -> None:
     async def scenario() -> None:
         app = MetricsApp(
             _summed_report(
-                _valued("fine", "g", 0),
+                _valued("fine", "g", value=0),
                 MetricOutcome(
                     spec=MetricSpec(name="boom", type="file_count", group="g"),
                     range_names=(),

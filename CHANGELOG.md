@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Severity emoji: every value is led by how bad it is against a **guide** —
+  the point at which its debt has reached full size. Set it globally with
+  `[display] guide` (default 100) or per metric with `guide`.
+- Group headers now carry what their metrics add up to, judged against the
+  sum of their guides. In the TUI, a group with nothing to show starts
+  folded; its header still reports the total, and a group holding an errored
+  metric never folds.
+- `ignore_lines` on `regex_count` and `symbol_uses`: regexes matched against
+  the line a hit sits on, so uses that are not debt can be excused. `ANY` in
+  an assertion is debt; `"form": ANY`, standing in for something that cannot
+  be compared, is not.
+- `over_lines` on `file_count`: count only the files longer than the gate,
+  answering "how many files are over 1k lines". A diff counts crossings — a
+  file that grows past the gate is new debt though it already existed.
+- `description` on any metric, shown in `tingle report` and the JSON, and
+  writable with `tingle add --description`.
+- `tingle check` says so when it passes, instead of passing in silence: in a
+  CI log, no output cannot be told apart from a step that never ran.
+
+### Fixed
+
+- The TUI's scroll container no longer steals focus from the metric rows. A
+  click on the empty space below them — or on the way back to a terminal
+  window that had lost focus — left the arrow keys scrolling the view, and
+  only clicking a row would return the cursor.
+
 ## [0.1.0] - 2026-07-12
 
 Initial release.

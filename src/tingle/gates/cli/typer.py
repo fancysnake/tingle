@@ -260,6 +260,10 @@ class CliGate:
             str | None,
             typer.Option("--group", help="Group heading to show this metric under."),
         ] = None,
+        description: Annotated[
+            str | None,
+            typer.Option("--description", help="What this metric means, in prose."),
+        ] = None,
         param: Annotated[
             list[str] | None,
             typer.Option(
@@ -275,6 +279,7 @@ class CliGate:
             ranges=tuple(range_names or ()),
             params=self._parse_params(param or []),
             group=group,
+            description=description,
         )
         try:
             target, metric_name = self._services.config.add_metric(Path.cwd(), draft)

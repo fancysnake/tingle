@@ -77,6 +77,64 @@ Add a grouped metric from the CLI with `--group`:
 $ tingle add regex_count '#\s*type:\s*ignore' --name type-ignores --group typing
 ```
 
+Every human view also shows what a group's metrics **add up to** — the sum
+of their values, judged against the sum of their [guides](#display). A group
+that measures nothing at all starts folded in the TUI, so the clean parts of
+a project keep out of the way. Its header still reports the total, so a
+folded group is quiet, not hidden — and a group holding a metric that
+*errored* never folds, since that is the one thing you most need to see.
+
+## `[display]`
+
+Sets the **guide**: the value a metric is judged against, meaning the point
+at which its debt has reached full size. It decides which emoji leads the
+number, so a reader can see at a glance how bad a count is without knowing
+what a good count would be.
+
+```toml
+[display]
+guide = 100      # the default for every metric
+
+[[metrics]]
+name = "huge-files"
+type = "file_count"
+over_lines = 1000
+guide = 5        # five such files is already a full-sized problem
+```
+
+A guide must be a positive whole number. It defaults to 100.
+
+The ladder runs on the ratio of the value to its guide:
+
+| the value is             | emoji |
+| ------------------------ | ----- |
+| zero                     | 🎉    |
+| up to a quarter of the guide | 🦠 |
+| up to half of it         | ⚠️    |
+| up to the guide itself   | 🚨    |
+| up to twice the guide    | 🔥    |
+| more than twice it       | 💀    |
+
+The same ladder ranks a group, against the sum of the guides it holds, and a
+branch's standing total in `tingle diff` — never its net, since a branch that
+adds one and removes one has moved nothing but still sits on the same debt.
+
+## Describing a metric
+
+Any metric may carry a `description`: prose saying what the number means and
+why it is worth paying down.
+
+```toml
+[[metrics]]
+name = "any-uses"
+type = "symbol_uses"
+symbol = "typing.Any"
+description = "Untyped escape hatches. Prefer a real type."
+```
+
+It prints under the metric in `tingle report`, and appears in the JSON. Add
+one from the CLI with `--description`.
+
 ## Counting ignored lint rules
 
 There is no per-linter magic; point the generic types at the config files
