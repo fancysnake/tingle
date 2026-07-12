@@ -32,7 +32,7 @@ key = "tool.ruff.format.ignore"
 name = "noqa-comment"
 type = "regex_count"
 group = "linting"
-pattern = '#\s*noqa'
+pattern = '#\s*noqa:'
 
 [[metrics]]
 name = "ruff-ignores"
