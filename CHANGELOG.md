@@ -12,7 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Severity emoji (🎉 🦠 🚧 🚨 🔥 💀) on every value, ranking it against a
-  **guide**: `[display] guide` globally (default 100), or `guide` per metric.
+  **guide** on a logarithmic ladder. With no guide set, one is derived from
+  the size of the codebase (one unit per 100 lines), so debt is read as a
+  density. Pin one with `[display] guide`, or per metric with `guide`.
+- `[display] loc_range` names the range those lines are counted over
+  (default: the default range).
 - Group headers show the sum of their metrics, ranked against the summed
   guides. In the TUI a group summing to zero starts folded, unless it holds
   an errored metric.

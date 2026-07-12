@@ -86,38 +86,61 @@ folded group is quiet, not hidden — and a group holding a metric that
 
 ## `[display]`
 
-Sets the **guide**: the value a metric is judged against, meaning the point
-at which its debt has reached full size. It decides which emoji leads the
-number, so a reader can see at a glance how bad a count is without knowing
-what a good count would be.
+Every value is led by an emoji saying how bad it is, so a reader can rank a
+count without knowing what a good count would be. What it is ranked against
+is the **guide**: the point at which debt has reached full size.
+
+**You do not have to set one.** Left alone, the guide is derived from the
+size of your codebase — one unit of full-size debt per 100 lines — so debt is
+read as a *density*. Seventy `noqa` comments mean one thing in five thousand
+lines and another in five hundred thousand.
 
 ```toml
 [display]
-guide = 100      # the default for every metric
-
-[[metrics]]
-name = "huge-files"
-type = "file_count"
-over_lines = 1000
-guide = 5        # five such files is already a full-sized problem
+loc_range = "python-src"   # count LOC here (default: the default range)
+# guide = 100              # pin one guide for every metric, ignoring size
 ```
 
-A guide must be a positive whole number. It defaults to 100.
+The ratio is **logarithmic**: `log(value) / log(guide)`. Debt does not hurt
+linearly — the tenth `# type: ignore` costs more than the hundredth.
 
-The ladder runs on the ratio of the value to its guide:
+| the ratio is | emoji |
+| ------------ | ----- |
+| zero         | 🎉    |
+| up to 0.25   | 🦠    |
+| up to 0.50   | 🚧    |
+| up to 1.00   | 🚨    |
+| up to 2.00   | 🔥    |
+| above 2.00   | 💀    |
 
-| the value is             | emoji |
-| ------------------------ | ----- |
-| zero                     | 🎉    |
-| up to a quarter of the guide | 🦠 |
-| up to half of it         | 🚧    |
-| up to the guide itself   | 🚨    |
-| up to twice the guide    | 🔥    |
-| more than twice it       | 💀    |
+At `value == guide` the ratio is exactly 1.0, so the guide always sits at the
+top of 🚨: full-size debt, not yet past it.
+
+In a 94,000-line project the derived guide is 940, which puts 2 occurrences
+at 🦠, 24 at 🚧, 70 at 🚨, and 15,590 at 🔥.
 
 The same ladder ranks a group, against the sum of the guides it holds, and a
 branch's standing total in `tingle diff` — never its net, since a branch that
 adds one and removes one has moved nothing but still sits on the same debt.
+
+### When to set a guide by hand
+
+The derived guide reads debt as *markers per line*, which is wrong for a
+metric that does not count markers. A `line_count` over a legacy package is
+the clearest case: it measures lines, so judging it per-line is a category
+error.
+
+```toml
+[[metrics]]
+name = "legacy-loc"
+type = "line_count"
+range = "legacy-package"
+guide = 20000      # this is a line count, not a density
+```
+
+A metric's own `guide` beats everything. `[display] guide` beats the derived
+one for every metric that names no guide of its own. A guide must be a
+positive whole number.
 
 ## Describing a metric
 
