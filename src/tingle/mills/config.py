@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 _TOP_LEVEL_KEYS = frozenset({"ranges", "metrics", "diff", "check", "display"})
 _DIFF_KEYS = frozenset({"base"})
 _CHECK_KEYS = frozenset({"policy", "ignore"})
-_DISPLAY_KEYS = frozenset({"guide"})
+_DISPLAY_KEYS = frozenset({"guide", "loc_range"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
 # `guide` and `description` are tingle's own, so they must not reach a
 # metric function as params; `ignore_lines` is a real param of the types
@@ -58,7 +58,7 @@ def validate(
     default_range = _resolve_default_range(ranges, errors)
     diff_base = _validate_diff(raw.get("diff", {}), errors)
     check = _validate_check(raw.get("check", {}), metrics=metrics, errors=errors)
-    display = _validate_display(raw.get("display", {}), errors)
+    display = _validate_display(raw.get("display", {}), ranges=ranges, errors=errors)
 
     if errors:
         raise ConfigError(errors)
@@ -355,8 +355,14 @@ def _check_policy(policy: object, errors: list[str]) -> CheckPolicy:
     return by_value[policy]
 
 
-def _validate_display(raw_display: object, errors: list[str]) -> DisplaySpec:
-    """Validate the optional `[display]` section."""
+def _validate_display(
+    raw_display: object, *, ranges: Mapping[str, RangeSpec], errors: list[str]
+) -> DisplaySpec:
+    """Validate the optional `[display]` section.
+
+    An unset `guide` is not the same as one pinned to a number: unset
+    means "derive it from the size of the codebase".
+    """
     if not isinstance(raw_display, Mapping):
         errors.append("[display] must be a table")
         return DisplaySpec()
@@ -364,10 +370,24 @@ def _validate_display(raw_display: object, errors: list[str]) -> DisplaySpec:
         f'[display]: unknown key "{key}"'
         for key in sorted(set(raw_display) - _DISPLAY_KEYS)
     )
-    if "guide" not in raw_display:
-        return DisplaySpec()
-    guide = _positive_int(raw_display["guide"], label="[display]: guide", errors=errors)
-    return DisplaySpec() if guide is None else DisplaySpec(guide=guide)
+
+    guide = None
+    if "guide" in raw_display:
+        guide = _positive_int(
+            raw_display["guide"], label="[display]: guide", errors=errors
+        )
+
+    loc_range = None
+    if "loc_range" in raw_display:
+        loc_range = raw_display["loc_range"]
+        if not isinstance(loc_range, str):
+            errors.append("[display]: loc_range must be a string")
+            loc_range = None
+        elif loc_range not in ranges:
+            errors.append(f'[display]: unknown range "{loc_range}" in loc_range')
+            loc_range = None
+
+    return DisplaySpec(guide=guide, loc_range=loc_range)
 
 
 def _positive_int(value: object, *, label: str, errors: list[str]) -> int | None:

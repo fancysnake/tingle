@@ -6,6 +6,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from tingle.mills.display import effective_guide
+from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
@@ -13,7 +14,6 @@ from tingle.pacts.report import MetricOutcome, RunReport
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping
-    from pathlib import PurePath
 
 
 def run(
@@ -30,10 +30,9 @@ def run(
             raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
     walked = tuple(project.walk())
+    loc = ProjectLoc(config, project=project, walked=walked)
     outcomes = tuple(
-        _outcome(
-            spec, config, project=project, metric_types=metric_types, walked=walked
-        )
+        _outcome(spec, config, project=project, metric_types=metric_types, loc=loc)
         for spec in config.metrics
         if only is None or spec.name in only
     )
@@ -46,12 +45,12 @@ def _outcome(
     *,
     project: ProjectFiles,
     metric_types: Mapping[str, MetricType],
-    walked: tuple[PurePath, ...],
+    loc: ProjectLoc,
 ) -> MetricOutcome:
     """Measure one metric, turning a failure into an errored outcome."""
     range_specs, range_names = ranges_for(spec, config)
-    files = resolve(walked, range_specs)
-    guide = effective_guide(spec, config.display)
+    files = resolve(loc.walked, range_specs)
+    guide = effective_guide(spec, config.display, loc=loc.lines)
     context = MetricContext(
         files=files, read=project.read, exists=project.exists, params=spec.params
     )

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from tingle.mills.display import effective_guide
+from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.mills.runner import ranges_for
 from tingle.pacts.config import Config, ConfigError, MetricSpec
@@ -21,7 +22,6 @@ from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Iterable, Mapping
-    from pathlib import PurePath
 
     from tingle.pacts.config import RangeSpec
     from tingle.pacts.diff import DiffMetricFunction
@@ -44,7 +44,9 @@ class DiffRunner:
                 raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
         branch_diff = self.diff_source.branch_diff(base)
-        walked = tuple(self.project.walk())
+        loc = ProjectLoc(
+            self.config, project=self.project, walked=tuple(self.project.walk())
+        )
 
         outcomes: list[DiffOutcome] = []
         skipped: list[str] = []
@@ -55,7 +57,7 @@ class DiffRunner:
                 skipped.append(spec.name)
                 continue
             outcomes.append(
-                self._outcome(spec, diff_func, branch_diff=branch_diff, walked=walked)
+                self._outcome(spec, diff_func, branch_diff=branch_diff, loc=loc)
             )
 
         return DiffReport(
@@ -73,10 +75,10 @@ class DiffRunner:
         diff_func: DiffMetricFunction,
         *,
         branch_diff: BranchDiff,
-        walked: tuple[PurePath, ...],
+        loc: ProjectLoc,
     ) -> DiffOutcome:
         range_specs, range_names = ranges_for(spec, self.config)
-        guide = effective_guide(spec, self.config.display)
+        guide = effective_guide(spec, self.config.display, loc=loc.lines)
         diff_context = DiffMetricContext(
             files=_filter_files(branch_diff.files, range_specs),
             read=self.project.read,
@@ -84,7 +86,7 @@ class DiffRunner:
             params=spec.params,
         )
         total_context = MetricContext(
-            files=resolve(walked, range_specs),
+            files=resolve(loc.walked, range_specs),
             read=self.project.read,
             exists=self.project.exists,
             params=spec.params,

@@ -6,14 +6,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from tingle.mills.config import validate
-from tingle.pacts.config import (
-    DEFAULT_GUIDE,
-    CheckPolicy,
-    CheckSpec,
-    Config,
-    ConfigError,
-    DisplaySpec,
-)
+from tingle.pacts.config import CheckPolicy, CheckSpec, Config, ConfigError, DisplaySpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, ParamSchema
 from tingle.specs.config import IMPLICIT_RANGE_INCLUDE, IMPLICIT_RANGE_NAME
 
@@ -355,10 +348,35 @@ def test_check_must_be_table() -> None:
     assert "[check] must be a table" in errors
 
 
-def test_display_defaults_to_the_default_guide() -> None:
+def test_an_unset_guide_means_derive_it_from_the_codebase() -> None:
+    """Not the same state as a guide pinned to a number: None means measure."""
     config = _validate({"metrics": []})
 
-    assert config.display == DisplaySpec(guide=DEFAULT_GUIDE)
+    assert config.display == DisplaySpec(guide=None, loc_range=None)
+
+
+def test_loc_range_is_read() -> None:
+    config = _validate(
+        {
+            "ranges": {"src": {"include": ["src/**/*.py"]}},
+            "display": {"loc_range": "src"},
+            "metrics": [],
+        }
+    )
+
+    assert config.display.loc_range == "src"
+
+
+def test_loc_range_must_name_a_configured_range() -> None:
+    errors = _errors_of({"display": {"loc_range": "nope"}, "metrics": []})
+
+    assert '[display]: unknown range "nope" in loc_range' in errors
+
+
+def test_loc_range_must_be_a_string() -> None:
+    errors = _errors_of({"display": {"loc_range": 3}, "metrics": []})
+
+    assert "[display]: loc_range must be a string" in errors
 
 
 def test_display_guide_is_read() -> None:

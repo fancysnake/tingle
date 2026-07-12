@@ -572,8 +572,8 @@ def test_metric_rows_carry_their_severity_emoji() -> None:
         async with app.run_test():
             titles = [c.title for c in app.query(Collapsible) if "metric" in c.classes]
 
-            assert any("🎉" in title for title in titles)
-            assert any("🦠" in title for title in titles)
+            assert any("🎉" in title for title in titles)  # the one measuring nothing
+            assert any("🚧" in title for title in titles)  # 3, against a guide of 100
 
     asyncio.run(scenario())
 
@@ -589,7 +589,7 @@ def test_group_header_carries_the_sum_of_its_metrics() -> None:
             (group,) = _groups(app)
 
             assert "78" in group.title  # 61 + 17
-            assert "🚧" in group.title  # against a summed guide of 200
+            assert "🚨" in group.title  # against their summed guide of 200
 
     asyncio.run(scenario())
 

@@ -105,14 +105,14 @@ def test_table_emoji_reflects_the_metric_guide() -> None:
     text = _rendered(
         report_table(
             _report(
-                _outcome("lenient", value=10, guide=100),  # a tenth of the guide
-                _outcome("strict", value=10, guide=4),  # past twice it
+                _outcome("lenient", value=10, guide=100),
+                _outcome("strict", value=10, guide=4),  # well past its guide
             )
         )
     )
 
-    assert "🦠 10" in text
-    assert "💀 10" in text
+    assert "🚨 10" in text
+    assert "🔥 10" in text
 
 
 def test_table_group_row_sums_the_group() -> None:
@@ -125,8 +125,8 @@ def test_table_group_row_sums_the_group() -> None:
         )
     )
 
-    # 78 against a summed guide of 200 is more than a quarter of it, under half
-    assert "🚧 78" in text
+    # 78 against a summed guide of 200: most of the way up, on the log ladder
+    assert "🚨 78" in text
 
 
 def test_table_stays_unchanged_when_nothing_is_grouped() -> None:
@@ -146,10 +146,12 @@ def test_an_errored_metric_shows_no_emoji() -> None:
 
 def test_a_group_holding_an_error_still_sums_the_rest() -> None:
     text = _rendered(
-        report_table(_report(_outcome("a", "g", value=3), _failed("boom", "g")))
+        report_table(
+            _report(_outcome("a", "g", value=3, guide=10), _failed("boom", "g"))
+        )
     )
 
-    assert "🦠 3" in text
+    assert "🚨 3" in text  # judged against 10, the failed metric adding no guide
 
 
 def test_listing_heading_carries_the_group_sum() -> None:
@@ -162,7 +164,7 @@ def test_listing_heading_carries_the_group_sum() -> None:
         )
     )
 
-    assert "## typing  🚧 78" in text
+    assert "## typing  🚨 78" in text
 
 
 def test_listing_prints_a_metric_description() -> None:

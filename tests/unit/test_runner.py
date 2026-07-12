@@ -6,14 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from tingle.mills.runner import run
-from tingle.pacts.config import (
-    DEFAULT_GUIDE,
-    Config,
-    ConfigError,
-    DisplaySpec,
-    MetricSpec,
-    RangeSpec,
-)
+from tingle.pacts.config import Config, ConfigError, DisplaySpec, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 if TYPE_CHECKING:
@@ -171,12 +164,42 @@ def test_outcome_carries_the_metric_guide_over_the_global_one() -> None:
     assert report.outcomes[0].guide == 5
 
 
-def test_outcome_falls_back_to_the_default_guide() -> None:
+def test_outcome_derives_its_guide_from_the_size_of_the_codebase() -> None:
+    """With nothing pinned, debt is judged as a density: one unit per 100 lines."""
+    project = FakeProject({"a.py": "x\n" * 250, "b.py": "y\n" * 50, "notes.md": ""})
     config = _config(MetricSpec(name="files", type="file_count"))
 
-    report = run(config, PROJECT, metric_types=METRIC_TYPES)
+    report = run(config, project, metric_types=METRIC_TYPES)
 
-    assert report.outcomes[0].guide == DEFAULT_GUIDE
+    # 300 lines of Python (notes.md is outside the default range) -> guide 3
+    assert report.outcomes[0].guide == 3
+
+
+def test_the_loc_range_overrides_which_files_are_counted() -> None:
+    """400 lines in a.py, 100 in b.py: the default range would count all 500."""
+    project = FakeProject({"a.py": "x\n" * 400, "b.py": "y\n" * 100})
+    just_a = RangeSpec(name="just-a", include=("a.py",))
+    config = Config(
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        ranges={"python": PYTHON_RANGE, "just-a": just_a},
+        metrics=(MetricSpec(name="files", type="file_count"),),
+        default_range=PYTHON_RANGE,
+        display=DisplaySpec(loc_range="just-a"),
+    )
+
+    report = run(config, project, metric_types=METRIC_TYPES)
+
+    assert report.outcomes[0].guide == 4  # 400 lines, not 500
+
+
+def test_an_empty_project_still_yields_a_guide() -> None:
+    """Nothing to divide by is not an option: the guide is floored at 1."""
+    config = _config(MetricSpec(name="files", type="file_count"))
+
+    report = run(config, FakeProject({"a.py": ""}), metric_types=METRIC_TYPES)
+
+    assert report.outcomes[0].guide == 1
 
 
 def test_a_failed_metric_still_carries_its_guide() -> None:

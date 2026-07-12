@@ -12,7 +12,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-#: Value a metric is judged against when neither it nor [display] sets a guide.
+#: Stand-in guide for an outcome built without one. The real fallback, when
+#: neither a metric nor [display] pins a guide, is derived from the size of
+#: the codebase -- which only a run can know, so it cannot be a default here.
 DEFAULT_GUIDE = 100
 
 
@@ -44,11 +46,17 @@ class DisplaySpec:
     """The `[display]` settings: how measured values are presented.
 
     `guide` is the value a metric is judged against — the point at which
-    its debt is considered to have reached full size. Metrics override it
-    individually; this is the fallback for those that do not.
+    its debt is considered to have reached full size. Left unset, it is
+    derived from the size of the codebase, so debt is read as a density
+    rather than an absolute count. Setting it pins one guide for every
+    metric that does not name its own, whatever the codebase does.
+
+    `loc_range` names the range those lines are counted over; unset, the
+    default range stands for "the project".
     """
 
-    guide: int = DEFAULT_GUIDE
+    guide: int | None = None
+    loc_range: str | None = None
 
 
 @dataclass(frozen=True)
