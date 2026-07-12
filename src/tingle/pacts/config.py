@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
@@ -45,6 +46,30 @@ class MetricSpec:
     group: str | None = None
 
 
+class CheckPolicy(StrEnum):
+    """When `tingle check` calls a branch a regression.
+
+    SUM weighs the branch as a whole: debt paid off in one metric offsets
+    debt taken on in another. ANY forbids the trade — no single metric may
+    grow, whatever else improved.
+    """
+
+    SUM = "sum"
+    ANY = "any"
+
+
+@dataclass(frozen=True)
+class CheckSpec:
+    """The `[check]` settings: how to judge a branch, and what to overlook.
+
+    `ignore` names metrics that neither fail the check nor appear in its
+    output — the ones expected to grow, like lines of code.
+    """
+
+    policy: CheckPolicy = CheckPolicy.SUM
+    ignore: tuple[str, ...] = ()
+
+
 @dataclass(frozen=True)
 class Config:
     """Validated tingle configuration."""
@@ -55,6 +80,7 @@ class Config:
     metrics: tuple[MetricSpec, ...]
     default_range: RangeSpec
     diff_base: str | None = None
+    check: CheckSpec = field(default_factory=CheckSpec)
 
 
 @dataclass(frozen=True)

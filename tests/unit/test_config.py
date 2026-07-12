@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from tingle.mills.config import validate
-from tingle.pacts.config import Config, ConfigError
+from tingle.pacts.config import CheckPolicy, CheckSpec, Config, ConfigError
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, ParamSchema
 from tingle.specs.config import IMPLICIT_RANGE_INCLUDE, IMPLICIT_RANGE_NAME
 
@@ -289,3 +289,60 @@ def test_diff_must_be_table() -> None:
     errors = _errors_of({"diff": "main"})
 
     assert "[diff] must be a table" in errors
+
+
+def _metric(name: str) -> dict[str, Any]:
+    return {"name": name, "type": "file_count"}
+
+
+def test_check_defaults_to_sum_and_no_ignores() -> None:
+    config = _validate({"metrics": []})
+
+    assert config.check == CheckSpec(policy=CheckPolicy.SUM, ignore=())
+
+
+def test_check_policy_and_ignore_are_read() -> None:
+    config = _validate(
+        {
+            "check": {"policy": "any", "ignore": ["loc"]},
+            "metrics": [_metric("loc"), _metric("noqa")],
+        }
+    )
+
+    assert config.check == CheckSpec(policy=CheckPolicy.ANY, ignore=("loc",))
+
+
+def test_check_policy_must_be_known() -> None:
+    errors = _errors_of({"check": {"policy": "every"}, "metrics": []})
+
+    assert "[check]: policy must be one of: sum, any" in errors
+
+
+def test_check_policy_must_be_string() -> None:
+    errors = _errors_of({"check": {"policy": 1}, "metrics": []})
+
+    assert "[check]: policy must be one of: sum, any" in errors
+
+
+def test_check_ignore_must_name_a_configured_metric() -> None:
+    errors = _errors_of({"check": {"ignore": ["nope"]}, "metrics": [_metric("loc")]})
+
+    assert '[check]: unknown metric "nope" in ignore' in errors
+
+
+def test_check_ignore_must_be_string_list() -> None:
+    errors = _errors_of({"check": {"ignore": "loc"}, "metrics": []})
+
+    assert "[check]: ignore must be a list of strings" in errors
+
+
+def test_check_unknown_key() -> None:
+    errors = _errors_of({"check": {"fail_on": "any"}, "metrics": []})
+
+    assert '[check]: unknown key "fail_on"' in errors
+
+
+def test_check_must_be_table() -> None:
+    errors = _errors_of({"check": "any"})
+
+    assert "[check] must be a table" in errors
