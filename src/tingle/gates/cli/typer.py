@@ -14,10 +14,17 @@ from rich.table import Table
 from tingle import __version__
 from tingle.gates.cli import render
 from tingle.mills.metrics.registry import METRIC_TYPES
-from tingle.pacts.config import Config, ConfigError, ConfigNotFoundError, MetricDraft
+from tingle.pacts.config import (
+    CheckPolicy,
+    Config,
+    ConfigError,
+    ConfigNotFoundError,
+    MetricDraft,
+)
 from tingle.pacts.diff import DiffReport, DiffSourceError
 
 if TYPE_CHECKING:
+    from tingle.pacts.check import CheckVerdict
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ServicesProtocol
 
@@ -40,6 +47,14 @@ BaseOption = Annotated[
         "--base",
         help="Base branch for --diff (default: [diff] base in the config,"
         " then 'main'). Implies --diff.",
+    ),
+]
+PolicyOption = Annotated[
+    str | None,
+    typer.Option(
+        "--policy",
+        help="Override [check] policy: 'sum' fails when the metrics grow in"
+        " total, 'any' fails when a single metric grows.",
     ),
 ]
 
@@ -81,6 +96,7 @@ class CliGate:
         self.app = typer.Typer(add_completion=False)
         self.app.callback(invoke_without_command=True)(self._root)
         self.app.command("stat")(self.stat)
+        self.app.command("check")(self.check)
         self.app.command("report")(self.report)
         self.app.command("list")(self.list_metrics)
         self.app.command("add")(self.add)
@@ -129,6 +145,30 @@ class CliGate:
             diff=diff or base is not None, base=base, config=config, metrics=metric
         )
         self._print_stat(request, json_out=json_out)
+
+    def check(
+        self,
+        *,
+        policy: PolicyOption = None,
+        base: BaseOption = None,
+        config: ConfigOption = None,
+        metric: MetricOption = None,
+    ) -> None:
+        """Fail (exit 1) if the branch worsened the metrics. For CI.
+
+        Prints only what the branch added, under the metrics that grew.
+        """
+        request = _MetricRequest(diff=True, base=base, config=config, metrics=metric)
+        loaded = self._load(config)
+        report, verdict = self._collect_check(
+            loaded, request, self._parse_policy(policy)
+        )
+        for line in render.check_listing(verdict):
+            self._stdout.print(line)
+        self._finish_diff(report)
+        if verdict.failed:
+            typer.echo(render.check_reason(verdict), err=True)
+            raise typer.Exit(1)
 
     def report(
         self,
@@ -288,13 +328,36 @@ class CliGate:
         config = self._load(request.config)
         try:
             return self._services.metrics.diff(
-                config, request.base or config.diff_base or "main", only=request.metrics
+                config, self._base_of(config, request), only=request.metrics
             )
         except ConfigError as exc:
             self._config_failure(exc)
         except DiffSourceError as exc:
-            typer.echo(f"diff error: {exc}", err=True)
-            raise typer.Exit(2) from None
+            self._diff_failure(exc)
+
+    def _collect_check(
+        self, config: Config, request: _MetricRequest, policy: CheckPolicy | None
+    ) -> tuple[DiffReport, CheckVerdict]:
+        try:
+            return self._services.metrics.check(
+                config,
+                self._base_of(config, request),
+                only=request.metrics,
+                policy=policy,
+            )
+        except ConfigError as exc:
+            self._config_failure(exc)
+        except DiffSourceError as exc:
+            self._diff_failure(exc)
+
+    @staticmethod
+    def _base_of(config: Config, request: _MetricRequest) -> str:
+        return request.base or config.diff_base or "main"
+
+    @staticmethod
+    def _diff_failure(exc: DiffSourceError) -> NoReturn:
+        typer.echo(f"diff error: {exc}", err=True)
+        raise typer.Exit(2) from None
 
     def _load(self, config_path: Path | None) -> Config:
         try:
@@ -327,6 +390,22 @@ class CliGate:
                     typer.echo(f"warning: {outcome.spec.name}: {warning}", err=True)
         if any(outcome.error for outcome in report.outcomes):
             raise typer.Exit(1)
+
+    @staticmethod
+    def _parse_policy(policy: str | None) -> CheckPolicy | None:
+        """Turn --policy into the enum; None leaves the config's policy alone."""
+        if policy is None:
+            return None
+        by_value = {member.value: member for member in CheckPolicy}
+        if policy not in by_value:
+            allowed = ", ".join(by_value)
+            typer.echo(
+                f'usage error: unknown --policy "{policy}"'
+                f" (expected one of: {allowed})",
+                err=True,
+            )
+            raise typer.Exit(2)
+        return by_value[policy]
 
     @staticmethod
     def _parse_params(pairs: list[str]) -> dict[str, str]:
