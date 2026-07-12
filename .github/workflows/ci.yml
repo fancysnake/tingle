@@ -27,3 +27,15 @@ jobs:
       - uses: jdx/mise-action@v2
       - run: mise exec -- poetry install
       - run: mise run lint:py
+
+  # advisory: reports the branch's debt without blocking the merge
+  metrics:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tingle check needs history to find the merge-base
+      - uses: jdx/mise-action@v2
+      - run: mise exec -- poetry install
+      - run: mise exec -- poetry run tingle check
