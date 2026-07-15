@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Group headers show the sum of their metrics, ranked against the summed
   guides. In the TUI a group summing to zero starts folded, unless it holds
   an errored metric.
+- The summary tables now read as an outline — a group name heads its indented
+  metrics, blocks ruled apart — replacing the `Group` column, where a
+  totalled heading row could read as a nameless metric. Every value's emoji
+  is aligned into one column, the numbers space-padded beneath it.
 - `ignore_lines` on `regex_count` and `symbol_uses`: regexes matched against
   the line a hit sits on, excusing hits that are not debt — `ANY` in an
   assertion counts, `"form": ANY` does not.

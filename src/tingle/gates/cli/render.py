@@ -71,31 +71,48 @@ def _description_line(outcome: _Outcome) -> Text | None:
 
 
 def report_table(report: RunReport) -> Table:
-    """Compact summary table of a full run."""
+    """Compact summary table of a full run.
+
+    Grouped, it reads as an outline: each group name heads its own metric
+    rows, indented under it, with the group's summed value on the heading
+    line. No separate Group column, so a heading is never mistaken for a
+    nameless metric that somehow carries a value.
+    """
     sections = group_sections(report.outcomes)
     grouped = any(name is not None for name, _ in sections)
-    table = Table(title=str(report.root))
+    numbers = [
+        outcome.result.value
+        for _name, outcomes in sections
+        for outcome in outcomes
+        if outcome.result is not None
+    ]
     if grouped:
-        table.add_column("Group")
+        numbers += [group_summary(outcomes).value for _name, outcomes in sections]
+    width = _value_width(numbers)
+    table = Table(title=str(report.root))
     table.add_column("Metric")
     table.add_column("Type")
     table.add_column("Ranges")
     table.add_column("Value", justify="right")
-    for name, outcomes in sections:
+    for index, (name, outcomes) in enumerate(sections):
+        if index > 0:
+            table.add_section()
         if grouped:
+            summary = group_summary(outcomes)
             table.add_row(
-                f"[b]{_group_label(name)}[/b]", "", "", "", _group_value(outcomes)
+                f"[b]{_group_label(name)}[/b]",
+                "",
+                "",
+                f"[b]{_valued(summary.value, summary.guide, width)}[/b]",
             )
         for outcome in outcomes:
             value = (
                 "[red]ERROR[/]"
                 if outcome.result is None
-                else _valued(outcome.result.value, outcome.guide)
+                else _valued(outcome.result.value, outcome.guide, width)
             )
-            group = ("",) if grouped else ()
             table.add_row(
-                *group,
-                outcome.spec.name,
+                _metric_label(outcome.spec.name, grouped=grouped),
                 outcome.spec.type,
                 ", ".join(outcome.range_names),
                 value,
@@ -103,35 +120,61 @@ def report_table(report: RunReport) -> Table:
     return table
 
 
-def _valued(value: int, guide: int) -> str:
-    """Render a measured number, led by how bad it is against its guide."""
-    return f"{severity_emoji(value, guide)} {value}"
+def _valued(value: int, guide: int, width: int = 0) -> str:
+    """Render a measured number, led by how bad it is against its guide.
+
+    `width` right-pads the number with spaces so that, down a column, every
+    emoji lands in the same place and the digits line up under each other.
+    """
+    return f"{severity_emoji(value, guide)} {value:>{width}}"
+
+
+def _metric_label(name: str, *, grouped: bool) -> str:
+    """Indent a metric name under its group heading, when there are groups."""
+    return f"  {name}" if grouped else name
+
+
+def _value_width(numbers: Sequence[int]) -> int:
+    """Widest rendered number, so the emoji column can be aligned to it.
+
+    Only the numbers that will actually show are passed in; errored metrics
+    render no number and so are left out.
+    """
+    return max((len(str(number)) for number in numbers), default=1)
 
 
 def _group_label(name: str | None) -> str:
     return name if name is not None else "(ungrouped)"
 
 
-def _group_value(outcomes: Sequence[_Outcome]) -> str:
-    """Render the group's summed value, judged against its summed guides."""
-    summary = group_summary(outcomes)
-    return f"[b]{_valued(summary.value, summary.guide)}[/b]"
-
-
 def diff_table(report: DiffReport) -> Table:
-    """Compact summary table of a branch diff."""
+    """Compact summary table of a branch diff.
+
+    Grouped, it reads as an outline like `report_table`: the group name heads
+    its indented metric rows, carrying the group's net beside its standing
+    total. No separate Group column.
+    """
     sections = group_sections(report.outcomes)
     grouped = any(name is not None for name, _ in sections)
-    table = Table(title=f"{report.root} vs {report.base_ref}")
+    numbers = [
+        outcome.total.value
+        for _name, outcomes in sections
+        for outcome in outcomes
+        if outcome.total is not None
+    ]
     if grouped:
-        table.add_column("Group")
+        numbers += [group_summary(outcomes).value for _name, outcomes in sections]
+    width = _value_width(numbers)
+    table = Table(title=f"{report.root} vs {report.base_ref}")
     table.add_column("Metric")
     table.add_column("Type")
     table.add_column("Added", justify="right")
     table.add_column("Removed", justify="right")
     table.add_column("Net", justify="right")
     table.add_column("Total", justify="right")
-    for name, outcomes in sections:
+    for index, (name, outcomes) in enumerate(sections):
+        if index > 0:
+            table.add_section()
         if grouped:
             summary = group_summary(outcomes)
             table.add_row(
@@ -139,20 +182,20 @@ def diff_table(report: DiffReport) -> Table:
                 "",
                 "",
                 "",
-                "",
                 _net_cell(summary.net or 0),
                 # the standing debt, not the net: a net of zero is not no debt
-                f"[b]{_valued(summary.value, summary.guide)}[/b]",
+                f"[b]{_valued(summary.value, summary.guide, width)}[/b]",
             )
         for outcome in outcomes:
-            group = ("",) if grouped else ()
             table.add_row(
-                *group, outcome.spec.name, outcome.spec.type, *_diff_cells(outcome)
+                _metric_label(outcome.spec.name, grouped=grouped),
+                outcome.spec.type,
+                *_diff_cells(outcome, width),
             )
     return table
 
 
-def _diff_cells(outcome: DiffOutcome) -> tuple[str, str, str, str]:
+def _diff_cells(outcome: DiffOutcome, width: int) -> tuple[str, str, str, str]:
     """Render the added/removed/net/total cells of one diff row."""
     if outcome.result is None:
         return ("", "", "[red]ERROR[/]", "")
@@ -160,7 +203,7 @@ def _diff_cells(outcome: DiffOutcome) -> tuple[str, str, str, str]:
         _added_cell(outcome.result.added),
         _removed_cell(outcome.result.removed),
         _net_cell(outcome.result.net),
-        _valued(outcome.total.value, outcome.guide) if outcome.total else "",
+        _valued(outcome.total.value, outcome.guide, width) if outcome.total else "",
     )
 
 

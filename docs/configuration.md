@@ -64,7 +64,8 @@ values, occurrences, and warnings are unchanged — but every human view
 collects grouped metrics together:
 
 - `tingle report` prints a `## <name>` heading per group.
-- The summary tables gain a `Group` column.
+- The summary tables read as an outline: each group name heads its own rows,
+  its metrics indented beneath it, one group's block ruled off from the next.
 - The interactive TUI nests each group as its own foldable section.
 
 Metrics keep config order within a group, groups appear in first-mention

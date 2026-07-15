@@ -129,6 +129,19 @@ def test_table_group_row_sums_the_group() -> None:
     assert "🚨 78" in text
 
 
+def test_table_aligns_the_emoji_by_space_padding_the_number() -> None:
+    """A one-digit value beside a two-digit one keeps every emoji in one column."""
+    text = _rendered(
+        report_table(
+            _report(_outcome("a", value=2, guide=100), _outcome("b", value=23))
+        )
+    )
+
+    # the shorter number is padded, so both emoji sit at the same offset
+    assert "🦠  2" in text  # 2 padded to the width of 23
+    assert "🚨 23" in text
+
+
 def test_table_stays_unchanged_when_nothing_is_grouped() -> None:
     """A groupless config must not sprout group rows."""
     text = _rendered(report_table(_report(_outcome("a"), _outcome("b"))))
