@@ -14,9 +14,9 @@ its stats) are visible at rest.
 
 | Key | Action |
 |---|---|
-| `↑` / `↓` (`k` / `j`) | move between headers |
+| `↑` / `↓` (`k` / `j`) | move between headers, and the occurrence lines of an unfolded metric |
 | `→` / `←` (`l` / `h`) | unfold / fold the focused header |
-| ++space++ / ++enter++ / click | toggle the focused header |
+| ++space++ / ++enter++ / click | toggle the focused header — or, on an occurrence line, open it |
 | `f` | fold or unfold every group at once, leaving file results as they are |
 | `p` | command palette |
 | `q` | quit |
@@ -24,6 +24,11 @@ its stats) are visible at rest.
 Each group and metric folds independently. Unfolding a metric shows its
 occurrences in place. With no groups configured it is a flat accordion of
 metrics, and `f` folds those instead.
+
+Arrow down onto an occurrence and press ++space++ or ++enter++ to **open it
+in VS Code** — the file at its line, in the window you are already in. This
+works from VS Code's integrated terminal, which puts the `code` command on
+`PATH`; run elsewhere, the key just says there is no editor to open into.
 
 `tingle --diff [--base REF]` opens the [branch-impact](diff.md) view.
 

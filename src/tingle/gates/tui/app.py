@@ -11,9 +11,9 @@ from textual.widgets import Collapsible, Footer, Header, Static
 from textual.widgets.collapsible import CollapsibleTitle
 
 from tingle.gates.cli.render import (
-    diff_occurrence_lines,
+    diff_occurrence_rows,
     group_sections,
-    occurrence_lines,
+    occurrence_rows,
 )
 from tingle.mills.display import group_summary, severity_emoji
 from tingle.pacts.diff import DiffOutcome
@@ -21,9 +21,12 @@ from tingle.pacts.diff import DiffOutcome
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from rich.text import Text
     from textual.app import ComposeResult
 
     from tingle.pacts.diff import DiffReport
+    from tingle.pacts.editor import EditorOpener
+    from tingle.pacts.metrics import Occurrence
     from tingle.pacts.report import GroupSummary, MetricOutcome, RunReport
 
 
@@ -50,13 +53,38 @@ class NavCollapsible(Collapsible):
     ]
 
 
+class OccurrenceLine(Static):
+    """One occurrence, focusable so Space/Enter can open it in the editor.
+
+    Sits inside a metric's `NavCollapsible`, so the arrow keys still bubble
+    up to the accordion navigation; only the open keys are handled here.
+    """
+
+    can_focus = True
+    BINDINGS: ClassVar = [
+        Binding("space", "app.open_occurrence", "Open"),
+        Binding("enter", "app.open_occurrence", "Open", show=False),
+    ]
+
+    def __init__(self, renderable: Text, *, path: str, line: int | None) -> None:
+        """Carry the hit's own path and line, not just its rendered text."""
+        super().__init__(renderable)
+        self.occ_path = path
+        self.occ_line = line
+
+
 class MetricsApp(App[None]):
     """Three-level accordion: group -> metric -> file results.
 
     Groups and their metric rows are visible at rest; each group and
     metric folds and unfolds independently (arrows or Enter), a metric
-    revealing its occurrences.
+    revealing its occurrences. On a revealed occurrence, Space or Enter
+    opens it in the editor.
     """
+
+    # up/down step through group and metric headers and, once a metric is
+    # unfolded, its occurrence lines -- so you can arrow onto a hit and open it
+    _FOCUS = "CollapsibleTitle, OccurrenceLine"
 
     TITLE = "tingle"
     # ctrl+p (the default) is swallowed by the VS Code terminal; there is
@@ -64,6 +92,7 @@ class MetricsApp(App[None]):
     COMMAND_PALETTE_BINDING = "p"
     CSS = """
     Collapsible.group > CollapsibleTitle { text-style: bold; }
+    OccurrenceLine:focus { background: $accent; color: $text; }
     """
     # navigation lives on NavCollapsible, not here: an app-level arrow
     # binding would have to be priority to beat the scroll container, and
@@ -75,10 +104,13 @@ class MetricsApp(App[None]):
         Binding("q", "quit", "Quit"),
     ]
 
-    def __init__(self, report: RunReport | DiffReport) -> None:
+    def __init__(
+        self, report: RunReport | DiffReport, opener: EditorOpener | None = None
+    ) -> None:
         """Present an already-computed report; the TUI never runs metrics."""
         super().__init__()
         self._report = report
+        self._opener = opener
         self._name_width = _column_width(o.spec.name for o in self._outcomes)
         self._type_width = _column_width(o.spec.type for o in self._outcomes)
 
@@ -130,11 +162,20 @@ class MetricsApp(App[None]):
         self.screen.focus_next("CollapsibleTitle")
 
     def action_focus_metric(self, direction: int) -> None:
-        """Move focus to the next/previous header (group or metric)."""
+        """Move focus to the next/previous header or revealed occurrence."""
         if direction < 0:
-            self.screen.focus_previous("CollapsibleTitle")
+            self.screen.focus_previous(self._FOCUS)
         else:
-            self.screen.focus_next("CollapsibleTitle")
+            self.screen.focus_next(self._FOCUS)
+
+    def action_open_occurrence(self) -> None:
+        """Open the focused occurrence in the editor (Space/Enter on a line)."""
+        if not isinstance(focused := self.focused, OccurrenceLine):
+            return
+        if self._opener is None or not self._opener.available:
+            self.notify("No VS Code terminal to open in.", severity="warning")
+            return
+        self._opener.open(str(self._report.root / focused.occ_path), focused.occ_line)
 
     def action_unfold(self) -> None:
         """Unfold (right arrow) the focused group/metric header."""
@@ -142,9 +183,14 @@ class MetricsApp(App[None]):
             collapsible.collapsed = False
 
     def action_fold(self) -> None:
-        """Fold (left arrow) the focused group/metric header."""
+        """Fold (left arrow) the group/metric holding focus, landing on its header.
+
+        Folding from a revealed occurrence would hide the focused line and
+        drop focus with it, so focus is parked on the header that remains.
+        """
         if (collapsible := self._focused_collapsible()) is not None:
             collapsible.collapsed = True
+            collapsible.query_one(CollapsibleTitle).focus()
 
     def action_toggle_fold(self) -> None:
         """Toggle (space) the focused group/metric header."""
@@ -274,9 +320,16 @@ def _escape(text: str) -> str:
 def _detail_widgets(outcome: MetricOutcome | DiffOutcome) -> list[Static]:
     if outcome.result is None:
         return [Static("[dim](metric failed; see the summary above)[/dim]")]
-    lines = (
-        diff_occurrence_lines(outcome.result)
+    rows = (
+        diff_occurrence_rows(outcome.result)
         if isinstance(outcome, DiffOutcome)
-        else occurrence_lines(outcome.result)
+        else occurrence_rows(outcome.result)
     )
-    return [Static(line) for line in lines]
+    return [_occurrence_widget(text, occurrence) for text, occurrence in rows]
+
+
+def _occurrence_widget(text: Text, occurrence: Occurrence | None) -> Static:
+    """Return a focusable, openable line for a real hit; a plain one otherwise."""
+    if occurrence is None:
+        return Static(text)
+    return OccurrenceLine(text, path=occurrence.path, line=occurrence.line)

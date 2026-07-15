@@ -305,11 +305,11 @@ class CliGate:
 
         if request.diff:
             diff_report = self._collect_diff(request)
-            MetricsApp(diff_report).run()
+            MetricsApp(diff_report, self._services.editor).run()
             self._finish_diff(diff_report)
         else:
             run_report = self._collect_run(request)
-            MetricsApp(run_report).run()
+            MetricsApp(run_report, self._services.editor).run()
             self._finish_run(run_report)
 
     def _print_stat(self, request: _MetricRequest, *, json_out: bool) -> None:

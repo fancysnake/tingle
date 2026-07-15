@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from tingle.pacts.check import CheckVerdict
     from tingle.pacts.config import CheckPolicy, Config, MetricDraft
     from tingle.pacts.diff import DiffReport
+    from tingle.pacts.editor import EditorOpener
     from tingle.pacts.report import RunReport
 
 
@@ -72,3 +73,8 @@ class ServicesProtocol(Protocol):
     @abstractmethod
     def metrics(self) -> MetricsServiceProtocol:
         """Metric execution."""
+
+    @property
+    @abstractmethod
+    def editor(self) -> EditorOpener:
+        """Opening a located hit in the user's editor."""

@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `description` on any metric, shown in `tingle report` and the JSON.
   `tingle add --description` writes one.
 - `tingle check` prints a line when it passes, instead of exiting silently.
+- In the TUI, arrow onto an occurrence and press Space or Enter to open it in
+  VS Code — the file at its line, in the window you are already in. Works from
+  VS Code's integrated terminal; elsewhere the key says there is no editor.
 
 ### Fixed
 

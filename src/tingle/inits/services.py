@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import cached_property
 
 from tingle.links.config_file.toml import TomlConfigStore
+from tingle.links.editor import VsCodeCli
 from tingle.links.fs.local import LocalProjectFiles
 from tingle.links.git.cli import GitCli
 from tingle.mills.metrics.registry import METRIC_TYPES
@@ -27,3 +28,8 @@ class Services:
             diff_source=GitCli,
             metric_types=METRIC_TYPES,
         )
+
+    @cached_property
+    def editor(self) -> VsCodeCli:
+        """Opening a hit in a running VS Code window via its terminal CLI."""
+        return VsCodeCli()

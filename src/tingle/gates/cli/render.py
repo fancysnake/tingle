@@ -103,13 +103,13 @@ def report_table(report: RunReport) -> Table:
                 f"[b]{_group_label(name)}[/b]",
                 "",
                 "",
-                f"[b]{_valued(summary.value, summary.guide, width)}[/b]",
+                f"[b]{_valued(summary.value, summary.guide, width=width)}[/b]",
             )
         for outcome in outcomes:
             value = (
                 "[red]ERROR[/]"
                 if outcome.result is None
-                else _valued(outcome.result.value, outcome.guide, width)
+                else _valued(outcome.result.value, outcome.guide, width=width)
             )
             table.add_row(
                 _metric_label(outcome.spec.name, grouped=grouped),
@@ -120,7 +120,7 @@ def report_table(report: RunReport) -> Table:
     return table
 
 
-def _valued(value: int, guide: int, width: int = 0) -> str:
+def _valued(value: int, guide: int, *, width: int = 0) -> str:
     """Render a measured number, led by how bad it is against its guide.
 
     `width` right-pads the number with spaces so that, down a column, every
@@ -184,7 +184,7 @@ def diff_table(report: DiffReport) -> Table:
                 "",
                 _net_cell(summary.net or 0),
                 # the standing debt, not the net: a net of zero is not no debt
-                f"[b]{_valued(summary.value, summary.guide, width)}[/b]",
+                f"[b]{_valued(summary.value, summary.guide, width=width)}[/b]",
             )
         for outcome in outcomes:
             table.add_row(
@@ -203,7 +203,11 @@ def _diff_cells(outcome: DiffOutcome, width: int) -> tuple[str, str, str, str]:
         _added_cell(outcome.result.added),
         _removed_cell(outcome.result.removed),
         _net_cell(outcome.result.net),
-        _valued(outcome.total.value, outcome.guide, width) if outcome.total else "",
+        (
+            _valued(outcome.total.value, outcome.guide, width=width)
+            if outcome.total
+            else ""
+        ),
     )
 
 
@@ -238,26 +242,42 @@ def run_listing(report: RunReport) -> list[Text]:
     return lines
 
 
+def occurrence_rows(result: MetricResult) -> list[tuple[Text, Occurrence | None]]:
+    """Occurrence lines paired with the hit each renders (None for a placeholder).
+
+    The pairing lets a caller that wants to act on a line -- the TUI opening
+    it in an editor -- reach the hit's path and line without parsing the text.
+    """
+    if result.occurrences:
+        return [
+            (Text(f"  {occurrence}"), occurrence) for occurrence in result.occurrences
+        ]
+    return [(Text("  (no located occurrences)", style="dim"), None)]
+
+
 def occurrence_lines(result: MetricResult) -> list[Text]:
     """Indented occurrence lines of one metric result."""
-    if result.occurrences:
-        return [Text(f"  {occurrence}") for occurrence in result.occurrences]
-    return [Text("  (no located occurrences)", style="dim")]
+    return [text for text, _occurrence in occurrence_rows(result)]
+
+
+def diff_occurrence_rows(result: DiffResult) -> list[tuple[Text, Occurrence | None]]:
+    """Signed occurrence lines, each paired with its hit (None for a placeholder)."""
+    if not result.added_occurrences and not result.removed_occurrences:
+        return [(Text("  (no located changes)", style="dim"), None)]
+    rows: list[tuple[Text, Occurrence | None]] = [
+        (Text(f"  + {occurrence}", style="red"), occurrence)
+        for occurrence in result.added_occurrences
+    ]
+    rows += [
+        (Text(f"  - {occurrence}", style="green"), occurrence)
+        for occurrence in result.removed_occurrences
+    ]
+    return rows
 
 
 def diff_occurrence_lines(result: DiffResult) -> list[Text]:
     """Signed, colored occurrence lines of one diff result."""
-    if not result.added_occurrences and not result.removed_occurrences:
-        return [Text("  (no located changes)", style="dim")]
-    lines = [
-        Text(f"  + {occurrence}", style="red")
-        for occurrence in result.added_occurrences
-    ]
-    lines.extend(
-        Text(f"  - {occurrence}", style="green")
-        for occurrence in result.removed_occurrences
-    )
-    return lines
+    return [text for text, _occurrence in diff_occurrence_rows(result)]
 
 
 def diff_listing(report: DiffReport) -> list[Text]:

@@ -109,6 +109,8 @@ required-imports = ["from __future__ import annotations"]
 "src/tingle/gates/cli/typer.py" = ["FBT001", "FBT002", "PLR0913", "PLC0415"]
 # the adapter's whole job is invoking the git executable
 "src/tingle/links/git/cli.py" = ["S603", "S607"]
+# and this one runs the resolved VS Code `code` executable (no shell, no path search)
+"src/tingle/links/editor.py" = ["S603"]
 
 [tool.mypy]
 strict = true

@@ -9,7 +9,8 @@ from textual.command import CommandList, CommandPalette
 from textual.containers import VerticalScroll
 from textual.widgets import Collapsible, Input, Static
 
-from tingle.gates.tui.app import MetricsApp, NavCollapsible
+from tingle.gates.tui.app import MetricsApp, NavCollapsible, OccurrenceLine
+from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
@@ -161,7 +162,9 @@ def test_arrows_navigate_even_when_content_overflows() -> None:
             await pilot.pause()
             assert scroll.max_scroll_y > 0  # the view really is too tall
             await pilot.press("down")
-            assert _focused_metric_id(app) == "metric-1"
+            # down steps into the unfolded metric's own occurrences, not past them
+            assert isinstance(app.focused, OccurrenceLine)
+            assert _focused_metric_id(app) == "metric-0"
 
     asyncio.run(scenario())
 
@@ -188,6 +191,74 @@ def test_space_toggles_focused_header() -> None:
             assert first.collapsed is False
             await pilot.press("space")
             assert first.collapsed is True
+
+    asyncio.run(scenario())
+
+
+def _recording_opener(*, available: bool = True) -> tuple[VsCodeCli, list[list[str]]]:
+    """Build the real VS Code adapter with its `code` spawn captured, not run."""
+    calls: list[list[str]] = []
+    opener = VsCodeCli(
+        environ={"TERM_PROGRAM": "vscode"} if available else {},
+        which=lambda name: "/usr/bin/code" if name == "code" else None,
+        spawn=lambda args: calls.append(list(args)),
+    )
+    return opener, calls
+
+
+def test_space_on_an_occurrence_opens_it_at_its_line() -> None:
+    async def scenario() -> None:
+        opener, calls = _recording_opener()
+        app = MetricsApp(RUN_REPORT, opener)
+        async with app.run_test() as pilot:
+            await pilot.press("right")  # unfold metric-0
+            await pilot.press("down")  # onto its first occurrence
+            assert isinstance(app.focused, OccurrenceLine)
+            await pilot.press("space")
+            # the path is resolved under the report root, at the hit's line
+            assert calls == [["/usr/bin/code", "--goto", f"{Path('/proj/src/a.py')}:1"]]
+
+    asyncio.run(scenario())
+
+
+def test_a_diff_occurrence_opens_too() -> None:
+    async def scenario() -> None:
+        opener, calls = _recording_opener()
+        app = MetricsApp(DIFF_REPORT, opener)
+        async with app.run_test() as pilot:
+            await pilot.press("right")
+            await pilot.press("down")
+            await pilot.press("space")
+            assert calls == [["/usr/bin/code", "--goto", f"{Path('/proj/src/a.py')}:3"]]
+
+    asyncio.run(scenario())
+
+
+def test_space_does_not_open_when_no_editor_is_reachable() -> None:
+    async def scenario() -> None:
+        opener, calls = _recording_opener(available=False)
+        app = MetricsApp(RUN_REPORT, opener)
+        async with app.run_test() as pilot:
+            await pilot.press("right")
+            await pilot.press("down")
+            assert isinstance(app.focused, OccurrenceLine)
+            await pilot.press("space")
+            assert not calls  # nothing opened; a notice is shown instead
+
+    asyncio.run(scenario())
+
+
+def test_space_on_a_header_still_toggles_not_opens() -> None:
+    """The open keys live on occurrence lines, so a header keeps folding."""
+
+    async def scenario() -> None:
+        opener, calls = _recording_opener()
+        app = MetricsApp(RUN_REPORT, opener)
+        async with app.run_test() as pilot:
+            first = app.query_one("#metric-0", Collapsible)
+            await pilot.press("space")  # focused on the header, not an occurrence
+            assert first.collapsed is False
+            assert not calls
 
     asyncio.run(scenario())
 
@@ -537,11 +608,13 @@ def test_the_view_still_scrolls_when_the_content_overflows() -> None:
         app = MetricsApp(tall)
         async with app.run_test(size=(80, 6)) as pilot:
             scroll = app.query_one(VerticalScroll)
-            await pilot.press("right")  # unfold, pushing the next row off-screen
+            await pilot.press("right")  # unfold, pushing the next rows off-screen
             await pilot.pause()
             assert scroll.max_scroll_y > 0  # the view really is too tall
 
-            await pilot.press("down")  # focus the row below the fold
+            # step down through the occurrences until the cursor is below the fold
+            for _ in range(10):
+                await pilot.press("down")
             await pilot.pause()
 
             assert scroll.scroll_y > 0  # the view followed the cursor down

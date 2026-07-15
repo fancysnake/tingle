@@ -262,6 +262,31 @@ needs manual clicking).
 
 ---
 
+## Open an occurrence in VS Code (TUI)
+
+**Preconditions:** run bare `tingle` **from a VS Code integrated terminal** (so
+`code` is on PATH), with a file open in the window.
+
+- [ ] Unfold a metric that has located occurrences (→ on its header) → Expected: its
+  `path:line` occurrence lines appear.
+- [ ] Press ↓ from the metric header → Expected: focus moves **onto the first occurrence
+  line** (it highlights), not past the metric to the next one.
+- [ ] Keep pressing ↓ / ↑ → Expected: focus steps through every occurrence line and then
+  on to the next header; a folded metric's occurrences are skipped.
+- [ ] On a focused occurrence line, press ++space++ (or ++enter++) → Expected: VS Code
+  jumps the active editor to **that file at that line**.
+- [ ] Open an occurrence with no line (e.g. a `file_count` or list-entry hit) → Expected:
+  the file opens at the top; no crash.
+- [ ] Press ++space++ while a **group or metric header** is focused (not an occurrence) →
+  Expected: it still folds/unfolds — opening is only bound to occurrence lines.
+- [ ] Press ++left++ while focused on an occurrence → Expected: the metric folds and focus
+  lands back on its header (focus is not lost into the hidden line).
+- [ ] Run the same in a **non-VS-Code terminal** (plain shell, or `TERM_PROGRAM` unset),
+  focus an occurrence, press ++space++ → Expected: a footer notice like "No VS Code
+  terminal to open in"; nothing launches.
+- [ ] Diff view (`tingle --diff`): unfold a metric, arrow onto a `+`/`-` occurrence, press
+  ++space++ → Expected: it opens that file at that line too.
+
 ## Cross-cutting regressions
 
 - [ ] `tingle stat`/`report` with **no** groups configured → Expected: output shape
