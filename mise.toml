@@ -6,7 +6,7 @@ enter = "poetry install"
 
 [tools]
 pipx = "1.15.0"
-"pipx:poetry" = "2.3.2"
+"pipx:poetry" = "2.4.1"
 python = "3.14.6"
 
 [env]
