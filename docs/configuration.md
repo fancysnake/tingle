@@ -64,7 +64,8 @@ values, occurrences, and warnings are unchanged — but every human view
 collects grouped metrics together:
 
 - `tingle report` prints a `## <name>` heading per group.
-- The summary tables gain a `Group` column.
+- The summary tables read as an outline: each group name heads its own rows,
+  its metrics indented beneath it, one group's block ruled off from the next.
 - The interactive TUI nests each group as its own foldable section.
 
 Metrics keep config order within a group, groups appear in first-mention
@@ -76,6 +77,87 @@ Add a grouped metric from the CLI with `--group`:
 ```console
 $ tingle add regex_count '#\s*type:\s*ignore' --name type-ignores --group typing
 ```
+
+Every human view also shows what a group's metrics **add up to** — the sum
+of their values, judged against the sum of their [guides](#display). A group
+that measures nothing at all starts folded in the TUI, so the clean parts of
+a project keep out of the way. Its header still reports the total, so a
+folded group is quiet, not hidden — and a group holding a metric that
+*errored* never folds, since that is the one thing you most need to see.
+
+## `[display]`
+
+Every value is led by an emoji saying how bad it is, so a reader can rank a
+count without knowing what a good count would be. What it is ranked against
+is the **guide**: the point at which debt has reached full size.
+
+**You do not have to set one.** Left alone, the guide is derived from the
+size of your codebase — one unit of full-size debt per 100 lines — so debt is
+read as a *density*. Seventy `noqa` comments mean one thing in five thousand
+lines and another in five hundred thousand.
+
+```toml
+[display]
+loc_range = "python-src"   # count LOC here (default: the default range)
+# guide = 100              # pin one guide for every metric, ignoring size
+```
+
+The ratio is **logarithmic**: `log(value) / log(guide)`. Debt does not hurt
+linearly — the tenth `# type: ignore` costs more than the hundredth.
+
+| the ratio is | emoji |
+| ------------ | ----- |
+| zero         | 🎉    |
+| up to 0.25   | 🦠    |
+| up to 0.50   | 🚧    |
+| up to 1.00   | 🚨    |
+| up to 2.00   | 🔥    |
+| above 2.00   | 💀    |
+
+At `value == guide` the ratio is exactly 1.0, so the guide always sits at the
+top of 🚨: full-size debt, not yet past it.
+
+In a 94,000-line project the derived guide is 940, which puts 2 occurrences
+at 🦠, 24 at 🚧, 70 at 🚨, and 15,590 at 🔥.
+
+The same ladder ranks a group, against the sum of the guides it holds, and a
+branch's standing total in `tingle diff` — never its net, since a branch that
+adds one and removes one has moved nothing but still sits on the same debt.
+
+### When to set a guide by hand
+
+The derived guide reads debt as *markers per line*, which is wrong for a
+metric that does not count markers. A `line_count` over a legacy package is
+the clearest case: it measures lines, so judging it per-line is a category
+error.
+
+```toml
+[[metrics]]
+name = "legacy-loc"
+type = "line_count"
+range = "legacy-package"
+guide = 20000      # this is a line count, not a density
+```
+
+A metric's own `guide` beats everything. `[display] guide` beats the derived
+one for every metric that names no guide of its own. A guide must be a
+positive whole number.
+
+## Describing a metric
+
+Any metric may carry a `description`: prose saying what the number means and
+why it is worth paying down.
+
+```toml
+[[metrics]]
+name = "any-uses"
+type = "symbol_uses"
+symbol = "typing.Any"
+description = "Untyped escape hatches. Prefer a real type."
+```
+
+It prints under the metric in `tingle report`, and appears in the JSON. Add
+one from the CLI with `--description`.
 
 ## Counting ignored lint rules
 

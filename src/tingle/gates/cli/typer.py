@@ -173,6 +173,8 @@ class CliGate:
         if verdict.failed:
             typer.echo(render.check_reason(verdict), err=True)
             raise typer.Exit(1)
+        # say so: silence would be indistinguishable from a step that never ran
+        self._stdout.print(render.check_success(verdict, report.base_ref))
 
     def report(
         self,
@@ -258,6 +260,10 @@ class CliGate:
             str | None,
             typer.Option("--group", help="Group heading to show this metric under."),
         ] = None,
+        description: Annotated[
+            str | None,
+            typer.Option("--description", help="What this metric means, in prose."),
+        ] = None,
         param: Annotated[
             list[str] | None,
             typer.Option(
@@ -273,6 +279,7 @@ class CliGate:
             ranges=tuple(range_names or ()),
             params=self._parse_params(param or []),
             group=group,
+            description=description,
         )
         try:
             target, metric_name = self._services.config.add_metric(Path.cwd(), draft)
@@ -298,11 +305,11 @@ class CliGate:
 
         if request.diff:
             diff_report = self._collect_diff(request)
-            MetricsApp(diff_report).run()
+            MetricsApp(diff_report, self._services.editor).run()
             self._finish_diff(diff_report)
         else:
             run_report = self._collect_run(request)
-            MetricsApp(run_report).run()
+            MetricsApp(run_report, self._services.editor).run()
             self._finish_run(run_report)
 
     def _print_stat(self, request: _MetricRequest, *, json_out: bool) -> None:

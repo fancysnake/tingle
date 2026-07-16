@@ -1,3 +1,6 @@
+[display]
+loc_range = "python"
+
 [ranges.python]
 include = ["src/**/*.py", "tests/**/*.py"]
 default = true
@@ -13,50 +16,56 @@ name = "fmt-comment"
 type = "regex_count"
 group = "formatting"
 pattern = '#\s*fmt'
+description = "`# fmt` comments that switch off the formatter."
 
 [[metrics]]
 name = "taplo-comment"
 type = "regex_count"
 group = "formatting"
 pattern = '#\s*taplo:'
+description = "`# taplo:` comments that switch off TOML formatting."
 
 [[metrics]]
 name = "codespell-comment"
 type = "regex_count"
 group = "formatting"
 pattern = '#\s*codespell:ignore'
+description = "`# codespell:ignore` comments that skip the spellchecker."
 
 [[metrics]]
 name = "ruff-format-ignore"
 type = "toml_list_length"
 group = "formatting"
 key = "tool.ruff.format.ignore"
+description = "Files excluded from ruff formatting."
 
 [[metrics]]
 name = "noqa-comment"
 type = "regex_count"
 group = "linting"
 pattern = '#\s*noqa:'
+description = "`# noqa:` comments that silence a ruff rule on one line."
 
 [[metrics]]
 name = "ruff-ignores"
 type = "toml_list_length"
 group = "linting"
 key = "tool.ruff.lint.ignore"
-
+description = "Ruff lint rules disabled project-wide."
 
 [[metrics]]
 name = "ruff-per-file-ignores"
 type = "toml_list_length"
 group = "linting"
 key = "tool.ruff.lint.per-file-ignores"
-
+description = "Ruff lint rules disabled for specific files."
 
 [[metrics]]
 name = "pylint-comment"
 type = "regex_count"
 group = "linting"
 pattern = '#\s*pylint:'
+description = "`# pylint:` comments that silence a check inline."
 
 [[metrics]]
 name = "pylint-disables"
@@ -65,6 +74,7 @@ group = "linting"
 file = ".pylintrc"
 section = "MESSAGES CONTROL"
 option = "disable"
+description = "Pylint checks disabled project-wide."
 
 # typing
 
@@ -73,6 +83,7 @@ name = "type-ignores"
 type = "regex_count"
 group = "typing"
 pattern = '#\s*type:\s*ignore'
+description = "`# type: ignore` comments that silence the type checker."
 
 [[metrics]]
 name = "mypy-overrides"
@@ -80,3 +91,18 @@ type = "toml_table_array"
 group = "typing"
 key = "tool.mypy.overrides"
 label = "module"
+description = "Modules given relaxed mypy strictness."
+
+[[metrics]]
+name = "long-files"
+type = "file_count"
+group = "linting"
+over_lines = 1000
+description = "Files over 1000 lines."
+
+[[metrics]]
+name = "any-uses"
+type = "symbol_uses"
+symbol = "ANY"
+ignore_lines = ['CheckPolicy.ANY']
+description = "`ANY` placeholders, excluding the CheckPolicy.ANY enum."

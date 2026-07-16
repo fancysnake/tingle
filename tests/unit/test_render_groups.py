@@ -61,12 +61,18 @@ def test_listing_without_groups_has_no_headings() -> None:
     assert "##" not in text
 
 
-def test_report_table_group_column_only_when_grouped() -> None:
+def test_report_table_has_no_group_column_and_heads_groups_inline() -> None:
+    """The outline drops the Group column: a group name heads its own row."""
     grouped = report_table(_report(_outcome("a", "typing"), _outcome("b")))
     plain = report_table(_report(_outcome("a"), _outcome("b")))
 
-    assert next(column.header for column in grouped.columns) == "Group"
+    assert "Group" not in [column.header for column in grouped.columns]
     assert "Group" not in [column.header for column in plain.columns]
+
+    metric_cells = list(grouped.columns[0].cells)
+    assert "[b]typing[/b]" in metric_cells  # the group heads its own row...
+    assert "  a" in metric_cells  # ...with its metric indented beneath it
+    assert "a" in list(plain.columns[0].cells)  # ungrouped: no indent
 
 
 def test_json_carries_group_and_null_when_unset() -> None:

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from tingle.mills.display import effective_guide
+from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
@@ -28,38 +30,44 @@ def run(
             raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
     walked = tuple(project.walk())
-    outcomes: list[MetricOutcome] = []
-    for spec in config.metrics:
-        if only is not None and spec.name not in only:
-            continue
+    loc = ProjectLoc(config, project=project, walked=walked)
+    outcomes = tuple(
+        _outcome(spec, config, project=project, metric_types=metric_types, loc=loc)
+        for spec in config.metrics
+        if only is None or spec.name in only
+    )
+    return RunReport(root=config.root, source=config.source, outcomes=outcomes)
 
-        range_specs, range_names = ranges_for(spec, config)
-        files = resolve(walked, range_specs)
-        context = MetricContext(
-            files=files, read=project.read, exists=project.exists, params=spec.params
+
+def _outcome(
+    spec: MetricSpec,
+    config: Config,
+    *,
+    project: ProjectFiles,
+    metric_types: Mapping[str, MetricType],
+    loc: ProjectLoc,
+) -> MetricOutcome:
+    """Measure one metric, turning a failure into an errored outcome."""
+    range_specs, range_names = ranges_for(spec, config)
+    files = resolve(loc.walked, range_specs)
+    guide = effective_guide(spec, config.display, loc=loc.lines)
+    context = MetricContext(
+        files=files, read=project.read, exists=project.exists, params=spec.params
+    )
+    try:
+        result = metric_types[spec.type].func(context)
+    # metric isolation: one failure must not stop the run
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        return MetricOutcome(
+            spec=spec,
+            range_names=range_names,
+            error=f"{type(exc).__name__}: {exc}",
+            guide=guide,
         )
-        try:
-            result = metric_types[spec.type].func(context)
-        # metric isolation: one failure must not stop the run
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            outcomes.append(
-                MetricOutcome(
-                    spec=spec,
-                    range_names=range_names,
-                    error=f"{type(exc).__name__}: {exc}",
-                )
-            )
-            continue
 
-        if not files and spec.ranges:
-            result = replace(
-                result, warnings=(*result.warnings, "ranges matched no files")
-            )
-        outcomes.append(
-            MetricOutcome(spec=spec, range_names=range_names, result=result)
-        )
-
-    return RunReport(root=config.root, source=config.source, outcomes=tuple(outcomes))
+    if not files and spec.ranges:
+        result = replace(result, warnings=(*result.warnings, "ranges matched no files"))
+    return MetricOutcome(spec=spec, range_names=range_names, result=result, guide=guide)
 
 
 def ranges_for(

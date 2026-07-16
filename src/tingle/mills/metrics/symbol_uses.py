@@ -8,17 +8,21 @@ An occurrence is attributed to the line where the reference starts.
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from tingle.mills.metrics.assemble import (
     FileFindings,
     accumulate_diff,
-    located_result,
-    readable_files,
+    compile_ignores,
+    drop_ignored,
+    located_metric,
+    validate_ignores,
 )
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
+    import re
     from collections.abc import Callable, Mapping
     from collections.abc import Set as AbstractSet
     from pathlib import PurePath
@@ -29,43 +33,49 @@ if TYPE_CHECKING:
 def symbol_uses(ctx: MetricContext) -> MetricResult:
     """Count references to the `symbol` param across the Python files."""
     parts = tuple(ctx.params["symbol"].split("."))
-    details: dict[str, int] = {}
-    warnings: list[str] = []
-    occurrences: list[Occurrence] = []
 
-    for path, text in readable_files(ctx, warnings, suffix=".py"):
+    def find(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
         try:
             tree = ast.parse(text)
         except SyntaxError as exc:
-            warnings.append(f"{path}: skipped (syntax error: {exc.msg})")
-            continue
-
+            return [], [f"{path}: skipped (syntax error: {exc.msg})"]
         lines, star_fallback = _occurrence_lines(tree, parts)
-        if star_fallback:
-            warnings.append(f"{path}: star import: falling back to bare-name counting")
-        if lines:
-            details[str(path)] = len(lines)
-            occurrences.extend(
-                Occurrence(path=str(path), line=line) for line in sorted(lines)
-            )
+        warnings = (
+            [f"{path}: star import: falling back to bare-name counting"]
+            if star_fallback
+            else []
+        )
+        found = [Occurrence(path=str(path), line=line) for line in sorted(lines)]
+        return found, warnings
 
-    return located_result(occurrences, details=details, warnings=warnings)
+    return located_metric(ctx, find=find, suffix=".py")
+
+
+@dataclass(frozen=True)
+class _Query:
+    """What the metric is looking for: the symbol, and what to excuse."""
+
+    parts: tuple[str, ...]
+    ignores: tuple[re.Pattern[str], ...]
 
 
 def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
     """Count references on lines the branch added vs lines it removed."""
-    parts = tuple(ctx.params["symbol"].split("."))
+    query = _Query(
+        parts=tuple(ctx.params["symbol"].split(".")),
+        ignores=compile_ignores(ctx.params),
+    )
 
     def per_file(file: FileDiff) -> FileFindings:
         if file.path.suffix != ".py":
             return [], [], []
         added, added_warnings = _side_occurrences(
-            ctx.read, file.path, parts=parts, touched=file.added_lines, side="current"
+            ctx.read, file.path, query=query, touched=file.added_lines, side="current"
         )
         removed, removed_warnings = _side_occurrences(
             ctx.read_base,
             file.path,
-            parts=parts,
+            query=query,
             touched=file.removed_lines,
             side="base",
         )
@@ -75,26 +85,33 @@ def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
-    """Check that `symbol` is a bare or dotted Python name."""
+    """Check `symbol` is a Python name and any `ignore_lines` compile."""
+    errors = validate_ignores(params)
     symbol = params.get("symbol")
     if (
         not isinstance(symbol, str)
         or not symbol
         or not all(part.isidentifier() for part in symbol.split("."))
     ):
-        return ["symbol must be a Python name like OldClient or pkg.mod.OldClient"]
-    return []
+        errors.append(
+            "symbol must be a Python name like OldClient or pkg.mod.OldClient"
+        )
+    return errors
 
 
 def _side_occurrences(
     reader: Callable[[PurePath], str | None],
     path: PurePath,
     *,
-    parts: tuple[str, ...],
+    query: _Query,
     touched: AbstractSet[int],
     side: str,
 ) -> tuple[list[Occurrence], list[str]]:
-    """Locate occurrences starting on the touched lines of one diff side."""
+    """Locate occurrences starting on the touched lines of one diff side.
+
+    Each side is filtered against its own text, so a line the metric
+    ignores on the branch is equally ignored in the base.
+    """
     if not touched:
         return [], []
     if (text := reader(path)) is None:
@@ -103,17 +120,21 @@ def _side_occurrences(
         tree = ast.parse(text)
     except SyntaxError as exc:
         return [], [f"{path}: {side} side skipped (syntax error: {exc.msg})"]
-    lines, star_fallback = _occurrence_lines(tree, parts)
+    lines, star_fallback = _occurrence_lines(tree, query.parts)
     warnings = (
         [f"{path}: {side} side: star import: falling back to bare-name counting"]
         if star_fallback
         else []
     )
-    found = [
-        Occurrence(path=str(path), line=line)
-        for line in sorted(lines)
-        if line in touched
-    ]
+    found = drop_ignored(
+        [
+            Occurrence(path=str(path), line=line)
+            for line in sorted(lines)
+            if line in touched
+        ],
+        text=text,
+        patterns=query.ignores,
+    )
     return found, warnings
 
 

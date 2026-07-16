@@ -14,9 +14,9 @@ its stats) are visible at rest.
 
 | Key | Action |
 |---|---|
-| `↑` / `↓` (`k` / `j`) | move between headers |
+| `↑` / `↓` (`k` / `j`) | move between headers, and the occurrence lines of an unfolded metric |
 | `→` / `←` (`l` / `h`) | unfold / fold the focused header |
-| ++space++ / ++enter++ / click | toggle the focused header |
+| ++space++ / ++enter++ / click | toggle the focused header — or, on an occurrence line, open it |
 | `f` | fold or unfold every group at once, leaving file results as they are |
 | `p` | command palette |
 | `q` | quit |
@@ -24,6 +24,11 @@ its stats) are visible at rest.
 Each group and metric folds independently. Unfolding a metric shows its
 occurrences in place. With no groups configured it is a flat accordion of
 metrics, and `f` folds those instead.
+
+Arrow down onto an occurrence and press ++space++ or ++enter++ to **open it
+in VS Code** — the file at its line, in the window you are already in. This
+works from VS Code's integrated terminal, which puts the `code` command on
+`PATH`; run elsewhere, the key just says there is no editor to open into.
 
 `tingle --diff [--base REF]` opens the [branch-impact](diff.md) view.
 
@@ -46,6 +51,14 @@ The compact summary — values only.
 
 The [CI gate](check.md): measure the branch, exit 1 if it worsened the
 metrics, and print only the lines it added under the metrics that grew.
+
+A branch that took on no debt says so, rather than passing in silence — in a
+CI log, no output cannot be told apart from a step that never ran:
+
+```console
+$ tingle check
+🎉 no new debt: 11 metrics against main
+```
 
 | Option | Meaning |
 |---|---|
@@ -92,6 +105,7 @@ types](metrics.md).
 | `--name NAME` | metric name (auto-generated and de-duplicated if omitted) |
 | `--range NAME` | target range (repeatable) |
 | `--group NAME` | group heading to show this metric under |
+| `--description TEXT` | what the metric means, in prose |
 | `--param key=value` | extra metric param (repeatable) |
 
 Without `--name`, the metric is named after its type and value

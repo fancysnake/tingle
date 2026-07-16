@@ -152,3 +152,19 @@ def test_value_and_param_conflict() -> None:
         build_metric({}, METRIC_TYPES, draft=draft)
 
     assert "both positionally and via --param" in excinfo.value.errors[0]
+
+
+def test_description_is_written_and_validates() -> None:
+    draft = MetricDraft(
+        type_name="regex_count", value="x", description="Escape hatches."
+    )
+
+    metric = build_metric({}, METRIC_TYPES, draft=draft)
+
+    assert metric["description"] == "Escape hatches."
+
+
+def test_no_description_omits_the_key() -> None:
+    draft = MetricDraft(type_name="regex_count", value="x")
+
+    assert "description" not in build_metric({}, METRIC_TYPES, draft=draft)

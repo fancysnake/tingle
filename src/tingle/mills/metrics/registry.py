@@ -18,6 +18,7 @@ from tingle.mills.metrics.counts import (
     file_count_diff,
     line_count,
     line_count_diff,
+    validate_count_params,
 )
 from tingle.mills.metrics.regex_count import regex_count, regex_count_diff
 from tingle.mills.metrics.regex_count import validate_params as validate_regex_params
@@ -31,7 +32,7 @@ METRIC_TYPES: dict[str, MetricType] = {
         func=regex_count,
         params=ParamSchema(
             required=("pattern",),
-            optional=("flags",),
+            optional=("flags", "ignore_lines"),
             primary="pattern",
             validate=validate_regex_params,
         ),
@@ -42,7 +43,10 @@ METRIC_TYPES: dict[str, MetricType] = {
         name="symbol_uses",
         func=symbol_uses,
         params=ParamSchema(
-            required=("symbol",), primary="symbol", validate=validate_symbol_params
+            required=("symbol",),
+            optional=("ignore_lines",),
+            primary="symbol",
+            validate=validate_symbol_params,
         ),
         description="Count references to a function or class in Python files.",
         diff_func=symbol_uses_diff,
@@ -83,7 +87,11 @@ METRIC_TYPES: dict[str, MetricType] = {
     "file_count": MetricType(
         name="file_count",
         func=file_count,
-        description="Number of files in the metric's ranges.",
+        params=ParamSchema(optional=("over_lines",), validate=validate_count_params),
+        description=(
+            "Number of files in the metric's ranges; with over_lines, only "
+            "those strictly longer than that many lines."
+        ),
         diff_func=file_count_diff,
     ),
     "line_count": MetricType(

@@ -12,6 +12,12 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+#: Stand-in guide for an outcome built without one. The real fallback, when
+#: neither a metric nor [display] pins a guide, is derived from the size of
+#: the codebase -- which only a run can know, so it cannot be a default here.
+DEFAULT_GUIDE = 100
+
+
 class ConfigNotFoundError(Exception):
     """No tingle.toml file or [tool.tingle] section could be found."""
 
@@ -36,14 +42,38 @@ class RangeSpec:
 
 
 @dataclass(frozen=True)
+class DisplaySpec:
+    """The `[display]` settings: how measured values are presented.
+
+    `guide` is the value a metric is judged against — the point at which
+    its debt is considered to have reached full size. Left unset, it is
+    derived from the size of the codebase, so debt is read as a density
+    rather than an absolute count. Setting it pins one guide for every
+    metric that does not name its own, whatever the codebase does.
+
+    `loc_range` names the range those lines are counted over; unset, the
+    default range stands for "the project".
+    """
+
+    guide: int | None = None
+    loc_range: str | None = None
+
+
+@dataclass(frozen=True)
 class MetricSpec:
-    """One configured metric. Empty `ranges` means the default range applies."""
+    """One configured metric. Empty `ranges` means the default range applies.
+
+    A `guide` of None inherits the one from `[display]`; the runner
+    resolves that fallback, so nothing downstream repeats it.
+    """
 
     name: str
     type: str
     ranges: tuple[str, ...] = ()
     params: Mapping[str, Any] = field(default_factory=dict)
     group: str | None = None
+    guide: int | None = None
+    description: str | None = None
 
 
 class CheckPolicy(StrEnum):
@@ -81,6 +111,7 @@ class Config:
     default_range: RangeSpec
     diff_base: str | None = None
     check: CheckSpec = field(default_factory=CheckSpec)
+    display: DisplaySpec = field(default_factory=DisplaySpec)
 
 
 @dataclass(frozen=True)
@@ -93,6 +124,7 @@ class MetricDraft:
     ranges: tuple[str, ...] = ()
     params: Mapping[str, str] = field(default_factory=dict)
     group: str | None = None
+    description: str | None = None
 
 
 class ConfigStore(Protocol):

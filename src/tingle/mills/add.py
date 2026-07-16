@@ -45,6 +45,8 @@ def build_metric(
     }
     if draft.group is not None:
         metric["group"] = draft.group
+    if draft.description is not None:
+        metric["description"] = draft.description
     if len(draft.ranges) == 1:
         metric["range"] = draft.ranges[0]
     elif len(draft.ranges) > 1:

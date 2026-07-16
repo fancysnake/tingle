@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-16
+
+### Added
+
+- Severity emoji (🎉 🦠 🚧 🚨 🔥 💀) on every value, ranking it against a
+  **guide** on a logarithmic ladder. With no guide set, one is derived from
+  the size of the codebase (one unit per 100 lines), so debt is read as a
+  density. Pin one with `[display] guide`, or per metric with `guide`.
+- `[display] loc_range` names the range those lines are counted over
+  (default: the default range).
+- Group headers show the sum of their metrics, ranked against the summed
+  guides. In the TUI a group summing to zero starts folded, unless it holds
+  an errored metric.
+- The summary tables now read as an outline — a group name heads its indented
+  metrics, blocks ruled apart — replacing the `Group` column, where a
+  totalled heading row could read as a nameless metric. Every value's emoji
+  is aligned into one column, the numbers space-padded beneath it.
+- `ignore_lines` on `regex_count` and `symbol_uses`: regexes matched against
+  the line a hit sits on, excusing hits that are not debt — `ANY` in an
+  assertion counts, `"form": ANY` does not.
+- `over_lines` on `file_count`: counts only files longer than the gate. In a
+  diff, a file growing past the gate is new debt, one refactored back under
+  it is debt paid off.
+- `description` on any metric, shown in `tingle report`, the JSON, and under
+  the metric in the TUI. `tingle add --description` writes one.
+- `tingle check` prints a line when it passes, instead of exiting silently.
+- In the TUI, arrow onto an occurrence and press Space or Enter to open it in
+  VS Code — the file at its line, in the window you are already in. Works from
+  VS Code's integrated terminal; elsewhere the key says there is no editor.
+
+### Fixed
+
+- TUI: clicking empty space no longer moves focus off the metric rows,
+  leaving the arrow keys scrolling instead of navigating.
+
 ## [0.1.0] - 2026-07-12
 
 Initial release.

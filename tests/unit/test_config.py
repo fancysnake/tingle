@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from tingle.mills.config import validate
-from tingle.pacts.config import CheckPolicy, CheckSpec, Config, ConfigError
+from tingle.pacts.config import CheckPolicy, CheckSpec, Config, ConfigError, DisplaySpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, ParamSchema
 from tingle.specs.config import IMPLICIT_RANGE_INCLUDE, IMPLICIT_RANGE_NAME
 
@@ -346,3 +346,117 @@ def test_check_must_be_table() -> None:
     errors = _errors_of({"check": "any"})
 
     assert "[check] must be a table" in errors
+
+
+def test_an_unset_guide_means_derive_it_from_the_codebase() -> None:
+    """Not the same state as a guide pinned to a number: None means measure."""
+    config = _validate({"metrics": []})
+
+    assert config.display == DisplaySpec(guide=None, loc_range=None)
+
+
+def test_loc_range_is_read() -> None:
+    config = _validate(
+        {
+            "ranges": {"src": {"include": ["src/**/*.py"]}},
+            "display": {"loc_range": "src"},
+            "metrics": [],
+        }
+    )
+
+    assert config.display.loc_range == "src"
+
+
+def test_loc_range_must_name_a_configured_range() -> None:
+    errors = _errors_of({"display": {"loc_range": "nope"}, "metrics": []})
+
+    assert '[display]: unknown range "nope" in loc_range' in errors
+
+
+def test_loc_range_must_be_a_string() -> None:
+    errors = _errors_of({"display": {"loc_range": 3}, "metrics": []})
+
+    assert "[display]: loc_range must be a string" in errors
+
+
+def test_display_guide_is_read() -> None:
+    config = _validate({"display": {"guide": 25}, "metrics": []})
+
+    assert config.display == DisplaySpec(guide=25)
+
+
+def test_display_unknown_key() -> None:
+    errors = _errors_of({"display": {"emoji": False}, "metrics": []})
+
+    assert '[display]: unknown key "emoji"' in errors
+
+
+def test_display_must_be_table() -> None:
+    errors = _errors_of({"display": 100})
+
+    assert "[display] must be a table" in errors
+
+
+@pytest.mark.parametrize("guide", [0, -1, "100", 1.5])
+def test_display_guide_must_be_a_positive_integer(guide: object) -> None:
+    errors = _errors_of({"display": {"guide": guide}, "metrics": []})
+
+    assert "[display]: guide must be a positive integer" in errors
+
+
+def test_display_guide_rejects_a_boolean() -> None:
+    """Bool subclasses int, so `guide = true` must not pass as the integer 1."""
+    errors = _errors_of({"display": {"guide": True}, "metrics": []})
+
+    assert "[display]: guide must be a positive integer" in errors
+
+
+def test_metric_guide_defaults_to_none_meaning_inherit() -> None:
+    config = _validate({"metrics": [_metric("loc")]})
+
+    assert config.metrics[0].guide is None
+
+
+def test_metric_guide_overrides_the_global_one() -> None:
+    config = _validate(
+        {"display": {"guide": 100}, "metrics": [{**_metric("loc"), "guide": 5}]}
+    )
+
+    assert config.metrics[0].guide == 5
+
+
+@pytest.mark.parametrize("guide", [0, -1, "5", True])
+def test_metric_guide_must_be_a_positive_integer(guide: object) -> None:
+    errors = _errors_of({"metrics": [{**_metric("loc"), "guide": guide}]})
+
+    assert 'metric "loc": guide must be a positive integer' in errors
+
+
+def test_metric_description_is_read() -> None:
+    config = _validate(
+        {"metrics": [{**_metric("loc"), "description": "Lines of code."}]}
+    )
+
+    assert config.metrics[0].description == "Lines of code."
+
+
+def test_metric_description_defaults_to_none() -> None:
+    config = _validate({"metrics": [_metric("loc")]})
+
+    assert config.metrics[0].description is None
+
+
+@pytest.mark.parametrize("description", ["", 5])
+def test_metric_description_must_be_a_non_empty_string(description: object) -> None:
+    errors = _errors_of({"metrics": [{**_metric("loc"), "description": description}]})
+
+    assert 'metric "loc": description must be a non-empty string' in errors
+
+
+def test_guide_and_description_are_not_passed_to_the_metric_as_params() -> None:
+    """They are tingle's own keys; a metric function must never see them."""
+    config = _validate(
+        {"metrics": [{**_metric("loc"), "guide": 5, "description": "Lines of code."}]}
+    )
+
+    assert not config.metrics[0].params
