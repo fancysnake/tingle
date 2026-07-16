@@ -63,7 +63,7 @@ def _section_heading(
     return Text(f"## {_group_label(name)}  {stat}", style="bold")
 
 
-def _description_line(outcome: _Outcome) -> Text | None:
+def description_line(outcome: _Outcome) -> Text | None:
     """Return the metric's own words about what it measures, if it has any."""
     if (description := outcome.spec.description) is None:
         return None
@@ -235,7 +235,7 @@ def run_listing(report: RunReport) -> list[Text]:
             lines.append(
                 Text(f"{outcome.spec.name} ({outcome.spec.type}): {stat}", style="bold")
             )
-            if (description := _description_line(outcome)) is not None:
+            if (description := description_line(outcome)) is not None:
                 lines.append(description)
             lines.extend(occurrence_lines(outcome.result))
             lines.append(Text(""))
@@ -301,7 +301,7 @@ def diff_listing(report: DiffReport) -> list[Text]:
                 lines.append(Text(""))
                 continue
             lines.append(_diff_heading(outcome))
-            if (description := _description_line(outcome)) is not None:
+            if (description := description_line(outcome)) is not None:
                 lines.append(description)
             lines.extend(diff_occurrence_lines(outcome.result))
             lines.append(Text(""))

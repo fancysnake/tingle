@@ -129,6 +129,73 @@ def test_collapsibles_start_collapsed_and_expand_in_place() -> None:
     asyncio.run(scenario())
 
 
+def test_a_metric_description_shows_in_its_details() -> None:
+    described = RunReport(
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        outcomes=(
+            MetricOutcome(
+                spec=MetricSpec(
+                    name="any-uses",
+                    type="symbol_uses",
+                    description="Bare ANY placeholders left uncompared.",
+                ),
+                range_names=(),
+                result=MetricResult(
+                    value=1, occurrences=(Occurrence(path="x.py", line=1),)
+                ),
+            ),
+        ),
+    )
+
+    async def scenario() -> None:
+        app = MetricsApp(described)
+        async with app.run_test():
+            # details are always in the DOM, so it is present without unfolding
+            assert "Bare ANY placeholders left uncompared." in _static_text(app)
+
+    asyncio.run(scenario())
+
+
+def test_a_metric_description_stays_visible_when_folded() -> None:
+    described = RunReport(
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        outcomes=(
+            MetricOutcome(
+                spec=MetricSpec(
+                    name="any-uses",
+                    type="symbol_uses",
+                    description="Bare ANY placeholders left uncompared.",
+                ),
+                range_names=(),
+                result=MetricResult(
+                    value=1, occurrences=(Occurrence(path="x.py", line=1),)
+                ),
+            ),
+        ),
+    )
+
+    async def scenario() -> None:
+        app = MetricsApp(described)
+        async with app.run_test():
+            metric = app.query_one("#metric-0", NavCollapsible)
+            assert metric.collapsed  # folded at rest
+            description = next(
+                node
+                for node in metric.query(Static)
+                if "Bare ANY placeholders left uncompared." in str(node.render())
+            )
+            # the description sits outside the foldable Contents, so collapsing
+            # the metric never hides what it measures
+            assert not any(
+                isinstance(ancestor, Collapsible.Contents)
+                for ancestor in description.ancestors
+            )
+
+    asyncio.run(scenario())
+
+
 def _focused_metric_id(app: MetricsApp) -> str | None:
     if (focused := app.focused) is None:
         return None

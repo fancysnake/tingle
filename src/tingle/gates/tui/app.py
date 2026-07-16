@@ -11,6 +11,7 @@ from textual.widgets import Collapsible, Footer, Header, Static
 from textual.widgets.collapsible import CollapsibleTitle
 
 from tingle.gates.cli.render import (
+    description_line,
     diff_occurrence_rows,
     group_sections,
     occurrence_rows,
@@ -51,6 +52,21 @@ class NavCollapsible(Collapsible):
         Binding("h", "app.fold", "Fold", show=False),
         Binding("l", "app.unfold", "Unfold", show=False),
     ]
+
+    # a caller sets this to show a line under the title; groups leave it None
+    description: Text | None = None
+
+    def compose(self) -> ComposeResult:
+        """Title, then the description, then the foldable occurrence rows.
+
+        The description sits outside `Contents`, so folding hides only the
+        occurrences -- what the metric measures stays legible at rest.
+        """
+        yield self._title
+        if self.description is not None:
+            yield Static(self.description, classes="description")
+        with self.Contents():
+            yield from self._contents_list
 
 
 class OccurrenceLine(Static):
@@ -135,14 +151,14 @@ class MetricsApp(App[None]):
             for section, (name, outcomes) in enumerate(sections):
                 metrics: list[NavCollapsible] = []
                 for outcome in outcomes:
-                    metrics.append(
-                        NavCollapsible(
-                            *_detail_widgets(outcome),
-                            title=self._title(outcome),
-                            id=f"metric-{index}",
-                            classes="metric",
-                        )
+                    metric = NavCollapsible(
+                        *_detail_widgets(outcome),
+                        title=self._title(outcome),
+                        id=f"metric-{index}",
+                        classes="metric",
                     )
+                    metric.description = description_line(outcome)
+                    metrics.append(metric)
                     index += 1
                 if grouped:
                     summary = group_summary(outcomes)
@@ -318,14 +334,17 @@ def _escape(text: str) -> str:
 
 
 def _detail_widgets(outcome: MetricOutcome | DiffOutcome) -> list[Static]:
+    widgets: list[Static] = []
     if outcome.result is None:
-        return [Static("[dim](metric failed; see the summary above)[/dim]")]
+        widgets.append(Static("[dim](metric failed; see the summary above)[/dim]"))
+        return widgets
     rows = (
         diff_occurrence_rows(outcome.result)
         if isinstance(outcome, DiffOutcome)
         else occurrence_rows(outcome.result)
     )
-    return [_occurrence_widget(text, occurrence) for text, occurrence in rows]
+    widgets.extend(_occurrence_widget(text, occurrence) for text, occurrence in rows)
+    return widgets
 
 
 def _occurrence_widget(text: Text, occurrence: Occurrence | None) -> Static:
