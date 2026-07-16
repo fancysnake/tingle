@@ -1,6 +1,6 @@
 [project]
 name = "tingle"
-version = "0.2.1"
+version = "0.4.0"
 description = "Constant refactoring monitoring tool"
 authors = [{ name = "Radosław Ganczarek", email = "radoslaw@ganczarek.in" }]
 license = "MIT"
