@@ -11,15 +11,15 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any, TypeAlias
 
-from tingle.pacts.diff import DiffResult
-from tingle.pacts.metrics import MetricResult
+from tingle.pacts.diff import DiffResult, FileStatus
+from tingle.pacts.metrics import MetricResult, Occurrence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping
     from pathlib import PurePath
 
-    from tingle.pacts.diff import FileDiff
-    from tingle.pacts.metrics import MetricContext, Occurrence
+    from tingle.pacts.diff import DiffMetricContext, FileDiff
+    from tingle.pacts.metrics import MetricContext
 
 #: What one file contributed to a diff: added, removed, and any warnings.
 FileFindings: TypeAlias = "tuple[list[Occurrence], list[Occurrence], list[str]]"
@@ -28,6 +28,11 @@ FileFindings: TypeAlias = "tuple[list[Occurrence], list[Occurrence], list[str]]"
 LocatedFinder: TypeAlias = (
     "Callable[[PurePath, str], tuple[list[Occurrence], list[str]]]"
 )
+
+#: Whether the thing is present in one side of a diff, plus any warnings.
+#: Takes the file's text on that side and the side's name -- "current" or
+#: "base" -- so a warning can say which of the two it came from.
+SidePresence: TypeAlias = "Callable[[PurePath, str, str], tuple[bool, list[str]]]"
 
 #: The param every line-located metric reads to discard uninteresting hits.
 IGNORE_LINES_PARAM = "ignore_lines"
@@ -138,6 +143,93 @@ def located_result(
         warnings=tuple(warnings),
         occurrences=tuple(occurrences),
     )
+
+
+def per_file_result(located: MetricResult) -> MetricResult:
+    """Collapse a located result so each file counts once, however many hits.
+
+    The measure stops being volume and becomes spread: how far a thing has
+    reached, not how heavily it is written where it already is. Reworking a
+    file that already counted moves nothing; a fresh file that reaches for
+    the thing is one more.
+
+    Details are kept as they are -- the per-file hit count still says how
+    heavily a file is involved -- so for a collapsed result the details sum
+    to more than the value. Each file's occurrence is placed at its first
+    hit, which is the useful line to open.
+    """
+    first: dict[str, int | None] = {}
+    for occurrence in located.occurrences:
+        first.setdefault(occurrence.path, occurrence.line)
+    return MetricResult(
+        value=len(first),
+        details=located.details,
+        warnings=located.warnings,
+        occurrences=tuple(
+            Occurrence(path=path, line=line) for path, line in first.items()
+        ),
+    )
+
+
+def presence_crossings(
+    ctx: DiffMetricContext, *, present: SidePresence, suffix: str | None = None
+) -> DiffResult:
+    """Count the files a thing appeared in, and the files it vanished from.
+
+    What counts is *crossing*, not touching: a file holding the thing now
+    but not at the base is spread taken on, one that held it then and does
+    not now is spread contained. A file that held it before and holds it
+    still counts for nothing however much of it the branch rewrote -- which
+    is the point, since reworking legacy code is not spreading it.
+
+    Both sides are read whole and re-analysed; the touched line sets are
+    never consulted. Only changed files are examined, which is sound:
+    presence cannot flip in a file the branch left alone.
+
+    A side that will not read counts as absent, and warns only when the
+    file's status says it should have been there -- a deleted file has no
+    current side, and that is not a problem worth a warning.
+    """
+
+    def per_file(file: FileDiff) -> FileFindings:
+        if suffix is not None and file.path.suffix != suffix:
+            return [], [], []
+        now, warnings = _side_presence(
+            ctx.read,
+            file,
+            present=present,
+            side="current",
+            expected=file.status is not FileStatus.DELETED,
+        )
+        before, base_warnings = _side_presence(
+            ctx.read_base,
+            file,
+            present=present,
+            side="base",
+            expected=file.status is not FileStatus.ADDED,
+        )
+        warnings.extend(base_warnings)
+        if now and not before:
+            return [Occurrence(path=str(file.path))], [], warnings
+        if before and not now:
+            return [], [Occurrence(path=str(file.path))], warnings
+        return [], [], warnings
+
+    return accumulate_diff(ctx.files, per_file)
+
+
+def _side_presence(
+    reader: Callable[[PurePath], str | None],
+    file: FileDiff,
+    *,
+    present: SidePresence,
+    side: str,
+    expected: bool,
+) -> tuple[bool, list[str]]:
+    """Ask one side whether the thing is there; absent when it will not read."""
+    if (text := reader(file.path)) is None:
+        return False, [f"{file.path}: {side} side unreadable"] if expected else []
+    return present(file.path, text, side)
 
 
 def accumulate_diff(
