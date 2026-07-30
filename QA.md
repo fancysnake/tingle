@@ -1,312 +1,284 @@
 # Manual Test Scenarios
 
-Based on: `feature/display-guides` vs `main`
-Changes in: **Severity emoji & density guide**, **Group summaries & folding (TUI)**,
-**`ignore_lines`**, **`over_lines` on `file_count`**, **Metric descriptions**,
-**`tingle check` success line**, **TUI focus fix**
+Based on: `feature/spread-metrics` vs `main`
+Changes in: **`regex_spread`**, **`symbol_spread`**, **crossing semantics in a diff**,
+**`tingle check` gating**, **JSON `value` vs `details`**, **shared finder refactor
+(regression surface on `regex_count` / `symbol_uses`)**
 
-Run commands from the repo root. This branch is **dogfooded** — `tingle.toml` in the
-root exercises most of these features against tingle's own source. Note that the root
-`tingle.toml` currently pins `[display] guide = 10` (uncommitted). Several scenarios
-below ask you to remove that pin — do so in a scratch copy or `git stash`/restore it
-after, since it's a deliberate local edit.
+Run commands from the repo root. This branch is **dogfooded** — the root `tingle.toml`
+carries `type-ignore-spread` beside the existing `type-ignores` count, so several
+scenarios below work against tingle's own source with no setup.
 
-**Preconditions common to all:** built/installed tingle on this branch; a terminal that
-renders emoji at 2 cells wide.
+**Preconditions common to all:** built/installed tingle on this branch
+(`poetry install`), a git repo with history (the merge-base is needed for every `--diff`
+scenario).
 
----
-
-## Severity emoji & the density guide
-
-### The ladder actually spreads across a real table
-
-**Preconditions:** root `tingle.toml`, `[display] guide = 10` line **removed** (so the
-derived density guide is used).
-
-- [ ] Run `tingle stat` → Expected: every value is preceded by one of 🎉 🦠 🚧 🚨 🔥 💀,
-  exactly one emoji per value, each drawn full-width (not clipped in half).
-- [ ] Read across the metrics → Expected: they do **not** all show the same emoji; a
-  metric with 0 hits shows 🎉, small counts show 🦠/🚧, larger ones climb.
-- [ ] Run `tingle stat --json` → Expected: each metric has a `"guide"` field equal to
-  `round(LOC/100)` for the codebase, floored at 1; not the literal 100.
-
-### A pinned global guide overrides the density guide
-
-**Preconditions:** root `tingle.toml` with `[display] guide = 10` present.
-
-- [ ] Run `tingle stat --json` → Expected: **every** metric's `"guide"` is `10`,
-  regardless of codebase size.
-- [ ] Change to `guide = 100`, rerun → Expected: emoji get gentler (a value of 3 that
-  read 🔥 against guide 10 now reads 🦠/🚧 against 100).
-- [ ] Set `guide = 0` → Expected: config error refusing a non-positive guide (not a
-  crash, not a silent divide-by-zero).
-- [ ] Set `guide = "abc"` or `guide = 1.5` → Expected: config error naming `guide` as
-  needing a positive whole number.
-
-### A per-metric guide beats both
-
-**Preconditions:** any config.
-
-- [ ] Add `guide = 20000` to a `line_count` metric, keep `[display] guide = 10` →
-  Expected: that metric is judged against 20000 (reads low/green even for thousands of
-  lines), while other metrics still use 10.
-- [ ] Run `tingle stat --json` → Expected: that one metric's `"guide"` is `20000`; the
-  rest are `10`.
-
-### The guide is always the top of 🚨, and the log scale bites early
-
-**Preconditions:** a metric with a known count; set its `guide` equal to that exact count.
-
-- [ ] Run `tingle stat` for `value == guide` → Expected: 🚨 (full-size debt, not yet
-  past it).
-- [ ] Set the guide to half the value → Expected: 🔥 or 💀 (past full size).
-- [ ] With `guide = 100`, find/craft a metric reading exactly 3 → Expected: 🚧 (log makes
-  3-of-100 already a quarter of the way up, harsher than a linear scale would show).
-
-### loc_range controls what LOC is counted over
-
-**Preconditions:** `[display] guide` **removed**; two ranges defined, e.g. `python`
-(src+tests) and a narrower `python-src` (src only).
-
-- [ ] Run `tingle stat --json`, note a metric's `guide` with no `loc_range` set →
-  Expected: guide derived from the **default** range's LOC.
-- [ ] Add `[display] loc_range = "python-src"`, rerun → Expected: guide is smaller (fewer
-  lines counted), so emoji get harsher across the board.
-- [ ] Set `loc_range = "does-not-exist"` → Expected: config error naming the unknown
-  range (not a silent fallback).
-
-### Empty / tiny project edge cases
-
-- [ ] Point tingle at a nearly empty directory (a few lines, `guide` unset) → Expected:
-  derived guide floors at 1 (never 0); a handful of markers reads harsh (🔥/💀) — density
-  being honest, not a bug.
-- [ ] A metric measuring 0 with any guide → Expected: 🎉, and no divide-by-zero even if
-  the guide itself resolves to 0 (all-errored group).
+The single most important property to confirm by hand: **a branch that reworks code
+which already matched must net zero.** That is the entire point of the feature, and it
+is the one thing a reader will not believe until they see it.
 
 ---
 
-## Group summaries & folding
+## `regex_spread` — counting files, not matches
 
-### Group headers show the summed value and emoji (outline layout)
+### A file counts once however many matches it holds
 
-**Preconditions:** root `tingle.toml` (has `formatting`, `linting`, `typing` groups).
+**Preconditions:** the root `tingle.toml` as committed on this branch.
 
-- [ ] Run `tingle stat` → Expected: **no** `Group` column; instead the table reads as an
-  outline — each group name heads its own row (bold), its metrics indented two spaces
-  beneath it, and a horizontal rule between one group's block and the next.
-- [ ] Read a group heading row → Expected: it shows the **sum** of its metrics' values,
-  led by an emoji ranking that sum against the summed guides. Because it sits on the named
-  heading line (not a blank row with a stray number), it reads clearly as a total.
-- [ ] Look down the `Value` column → Expected: every emoji sits in the **same column**;
-  the numbers are right-padded with spaces so `🦠  2` and `🚨 23` line up under each other.
-- [ ] Run `tingle report` → Expected: each `## <group>` heading carries the same summed
-  value + emoji.
-- [ ] Run `tingle stat --json` → Expected: metrics carry their `"group"`; the outline and
-  sum are presentation only (verify by hand that group value == sum of members).
-- [ ] Confirm a metric that **errored** is excluded from its group's sum (contributes no
-  value and no guide), but the group heading and its row are still shown (`ERROR` in the
-  value cell).
-- [ ] With no groups configured at all → Expected: no group headings, no rules, metric
-  names not indented — just the plain metric rows, values still emoji-led and aligned.
-- [ ] Run `tingle stat --diff` → Expected: the same outline (no `Group` column); each
-  group heading shows the net beside the standing total, and the `Total` column's emoji
-  are aligned the same way.
+- [ ] Run `tingle report --metric type-ignores` → Expected: **4** occurrences, two of
+  them in the same file (`tests/unit/test_contracts.py`).
+- [ ] Run `tingle report --metric type-ignore-spread` → Expected: **3** occurrences —
+  one line per *file*, and `test_contracts.py` appears **once**, not twice.
+- [ ] Compare the two lists → Expected: the spread list is the count list with
+  duplicates-per-file collapsed; no file appears in one and not the other.
+- [ ] Read the spread occurrence for `test_contracts.py` → Expected: it points at the
+  **first** `# type: ignore` in that file (line 23), not the second.
 
-### A zero-sum group starts folded in the TUI — unless it holds an error
+### It reacts to a new file, not to more matches in an old one
 
-**Preconditions:** a group whose metrics all measure 0 (e.g. `formatting` if no `# fmt`
-etc. exist); run bare `tingle` in a TTY.
+**Preconditions:** a scratch file you will delete afterwards.
 
-- [ ] Launch TUI → Expected: the all-zero group appears **folded** at start; its header
-  still shows the `🎉 0` total (quiet, not hidden).
-- [ ] A group with any non-zero metric → Expected: starts **unfolded**.
-- [ ] Force a metric in an otherwise-zero group to error (e.g. point a `toml_list_length`
-  at a bad key) → Expected: that group starts **unfolded** despite summing to zero,
-  because it hides an error.
+- [ ] Add a second `# type: ignore` to a file that **already** has one, run
+  `tingle stat` → Expected: `type-ignores` goes **up by 1**, `type-ignore-spread` stays
+  **the same**.
+- [ ] Instead put one `# type: ignore` in a file that had **none**, run `tingle stat` →
+  Expected: **both** go up by 1.
+- [ ] Remove one of two `# type: ignore`s from the same file → Expected: the count drops,
+  the spread does not.
+- [ ] Remove the last one from a file → Expected: both drop.
 
-### Diff group headers show net beside standing total
+### Params behave as they do on `regex_count`
 
-**Preconditions:** a branch with changes vs base; `tingle stat --diff` and bare
-`tingle --diff`.
+**Preconditions:** a scratch `tingle.toml`, or a `--config` pointing at one.
 
-- [ ] Run `tingle stat --diff` → Expected: group row shows the **net** change and the
-  **standing total** (with emoji on the total). A group with +2/−2 (net 0) still shows the
-  full standing total, and is marked changed.
-- [ ] In the TUI diff, a group that moved nothing (net 0, no churn) → Expected: starts
-  folded; one with churn (net 0 but +2/−2) → starts unfolded.
+- [ ] Configure a `regex_spread` with `flags = ["IGNORECASE"]` against mixed-case text →
+  Expected: matches case-insensitively, same as `regex_count`.
+- [ ] Configure one with an invalid pattern (`'([unclosed'`) → Expected: rejected at
+  **config validation** time with a clear message, not at run time — same as
+  `regex_count`.
+- [ ] Configure one with an unknown flag (`flags = ["MAGIC"]`) → Expected: config error
+  naming the allowed flags.
+- [ ] Configure one with a param that does not exist (`over_lines = 5`) → Expected:
+  `unknown param "over_lines"`.
 
 ---
 
-## `ignore_lines`
+## `symbol_spread` — counting files, not references
 
-### Excusing placeholder hits
+### Reach rather than volume
 
-**Preconditions:** create a scratch file with:
-
-```python
-assert response == {"form": ANY, "id": 3}   # should be excused
-assert result == ANY                        # should be counted
-```
-
-and a metric:
+**Preconditions:** a scratch project with a legacy class used several times in one file
+and once in another:
 
 ```toml
 [[metrics]]
-name = "any-uses"
+name = "legacy-uses"
 type = "symbol_uses"
+symbol = "app.legacy.OldClient"
+
+[[metrics]]
+name = "legacy-spread"
+type = "symbol_spread"
+symbol = "app.legacy.OldClient"
+```
+
+- [ ] Run `tingle report` → Expected: `legacy-uses` lists every reference including the
+  import line; `legacy-spread` lists each *file* once, at its first reference.
+- [ ] Point both at a **bare** symbol (`OldClient`) → Expected: same collapse behaviour;
+  the bare-symbol overcounting warning in the docs applies to the count, and the spread
+  is correspondingly less sensitive to it.
+- [ ] Add a `.md` or `.txt` file containing the word `OldClient` → Expected: **not**
+  counted by either, and **no** warning about it (non-Python files are skipped silently).
+- [ ] Add a Python file with a **syntax error** → Expected: it is skipped with a warning,
+  and does not count toward the spread.
+- [ ] Add a file using `from app.legacy import *` then `OldClient()` → Expected: counted,
+  with the star-import fallback warning — one warning, not one per reference.
+
+---
+
+## Crossing semantics in a diff — the core of the feature
+
+### Reworking legacy code nets zero
+
+**Preconditions:** a branch off `main` that heavily edits a file which **already**
+matched, and adds **one** new file that matches. (This is the exact scenario the feature
+exists for.)
+
+- [ ] Run `tingle stat --diff` → Expected: the **counting** metric shows a large `+N`
+  driven by churn; the **spread** metric shows exactly **`+1`**.
+- [ ] Run `tingle report --diff --metric <spread-metric>` → Expected: exactly one `+`
+  line, naming the **new** file — the churned file is **absent** from the list.
+- [ ] Confirm the spread occurrence has **no line number** (bare path) → Expected: it is
+  the *file* that crossed, so a line would be a lie.
+- [ ] Now rework the legacy file even harder (double the matches) and rerun → Expected:
+  the spread net is **still** `+1`; only the counting metric moves.
+
+### Both directions, and creation / deletion
+
+- [ ] On a branch, delete the **last** match from a file that had one → Expected: spread
+  net `−1`, the file appears under removed occurrences.
+- [ ] Delete an entire file that matched → Expected: `−1`, and **no** warning (a deleted
+  file has no current side to read, which is not a problem).
+- [ ] Create a new file that matches → Expected: `+1`, no warning.
+- [ ] On one branch do both (one file gains, one loses) → Expected: `Added +1`,
+  `Removed −1`, `Net 0` — and both files listed in `report --diff`.
+- [ ] Rename a file that matches, without changing its contents → Expected: treated as
+  delete + add, so net 0 (documented approximation — confirm it does not report `+1`).
+
+### The diff never consults touched lines
+
+- [ ] Take a file that matches, and change a line **far away** from any match →
+  Expected: spread net 0 (the file matched before and matches still).
+- [ ] Take a file that matches, and make a **whitespace-only** change → Expected: net 0.
+- [ ] Confirm a file the branch did **not** touch at all never appears in the diff, in
+  either direction.
+
+### `regex_spread` has no multi-line caveat
+
+**Preconditions:** a pattern containing a newline, e.g. `pattern = 'start\nend'`, on both
+a `regex_count` and a `regex_spread` metric.
+
+- [ ] Add a matching two-line block on a branch, run `tingle stat --diff` → Expected:
+  `regex_count` shows **0** in the diff columns while its Total is non-zero (the
+  documented per-line caveat); `regex_spread` shows **`+1`** and agrees with its Total.
+- [ ] Same check with `flags = ["DOTALL"]` → Expected: `regex_spread` behaves the same in
+  the diff as in the full run.
+
+---
+
+## `ignore_lines` on the spread types
+
+**Preconditions:** a metric with `ignore_lines`, e.g.
+
+```toml
+[[metrics]]
+name = "any-spread"
+type = "symbol_spread"
 symbol = "ANY"
 ignore_lines = ['"form":\s*ANY']
 ```
 
-- [ ] Run `tingle report --metric any-uses` → Expected: value counts **only** the
-  `result == ANY` line; the `"form": ANY` line does not appear among occurrences.
-- [ ] Run `tingle report --json` for it → Expected: the excused line is absent from
-  `occurrences` **and** leaves no trace in per-file `details`.
-- [ ] Remove `ignore_lines`, rerun → Expected: both lines counted (value goes up by 1).
-  Confirms the filter is what excused it.
-- [ ] Apply `ignore_lines` to a `regex_count` metric too → Expected: same behavior (both
-  types honor it).
-- [ ] Give `ignore_lines` an invalid regex → Expected: config error naming the bad
-  pattern, not a stack trace at run time.
-- [ ] A pattern matching **every** line → Expected: value 0, no occurrences, no error.
+- [ ] A file whose **every** hit is excused → Expected: does **not** count, and does not
+  appear among occurrences.
+- [ ] A file with one excused hit and one real hit → Expected: counts **once**, and its
+  occurrence points at the **real** hit, not the excused one.
+- [ ] On a branch, add only an **excused** hit to a clean file → Expected: spread net
+  **0** (excusing happens before the collapse, on both sides).
+- [ ] Remove the excusing pattern from the config and rerun → Expected: the file now
+  counts.
 
 ---
 
-## `over_lines` on `file_count`
+## `tingle check` — gating on containment
 
-### Counting only oversized files
+**Preconditions:** a spread metric configured, and the churn branch from above.
 
-**Preconditions:** a range containing files of known lengths; a metric:
-
-```toml
-[[metrics]]
-name = "big-files"
-type = "file_count"
-over_lines = 100
-```
-
-- [ ] Run `tingle report --metric big-files` → Expected: counts only files with
-  **strictly more than** 100 lines; a file with exactly 100 lines is **not** counted.
-- [ ] Inspect occurrences / `--json details` → Expected: each counted file is listed with
-  its line count recorded.
-- [ ] Remove `over_lines`, rerun → Expected: counts **all** files in the range (plain file
-  count).
-- [ ] Set `over_lines = 0` / negative / non-integer → Expected: sensible config
-  validation (0 effectively counts non-empty; non-integer errors) — confirm no crash.
-- [ ] Confirm a `file_count` **without** `over_lines` opens no files (fast path) — sanity:
-  it still returns the right count on a range with binary/unreadable files present.
-
-### over_lines in a diff crosses the threshold both ways
-
-**Preconditions:** branch where one file grows past `over_lines` and another shrinks back
-under it.
-
-- [ ] Run `tingle stat --diff --metric big-files` → Expected: the file crossing **up**
-  counts as added debt (+1); the file crossing **down** counts as paid off (−1); files
-  that stay on the same side don't move the count.
+- [ ] Run `tingle check` on a branch that only reworks already-matching code → Expected:
+  the spread metric contributes **0**; if it is the only metric, exit **0** and the
+  success line prints.
+- [ ] Run `tingle check` on a branch that adds one new matching file → Expected: exit
+  **1**, and the spread metric is listed with `+1` and the file path.
+- [ ] Set `[check] policy = "any"` and confirm a `+1` spread fails even when other
+  metrics improved.
+- [ ] Add the spread metric to `[check] ignore` → Expected: it neither fails the build
+  nor appears in the output.
+- [ ] Confirm the sum in the failure line accounts for the spread metric exactly once.
 
 ---
 
-## Metric descriptions
+## Registry surface — `list`, `add`, JSON
 
-**Preconditions:** add `description = "Untyped escape hatches. Prefer a real type."` to a
-metric (or use `tingle add … --description "…"`).
+### Both types are discoverable
 
-- [ ] Run `tingle report` → Expected: the description prints under that metric,
-  dimmed/italic; metrics without one are unchanged.
-- [ ] Run `tingle report --json` and `tingle stat --json` → Expected: `"description"`
-  field present (value or `null`).
-- [ ] Run `tingle add regex_count '#\s*hack' --name hacks --description "…"` → Expected:
-  the written TOML block includes the `description` key; `tingle stat` then shows it.
-- [ ] `tingle stat` table (not report) → Expected: description does **not** clutter the
-  compact table.
+- [ ] Run `tingle list --types` → Expected: `regex_spread` and `symbol_spread` appear,
+  alphabetically among the rest, each with a description mentioning **spread**.
+- [ ] Check their Required/Optional param columns → Expected: identical to `regex_count`
+  and `symbol_uses` respectively (`pattern` + `flags`, `ignore_lines`; `symbol` +
+  `ignore_lines`).
+- [ ] Run `tingle list --types` with **no config file present** → Expected: still works.
 
----
+### `add` binds the positional value
 
-## `tingle check` success line
+- [ ] Run `tingle add regex_spread '#\s*hack' --name hack-spread` → Expected: writes a
+  `[[metrics]]` block with `type = "regex_spread"` and `pattern = '#\s*hack'`; existing
+  file formatting and comments preserved.
+- [ ] Run `tingle add symbol_spread 'app.legacy.OldClient'` with no `--name` → Expected:
+  an auto-name derived from the type and value, not colliding with existing names.
+- [ ] Run `tingle add regex_spread` with **no** value → Expected: the required-param
+  error, same as `regex_count`.
+- [ ] Run `tingle stat` afterwards → Expected: the added metric measures immediately.
+- [ ] Revert the added blocks.
 
-**Preconditions:** a branch that does **not** worsen metrics vs base.
+### JSON: `value` and `details` deliberately disagree
 
-- [ ] Run `tingle check` on a clean branch → Expected: exit 0 **and** a printed line
-  `🎉 no new debt: N metrics against <base>` (no longer silent).
-- [ ] Run on a branch that pays off debt → Expected: `🎉 no new debt, and K paid off: …`.
-- [ ] Run on a branch that adds debt → Expected: exit 1, the worsened metrics with `+`
-  occurrences, and **no** success line.
-- [ ] Confirm singular/plural: a config with exactly one judged metric → `1 metric`, not
-  `1 metrics`.
-- [ ] Confirm the base named in the line matches `--base` / `[diff] base` / `main`
-  resolution.
-
----
-
-## TUI focus & navigation (regression)
-
-**Preconditions:** bare `tingle` in a real terminal (the fix is about mouse focus, so this
-needs manual clicking).
-
-- [ ] Launch, then press ↑/↓ → Expected: focus moves between group/metric headers; →/←
-  unfold/fold; Space toggles; `hjkl` mirror the arrows.
-- [ ] **The fix:** click the **empty space below** the metric rows, then press ↑/↓ →
-  Expected: arrows still **navigate** headers (they must not turn into scroll — this was
-  the bug).
-- [ ] Switch focus to another terminal window and back (click to refocus the window on
-  empty space), then press arrows → Expected: navigation still works without first
-  clicking a row.
-- [ ] Press `f` to fold all groups, then arrows → Expected: focus lands on a still-visible
-  enclosing header and arrows keep working (focus not lost into a hidden widget); `f`
-  again unfolds.
-- [ ] Press `p` → command palette opens and its own result list responds to arrows (the
-  app arrows don't steal them); `q` quits.
-- [ ] Metric name / range containing `[` (craft one) → Expected: rendered literally in the
-  TUI, not swallowed as Textual markup.
+- [ ] Run `tingle report --json` → Expected: `type-ignore-spread` has `"value": 3` while
+  its `"details"` maps **files to hit counts** and sums to **4**.
+- [ ] Confirm `type-ignores` in the same output has `"value": 4` and details summing to
+  4 — the two metrics share identical details and differ only in `value`.
+- [ ] Run `tingle stat --json` → Expected: `"details"` is `null` for both (unchanged
+  behaviour — `stat` does not carry details).
+- [ ] Read the `"occurrences"` in `tingle report --json` for the spread metric →
+  Expected: three entries, each a file with the line of its first hit.
+- [ ] Run `tingle report --cobertura` → Expected: still valid XML, spread metrics
+  included without breaking the schema.
 
 ---
 
-## Open an occurrence in VS Code (TUI)
+## Report, TUI, and editor links
 
-**Preconditions:** run bare `tingle` **from a VS Code integrated terminal** (so
-`code` is on PATH), with a file open in the window.
-
-- [ ] Unfold a metric that has located occurrences (→ on its header) → Expected: its
-  `path:line` occurrence lines appear.
-- [ ] Press ↓ from the metric header → Expected: focus moves **onto the first occurrence
-  line** (it highlights), not past the metric to the next one.
-- [ ] Keep pressing ↓ / ↑ → Expected: focus steps through every occurrence line and then
-  on to the next header; a folded metric's occurrences are skipped.
-- [ ] On a focused occurrence line, press ++space++ (or ++enter++) → Expected: VS Code
-  jumps the active editor to **that file at that line**.
-- [ ] Open an occurrence with no line (e.g. a `file_count` or list-entry hit) → Expected:
-  the file opens at the top; no crash.
-- [ ] Press ++space++ while a **group or metric header** is focused (not an occurrence) →
-  Expected: it still folds/unfolds — opening is only bound to occurrence lines.
-- [ ] Press ++left++ while focused on an occurrence → Expected: the metric folds and focus
-  lands back on its header (focus is not lost into the hidden line).
-- [ ] Run the same in a **non-VS-Code terminal** (plain shell, or `TERM_PROGRAM` unset),
-  focus an occurrence, press ++space++ → Expected: a footer notice like "No VS Code
-  terminal to open in"; nothing launches.
-- [ ] Diff view (`tingle --diff`): unfold a metric, arrow onto a `+`/`-` occurrence, press
-  ++space++ → Expected: it opens that file at that line too.
-
-## Cross-cutting regressions
-
-- [ ] `tingle stat`/`report` with **no** groups configured → Expected: output shape
-  unchanged from pre-feature (no empty `Group` column, no headings), just with emoji added
-  to values.
-- [ ] `tingle report --cobertura` → Expected: still emits valid XML; emoji/guide changes
-  don't leak into it.
-- [ ] A per-metric failure (one broken metric) → Expected: the run still completes, that
-  metric shows `ERROR`, its group shows but excludes it from the sum, exit code reflects a
-  metric failure (1) not a crash (2).
-- [ ] Run the automated suite as a backstop: `mise run test:py`, `mise run lint:py`, and
-  `tingle check` on the branch → Expected: all green (confirms the manual surface matches
-  what CI asserts).
+- [ ] Run `tingle report --metric type-ignore-spread` → Expected: the description prints,
+  and each occurrence renders as `path:line`.
+- [ ] Open the TUI (`tingle`) → Expected: the spread metric appears in its group, the
+  group sum includes it, emoji ranking works as for any other metric.
+- [ ] In the TUI, select a spread occurrence and press ++space++ → Expected: opens the
+  file at the first hit's line in VS Code.
+- [ ] In `report --diff`, select a spread occurrence (bare path, no line) → Expected:
+  opens the file at the top, no crash from the missing line.
 
 ---
 
-**Highest-risk, least-machine-covered** items — the three that need a real terminal and a
-mouse: **the empty-space click focus fix**, **emoji width (no half-drawn glyphs)**, and
-**fold-all not losing focus**. Automated tests can't click or measure font rendering, so
-give those extra attention. The density-guide math is well unit-tested (including the 94k
-dataset as a regression), so trust it more — but do the one end-to-end check that the
-pinned-vs-derived guide actually flips the JSON `guide` field, since that's the seam
-between config and display.
+## Regressions — the shared finder refactor
+
+`regex_count` and `symbol_uses` were refactored to share their finder with the new
+spread types. Their behaviour must be **unchanged**.
+
+- [ ] Run `tingle stat` on this branch and on `main`, compare every metric value →
+  Expected: identical except for the newly added `type-ignore-spread` row.
+- [ ] Run `tingle report --metric type-ignores` on both → Expected: byte-identical
+  occurrence lists.
+- [ ] Run `tingle report --metric any-uses` on both → Expected: identical, including the
+  `ignore_lines` exclusion of `CheckPolicy.ANY`.
+- [ ] Run `tingle stat --diff` on a branch with real changes on both → Expected:
+  identical Added/Removed/Net for every pre-existing metric.
+- [ ] Trigger a `symbol_uses` **star-import** warning and a **syntax-error** warning on a
+  diff → Expected: wording still reads `<path>: <side> side skipped (syntax error: …)`
+  for `symbol_uses_diff` (unchanged); the new spread types use
+  `<path>: <side> side: <message>` (new, and consistent between warning kinds).
+
+---
+
+## Cross-cutting
+
+- [ ] A spread metric whose range matches **no files** → Expected: value 0, 🎉, no crash.
+- [ ] A spread metric over a range containing **binary/unreadable** files → Expected: the
+  file is skipped with the usual warning and does not count.
+- [ ] A per-metric failure in a spread metric → Expected: the run completes, that metric
+  shows `ERROR`, others are unaffected, exit 1 not a crash.
+- [ ] `tingle stat --diff` in a **shallow clone** → Expected: the documented merge-base
+  failure, not a spread-specific error.
+- [ ] Run the automated suite as a backstop: `mise run test:py`, `mise run lint:py`,
+  `mise run docs:build` → Expected: all green.
+
+---
+
+**Highest-risk, least-machine-covered** items: the **churn-nets-zero** scenario end to
+end on a real branch (unit tests assert it, but only against synthetic file contents —
+see it once against real git history), the **rename** case (delete + add is an
+approximation the unit tests do not exercise), and the **`main` vs branch value
+comparison** confirming the shared-finder refactor changed nothing. The collapse
+arithmetic, crossing directions, and `ignore_lines` interaction are thoroughly unit
+tested — trust those more.
+
+Note that `mise run shitcheck` fails on this branch, and on `main` too:
+`scripts/shitcheck.sh` does not exist in this repo. That is a pre-existing gap in the
+shared task config, not something this branch introduced.

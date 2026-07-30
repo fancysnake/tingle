@@ -188,11 +188,16 @@ legacy-arch (symbol_spread): 🔥 3
   src/d.py:1
 ```
 
-The per-file **hit** count is kept in the JSON `details`, so the machine-readable
-output still says how heavily each file is involved, not merely that it is. For
-a spread metric those details therefore sum to more than the value — three files
-holding eleven references between them is `"value": 3` with details summing to
-11. That is deliberate, and it is the one place the two disagree.
+The per-file **hit** count is kept in the `details` of `tingle report --json`, so
+the machine-readable output still says how heavily each file is involved, not
+merely that it is. For a spread metric those details therefore sum to more than
+the value — three files holding eleven references between them is `"value": 3`
+with details summing to 11. That is deliberate, and it is the one place the two
+disagree.
+
+It also means a spread metric and its counting sibling emit **identical**
+details and differ only in `value`, which is the cleanest way to see what the
+collapse did.
 
 ## `toml_list_length`
 
