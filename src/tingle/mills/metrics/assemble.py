@@ -29,10 +29,11 @@ LocatedFinder: TypeAlias = (
     "Callable[[PurePath, str], tuple[list[Occurrence], list[str]]]"
 )
 
-#: Whether the thing is present in one side of a diff, plus any warnings.
-#: Takes the file's text on that side and the side's name -- "current" or
-#: "base" -- so a warning can say which of the two it came from.
-SidePresence: TypeAlias = "Callable[[PurePath, str, str], tuple[bool, list[str]]]"
+#: Whether the thing is present in one side of a diff, plus anything the
+#: analysis wants to warn about. Warnings are bare messages: which file and
+#: which side they concern is not the analysis's to know, and is prefixed on
+#: for it.
+SidePresence: TypeAlias = "Callable[[PurePath, str], tuple[bool, list[str]]]"
 
 #: The param every line-located metric reads to discard uninteresting hits.
 IGNORE_LINES_PARAM = "ignore_lines"
@@ -229,7 +230,8 @@ def _side_presence(
     """Ask one side whether the thing is there; absent when it will not read."""
     if (text := reader(file.path)) is None:
         return False, [f"{file.path}: {side} side unreadable"] if expected else []
-    return present(file.path, text, side)
+    found, warnings = present(file.path, text)
+    return found, [f"{file.path}: {side} side: {warning}" for warning in warnings]
 
 
 def accumulate_diff(

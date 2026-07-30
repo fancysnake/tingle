@@ -115,7 +115,7 @@ def regex_spread_diff(ctx: DiffMetricContext) -> DiffResult:
     find = _finder(_compile(ctx.params))
     ignores = compile_ignores(ctx.params)
 
-    def present(path: PurePath, text: str, _side: str) -> tuple[bool, list[str]]:
+    def present(path: PurePath, text: str) -> tuple[bool, list[str]]:
         hits, warnings = find(path, text)
         return bool(drop_ignored(hits, text=text, patterns=ignores)), warnings
 

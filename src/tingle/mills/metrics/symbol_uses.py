@@ -17,6 +17,8 @@ from tingle.mills.metrics.assemble import (
     compile_ignores,
     drop_ignored,
     located_metric,
+    per_file_result,
+    presence_crossings,
     validate_ignores,
 )
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
@@ -27,12 +29,31 @@ if TYPE_CHECKING:
     from collections.abc import Set as AbstractSet
     from pathlib import PurePath
 
+    from tingle.mills.metrics.assemble import LocatedFinder
     from tingle.pacts.diff import DiffMetricContext, DiffResult, FileDiff
 
 
 def symbol_uses(ctx: MetricContext) -> MetricResult:
     """Count references to the `symbol` param across the Python files."""
-    parts = tuple(ctx.params["symbol"].split("."))
+    return located_metric(ctx, find=_finder(_parts(ctx.params)), suffix=".py")
+
+
+def symbol_spread(ctx: MetricContext) -> MetricResult:
+    """Count the Python files referencing the `symbol` param, however often.
+
+    The same analysis as `symbol_uses`, measuring reach instead of volume:
+    a file with forty references counts once, like a file with one. It is
+    the metric for a strangler fig judged by how far the legacy class has
+    got, where reworking the code already using it is not the thing being
+    watched.
+    """
+    return per_file_result(
+        located_metric(ctx, find=_finder(_parts(ctx.params)), suffix=".py")
+    )
+
+
+def _finder(parts: tuple[str, ...]) -> LocatedFinder:
+    """Locate every reference to the symbol in one file's source."""
 
     def find(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
         try:
@@ -48,7 +69,12 @@ def symbol_uses(ctx: MetricContext) -> MetricResult:
         found = [Occurrence(path=str(path), line=line) for line in sorted(lines)]
         return found, warnings
 
-    return located_metric(ctx, find=find, suffix=".py")
+    return find
+
+
+def _parts(params: Mapping[str, Any]) -> tuple[str, ...]:
+    """Split the dotted `symbol` param into the chain to look for."""
+    return tuple(params["symbol"].split("."))
 
 
 @dataclass(frozen=True)
@@ -61,10 +87,7 @@ class _Query:
 
 def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
     """Count references on lines the branch added vs lines it removed."""
-    query = _Query(
-        parts=tuple(ctx.params["symbol"].split(".")),
-        ignores=compile_ignores(ctx.params),
-    )
+    query = _Query(parts=_parts(ctx.params), ignores=compile_ignores(ctx.params))
 
     def per_file(file: FileDiff) -> FileFindings:
         if file.path.suffix != ".py":
@@ -82,6 +105,35 @@ def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
         return added, removed, [*added_warnings, *removed_warnings]
 
     return accumulate_diff(ctx.files, per_file)
+
+
+def symbol_spread_diff(ctx: DiffMetricContext) -> DiffResult:
+    """Count Python files the branch spread the symbol to, and cleared it from.
+
+    A file referencing the symbol now but not at the base is one more; a
+    file that referenced it then and does not now is one less. How much of
+    a referencing file the branch rewrote is beside the point, so reworking
+    legacy code nets zero while one fresh file importing the class does not.
+    """
+    query = _Query(parts=_parts(ctx.params), ignores=compile_ignores(ctx.params))
+
+    def present(path: PurePath, text: str) -> tuple[bool, list[str]]:
+        try:
+            tree = ast.parse(text)
+        except SyntaxError as exc:
+            return False, [f"skipped (syntax error: {exc.msg})"]
+        lines, star_fallback = _occurrence_lines(tree, query.parts)
+        warnings = (
+            ["star import: falling back to bare-name counting"] if star_fallback else []
+        )
+        found = drop_ignored(
+            [Occurrence(path=str(path), line=line) for line in sorted(lines)],
+            text=text,
+            patterns=query.ignores,
+        )
+        return bool(found), warnings
+
+    return presence_crossings(ctx, present=present, suffix=".py")
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:

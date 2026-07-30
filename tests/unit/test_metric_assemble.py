@@ -25,7 +25,7 @@ def _context(
     )
 
 
-def _present(_path: PurePath, text: str, _side: str) -> tuple[bool, list[str]]:
+def _present(_path: PurePath, text: str) -> tuple[bool, list[str]]:
     return "HIT" in text, []
 
 
@@ -218,9 +218,9 @@ def test_suffix_skips_files_of_other_kinds() -> None:
     assert not result.warnings
 
 
-def test_side_warnings_reach_the_result() -> None:
-    def warns(_path: PurePath, text: str, side: str) -> tuple[bool, list[str]]:
-        return "HIT" in text, [f"{side} side is odd"]
+def test_side_warnings_are_labelled_with_file_and_side() -> None:
+    def warns(_path: PurePath, text: str) -> tuple[bool, list[str]]:
+        return "HIT" in text, ["something is odd"]
 
     file = FileDiff(path=PurePath("a.py"), status=FileStatus.MODIFIED)
 
@@ -228,4 +228,9 @@ def test_side_warnings_reach_the_result() -> None:
         _context((file,), {"a.py": "HIT\n"}, base={"a.py": "HIT\n"}), present=warns
     )
 
-    assert result.warnings == ("current side is odd", "base side is odd")
+    # the analysis reports a bare message; which file and which side it
+    # concerns is prefixed on for it
+    assert result.warnings == (
+        "a.py: current side: something is odd",
+        "a.py: base side: something is odd",
+    )
