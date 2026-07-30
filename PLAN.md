@@ -161,9 +161,14 @@ $ tingle add regex_spread 'from tingle\.pacts' --name pacts-reach   # then rever
 
 - `CHANGELOG.md` — entry under `## [Unreleased]` → `### Added`.
 - `tingle.toml` — add one spread metric so the repo exercises the feature
-  against itself. Proposal: `noqa-comment-files` (`regex_spread` on
-  `#\s*noqa:`, group `linting`), which reads directly against the existing
-  `noqa-comment` count.
+  against itself: `type-ignore-spread` (`regex_spread` on
+  `#\s*type:\s*ignore`, group `typing`), which reads directly against the
+  existing `type-ignores` count of 4.
+
+  *Revised during implementation, approved.* The original proposal was
+  `noqa-comment-files` on `#\s*noqa:`, but this repo has no `# noqa:`
+  comments, so that metric measures 0 and demonstrates nothing.
+  `symbol_spread` stays undogfooded; its unit tests are the coverage.
 
 **Verify:** `mise run lint:py && mise run test:py && tingle stat && tingle stat --diff`
 

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `regex_spread` and `symbol_spread`: the same searches as `regex_count` and
+  `symbol_uses`, counting the **files** a thing appears in rather than the
+  number of times it is written. A file with forty matches counts once.
+- In a diff the spread types compare whole-file presence against the
+  merge-base rather than counting touched lines, so rewriting a file that
+  already matched nets zero while one new file that matches is +1 — the
+  metric to gate on when the goal is containment rather than removal, since
+  it does not fail every bug fix to legacy code.
+- `regex_spread` matches both sides of a diff full-text, so unlike
+  `regex_count` it carries no multi-line caveat in diff mode.
+
 ## [0.4.0] - 2026-07-16
 
 ### Added
