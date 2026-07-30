@@ -4,7 +4,9 @@ from tingle.mills.metrics.registry import METRIC_TYPES
 
 EXPECTED_TYPES = {
     "regex_count",
+    "regex_spread",
     "symbol_uses",
+    "symbol_spread",
     "toml_list_length",
     "toml_table_array",
     "ini_list_length",
@@ -28,6 +30,10 @@ def test_param_specs() -> None:
     assert METRIC_TYPES["regex_count"].params.primary == "pattern"
     assert METRIC_TYPES["symbol_uses"].params.required == ("symbol",)
     assert METRIC_TYPES["symbol_uses"].params.primary == "symbol"
+    assert METRIC_TYPES["regex_spread"].params.required == ("pattern",)
+    assert METRIC_TYPES["regex_spread"].params.primary == "pattern"
+    assert METRIC_TYPES["symbol_spread"].params.required == ("symbol",)
+    assert METRIC_TYPES["symbol_spread"].params.primary == "symbol"
     assert METRIC_TYPES["toml_list_length"].params.required == ("key",)
     assert METRIC_TYPES["toml_list_length"].params.optional == ("file",)
     assert METRIC_TYPES["toml_table_array"].params.required == ("key",)
@@ -50,3 +56,18 @@ def test_param_specs() -> None:
 def test_every_metric_type_has_a_diff_variant() -> None:
     for metric_type in METRIC_TYPES.values():
         assert metric_type.diff_func is not None, metric_type.name
+
+
+def test_spread_types_accept_what_their_counting_siblings_do() -> None:
+    # a spread metric is the same search read differently, so anything
+    # configurable on the count must be configurable on the spread
+    for counting, spread in (
+        ("regex_count", "regex_spread"),
+        ("symbol_uses", "symbol_spread"),
+    ):
+        assert METRIC_TYPES[spread].params.optional == (
+            METRIC_TYPES[counting].params.optional
+        )
+        assert METRIC_TYPES[spread].params.validate is (
+            METRIC_TYPES[counting].params.validate
+        )
