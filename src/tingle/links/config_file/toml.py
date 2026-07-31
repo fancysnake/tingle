@@ -53,8 +53,9 @@ pattern = '#\s*noqa'
 class TomlConfigStore(ConfigStore):
     """Reads and edits tingle's configuration as TOML."""
 
+    @staticmethod
     def load_raw(
-        self, root: Path, override: Path | None = None
+        root: Path, override: Path | None = None
     ) -> tuple[Path, dict[str, Any]]:
         """Locate and parse the tingle configuration.
 
@@ -82,7 +83,8 @@ class TomlConfigStore(ConfigStore):
         msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
         raise ConfigNotFoundError(msg)
 
-    def edit_target(self, root: Path) -> Path:
+    @staticmethod
+    def edit_target(root: Path) -> Path:
         """Return the config file `tingle add` should edit.
 
         tingle.toml wins; pyproject.toml only when it already carries a
@@ -98,7 +100,8 @@ class TomlConfigStore(ConfigStore):
                 return pyproject
         return tingle
 
-    def append_metric(self, path: Path, metric: Mapping[str, Any]) -> None:
+    @staticmethod
+    def append_metric(path: Path, metric: Mapping[str, Any]) -> None:
         """Append a [[metrics]] entry, preserving existing formatting."""
         document = (
             tomlkit.parse(path.read_text(encoding="utf-8"))
@@ -118,7 +121,8 @@ class TomlConfigStore(ConfigStore):
 
         path.write_text(tomlkit.dumps(document), encoding="utf-8")
 
-    def write_starter(self, root: Path) -> Path:
+    @staticmethod
+    def write_starter(root: Path) -> Path:
         """Create a commented starter tingle.toml; refuse to overwrite."""
         path = root / TINGLE_FILE
         if path.exists():

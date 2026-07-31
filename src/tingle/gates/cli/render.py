@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any, TypeVar
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree as ET  # ruff: ignore [suspicious-xml-etree-import]
 
 from rich.table import Table
 from rich.text import Text
@@ -223,13 +223,15 @@ def run_listing(report: RunReport) -> list[Text]:
             lines.append(heading)
         for outcome in outcomes:
             if outcome.result is None:
-                lines.append(
-                    Text(
-                        f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
-                        style="bold red",
-                    )
+                lines.extend(
+                    [
+                        Text(
+                            f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
+                            style="bold red",
+                        ),
+                        Text(""),
+                    ]
                 )
-                lines.append(Text(""))
                 continue
             stat = _valued(outcome.result.value, outcome.guide)
             lines.append(
@@ -292,13 +294,15 @@ def diff_listing(report: DiffReport) -> list[Text]:
             lines.append(heading)
         for outcome in outcomes:
             if outcome.result is None:
-                lines.append(
-                    Text(
-                        f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
-                        style="bold red",
-                    )
+                lines.extend(
+                    [
+                        Text(
+                            f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
+                            style="bold red",
+                        ),
+                        Text(""),
+                    ]
                 )
-                lines.append(Text(""))
                 continue
             lines.append(_diff_heading(outcome))
             if (description := description_line(outcome)) is not None:
