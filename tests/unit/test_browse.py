@@ -1,0 +1,330 @@
+from __future__ import annotations
+
+from tingle.mills.browse import (
+    UNGROUPED,
+    begin,
+    clear_sort,
+    group_key,
+    is_folded,
+    metric_key,
+    outlined,
+    push_sort,
+    record,
+    restart,
+    rows,
+    set_fold,
+    set_query,
+    start,
+    toggle_fold,
+    toggle_fold_all,
+)
+from tingle.pacts.browse import BrowseState, MetricStatus, RowKind, SortKey
+from tingle.pacts.config import MetricSpec
+from tingle.pacts.diff import DiffOutcome, DiffResult
+from tingle.pacts.metrics import MetricResult, Occurrence
+from tingle.pacts.report import MetricOutcome
+
+NOQA = MetricSpec(name="noqa-comment", type="regex_count", group="linting")
+PYLINT = MetricSpec(name="pylint-comment", type="regex_count", group="linting")
+LOC = MetricSpec(name="loc", type="file_lines", group="size")
+LEGACY = MetricSpec(name="legacy-arch", type="symbol_uses")
+
+SPECS = (NOQA, PYLINT, LOC, LEGACY)
+
+
+def _outcome(
+    spec: MetricSpec, value: int, *, guide: int = 100, paths: tuple[str, ...] = ()
+) -> MetricOutcome:
+    return MetricOutcome(
+        spec=spec,
+        range_names=("src",),
+        result=MetricResult(
+            value=value,
+            occurrences=tuple(Occurrence(path=path, line=1) for path in paths),
+        ),
+        guide=guide,
+    )
+
+
+def _measured() -> BrowseState:
+    """Finish a run over SPECS: the fixture most tests start from."""
+    state = start(SPECS)
+    state = record(state, _outcome(NOQA, 0))
+    state = record(
+        state, _outcome(PYLINT, 4, paths=("src/mills/runner.py", "src/mills/diff.py"))
+    )
+    state = record(state, _outcome(LOC, 900, guide=2000))
+    return record(state, _outcome(LEGACY, 7, paths=("src/views.py",)))
+
+
+def _labels(state: BrowseState) -> list[str]:
+    return [row.cells[0] for row in rows(state)]
+
+
+def _metric_names(state: BrowseState) -> list[str]:
+    return [row.cells[0] for row in rows(state) if row.kind is RowKind.METRIC]
+
+
+def test_a_fresh_session_lists_every_configured_metric_as_pending() -> None:
+    state = start(SPECS)
+
+    assert [entry.status for entry in state.entries] == [MetricStatus.PENDING] * 4
+    assert _metric_names(state) == [
+        "noqa-comment",
+        "pylint-comment",
+        "loc",
+        "legacy-arch",
+    ]
+
+
+def test_rows_nest_metrics_under_their_group_in_config_order() -> None:
+    state = _measured()
+
+    assert _labels(state) == [
+        "linting",
+        "noqa-comment",
+        "pylint-comment",
+        "size",
+        "loc",
+        UNGROUPED,
+        "legacy-arch",
+    ]
+    assert [row.depth for row in rows(state)] == [0, 1, 1, 0, 1, 0, 1]
+
+
+def test_a_partly_pending_run_shows_blanks_and_a_partial_group_total() -> None:
+    state = record(begin(start(SPECS), "pylint-comment"), _outcome(NOQA, 3))
+
+    header, noqa, pylint, *_ = rows(state)
+    assert header.cells[2] == "🚧 3"
+    assert noqa.cells[2] == "🚧 3"
+    assert pylint.cells[2] == "…"
+    assert pylint.entry is not None
+    assert pylint.entry.status is MetricStatus.RUNNING
+
+
+def test_an_errored_metric_says_so_and_raises_its_groups_error_flag() -> None:
+    state = record(
+        start(SPECS), MetricOutcome(spec=NOQA, range_names=(), error="ValueError: boom")
+    )
+
+    header, noqa, *_ = rows(state)
+    assert noqa.cells[2] == "ERROR"
+    assert noqa.entry is not None
+    assert noqa.entry.status is MetricStatus.ERROR
+    assert header.summary is not None
+    assert header.summary.has_error
+
+
+def test_restart_sends_every_metric_back_to_pending_keeping_the_outline() -> None:
+    state = set_fold(_measured(), group_key("linting"), folded=True)
+
+    state = restart(state)
+
+    assert [entry.status for entry in state.entries] == [MetricStatus.PENDING] * 4
+    assert is_folded(state, group_key("linting"))
+
+
+def test_occurrences_are_child_rows_of_an_unfolded_metric() -> None:
+    state = _measured()
+
+    assert is_folded(state, metric_key("pylint-comment"))
+    assert "src/mills/runner.py:1" not in _labels(state)
+
+    state = toggle_fold(state, metric_key("pylint-comment"))
+    hits = [row for row in rows(state) if row.kind is RowKind.OCCURRENCE]
+    assert [row.cells for row in hits] == [
+        ("src/mills/runner.py:1", "", ""),
+        ("src/mills/diff.py:1", "", ""),
+    ]
+    assert hits[0].occurrence == Occurrence(path="src/mills/runner.py", line=1)
+
+
+def test_a_metric_with_nothing_under_it_is_not_foldable() -> None:
+    (noqa,) = [row for row in rows(_measured()) if row.cells[0] == "noqa-comment"]
+
+    assert noqa.folded is None
+
+
+def test_folding_a_group_hides_its_metrics_but_not_the_others() -> None:
+    state = set_fold(_measured(), group_key("linting"), folded=True)
+
+    assert _labels(state) == ["linting", "size", "loc", UNGROUPED, "legacy-arch"]
+
+
+def test_fold_all_folds_every_group_then_unfolds_them_together() -> None:
+    state = toggle_fold_all(_measured())
+
+    assert _labels(state) == ["linting", "size", UNGROUPED]
+
+    state = toggle_fold_all(state)
+    assert _metric_names(state) == [
+        "noqa-comment",
+        "pylint-comment",
+        "loc",
+        "legacy-arch",
+    ]
+
+
+def test_push_sort_stacks_and_moves_a_repeated_key_to_the_front() -> None:
+    state = push_sort(
+        push_sort(push_sort(start(SPECS), SortKey.NAME), SortKey.TYPE), SortKey.NAME
+    )
+
+    assert state.sort == (SortKey.NAME, SortKey.TYPE)
+
+
+def test_sorting_by_name_then_by_type_gives_type_major_order() -> None:
+    state = push_sort(push_sort(_measured(), SortKey.NAME), SortKey.TYPE)
+
+    assert _metric_names(state) == [
+        "loc",  # file_lines
+        "noqa-comment",  # regex_count, then by name
+        "pylint-comment",
+        "legacy-arch",  # symbol_uses
+    ]
+
+
+def test_a_non_group_primary_key_flattens_the_view_and_disables_folding() -> None:
+    state = push_sort(_measured(), SortKey.NAME)
+
+    assert not outlined(state)
+    assert [row.kind for row in rows(state)] == [RowKind.METRIC] * 4
+    assert _metric_names(state) == [
+        "legacy-arch",
+        "loc",
+        "noqa-comment",
+        "pylint-comment",
+    ]
+    assert all(row.folded is None for row in rows(state))
+
+
+def test_a_group_primary_key_keeps_the_outline_and_orders_groups_by_name() -> None:
+    state = push_sort(push_sort(_measured(), SortKey.NAME), SortKey.GROUP)
+
+    assert outlined(state)
+    assert _labels(state) == [
+        "linting",
+        "noqa-comment",
+        "pylint-comment",
+        "size",
+        "loc",
+        UNGROUPED,
+        "legacy-arch",
+    ]
+
+
+def test_sorting_by_value_puts_the_biggest_first_and_the_unmeasured_last() -> None:
+    state = record(start(SPECS), _outcome(NOQA, 5))
+    state = record(state, _outcome(LOC, 900))
+
+    state = push_sort(state, SortKey.VALUE)
+
+    assert _metric_names(state) == [
+        "loc",
+        "noqa-comment",
+        "legacy-arch",  # never measured, so nothing to rank
+        "pylint-comment",
+    ]
+
+
+def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
+    state = record(start((NOQA, LOC)), _outcome(NOQA, 5, guide=5))
+    state = record(state, _outcome(LOC, 900, guide=100_000))
+
+    assert _metric_names(push_sort(state, SortKey.VALUE)) == ["loc", "noqa-comment"]
+    assert _metric_names(push_sort(state, SortKey.SCORE)) == ["noqa-comment", "loc"]
+
+
+def test_folds_survive_a_sort_that_hid_them_and_come_back_on_reset() -> None:
+    state = set_fold(_measured(), group_key("linting"), folded=True)
+
+    state = push_sort(state, SortKey.NAME)
+    assert _metric_names(state) == [
+        "legacy-arch",
+        "loc",
+        "noqa-comment",
+        "pylint-comment",
+    ]
+
+    state = clear_sort(state)
+    assert _labels(state) == ["linting", "size", "loc", UNGROUPED, "legacy-arch"]
+
+
+def test_a_diff_row_shows_the_branch_impact_beside_the_standing_total() -> None:
+    outcome = DiffOutcome(
+        spec=NOQA,
+        range_names=("src",),
+        result=DiffResult(net=2, added=3, removed=1),
+        total=MetricResult(value=24),
+        guide=100,
+    )
+
+    header, noqa, *_ = rows(record(start((NOQA,)), outcome))
+    assert noqa.cells[2] == "+3 / -1 (net +2 of 🚨 24)"
+    assert header.cells[2] == "net +2 of 🚨 24"
+
+
+def test_search_matches_a_metric_by_its_own_name() -> None:
+    state = set_query(_measured(), "pylint")
+
+    assert _labels(state) == ["linting", "pylint-comment"]
+
+
+def test_search_is_case_sensitive() -> None:
+    assert _labels(set_query(_measured(), "Pylint")) == []
+
+
+def test_a_group_name_match_shows_every_metric_in_the_group() -> None:
+    state = set_query(_measured(), "lint")
+
+    assert _labels(state) == ["linting", "noqa-comment", "pylint-comment"]
+
+
+def test_a_name_match_leaves_the_metric_folded_as_the_reader_left_it() -> None:
+    state = set_fold(_measured(), metric_key("pylint-comment"), folded=True)
+
+    state = set_query(state, "pylint")
+
+    assert _labels(state) == ["linting", "pylint-comment"]
+
+
+def test_a_file_match_reveals_the_metric_showing_only_the_matching_hits() -> None:
+    state = set_query(_measured(), "runner.py")
+
+    assert _labels(state) == ["linting", "pylint-comment", "src/mills/runner.py:1"]
+
+
+def test_a_search_finds_a_file_inside_a_folded_metric_inside_a_folded_group() -> None:
+    state = set_fold(_measured(), metric_key("pylint-comment"), folded=True)
+    state = set_fold(state, group_key("linting"), folded=True)
+    assert _labels(state) == ["linting", "size", "loc", UNGROUPED, "legacy-arch"]
+
+    state = set_query(state, "views.py")
+
+    assert _labels(state) == [UNGROUPED, "legacy-arch", "src/views.py:1"]
+
+
+def test_an_explicit_fold_during_a_search_beats_the_reveal() -> None:
+    state = set_query(_measured(), "runner.py")
+
+    state = toggle_fold(state, metric_key("pylint-comment"))
+
+    assert _labels(state) == ["linting", "pylint-comment"]
+    assert is_folded(state, metric_key("pylint-comment"))
+
+
+def test_leaving_the_search_restores_the_fold_state_untouched() -> None:
+    state = set_fold(_measured(), metric_key("pylint-comment"), folded=True)
+    before = _labels(state)
+
+    state = set_query(state, "runner.py")
+    state = toggle_fold(state, group_key("linting"))
+    state = set_query(state, "")
+
+    assert state.overlay == {}
+    assert _labels(state) == before
+
+
+def test_a_search_that_matches_nothing_empties_the_view() -> None:
+    assert not rows(set_query(_measured(), "nothing-matches-this"))

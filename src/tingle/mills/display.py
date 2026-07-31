@@ -49,8 +49,8 @@ def loc_guide(loc: int) -> int:
     return max(1, round(loc / LOC_PER_GUIDE))
 
 
-def severity_emoji(value: int, guide: int) -> str:
-    """How bad `value` is against `guide`, as one emoji.
+def severity_ratio(value: int, guide: int) -> float:
+    """How bad `value` is against `guide`, as a number.
 
     The ratio is logarithmic: at `value == guide` it is exactly 1.0, as a
     linear ratio would be, so a guide keeps its meaning -- the point at
@@ -60,10 +60,25 @@ def severity_emoji(value: int, guide: int) -> str:
 
     Zero is answered before anything is divided, so a group whose metrics
     all errored -- no values, and so no guides to divide by -- is safe.
+
+    This is the ladder the emoji stand on, exposed as a number because
+    sorting by severity has to compare metrics judged against different
+    guides, which their raw values cannot do.
+    """
+    if value <= 0:
+        return 0.0
+    return math.log1p(value) / math.log1p(max(guide, 1))
+
+
+def severity_emoji(value: int, guide: int) -> str:
+    """How bad `value` is against `guide`, as one emoji.
+
+    The first band whose ceiling the ratio fits under wins; nothing at
+    all is its own state, above the ladder rather than on its bottom rung.
     """
     if value <= 0:
         return EMOJI_ZERO
-    ratio = math.log1p(value) / math.log1p(max(guide, 1))
+    ratio = severity_ratio(value, guide)
     for ceiling, emoji in EMOJI_BANDS:
         if ratio <= ceiling:
             return emoji

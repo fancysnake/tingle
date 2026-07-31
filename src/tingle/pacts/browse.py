@@ -1,0 +1,126 @@
+"""Contracts for browsing a run interactively: rows, sorting, state.
+
+The interactive gate draws whatever `mills.browse` says is visible, so
+the state of a browsing session -- what has been measured, what is
+folded, what is sorted, what is being searched for -- is a contract, not
+a widget tree. Nothing here knows a terminal exists.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from tingle.pacts.config import MetricSpec
+    from tingle.pacts.diff import DiffOutcome
+    from tingle.pacts.metrics import Occurrence
+    from tingle.pacts.report import GroupSummary, MetricOutcome
+
+
+class MetricStatus(StrEnum):
+    """How far one metric has got in the run.
+
+    A metric exists as a row before it has been measured, so the reader
+    sees the shape of the run at once and watches it fill; PENDING and
+    RUNNING are what that row shows in the meantime.
+    """
+
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    ERROR = "error"
+
+
+class SortKey(StrEnum):
+    """A column the reader can sort by.
+
+    VALUE and SCORE are separate keys because they answer different
+    questions: value is the raw count ("what is biggest"), score is the
+    value against the metric's own guide ("what is worst"), which is the
+    only one of the two that compares metrics with different guides.
+    """
+
+    GROUP = "group"
+    NAME = "name"
+    TYPE = "type"
+    VALUE = "value"
+    SCORE = "score"
+
+
+class RowKind(StrEnum):
+    """What a visible row stands for.
+
+    One table holds all three, so a renderer reads this rather than
+    guessing from which fields happen to be set.
+    """
+
+    GROUP = "group"
+    METRIC = "metric"
+    OCCURRENCE = "occurrence"
+
+
+@dataclass(frozen=True)
+class MetricEntry:
+    """One configured metric and everything known about it so far.
+
+    `outcome` is None until the metric has been measured; `status` says
+    whether that is because it has not started, is running, or failed.
+    """
+
+    spec: MetricSpec
+    status: MetricStatus = MetricStatus.PENDING
+    outcome: MetricOutcome | DiffOutcome | None = None
+
+
+@dataclass(frozen=True)
+class Row:
+    """One line of the browser, ready to be drawn.
+
+    `cells` is the row's text for the Group/Metric, Type and Value
+    columns, already carrying the emoji a value earns; occurrence rows
+    leave the last two blank, since a located hit has neither type nor
+    value of its own. Styling is the renderer's business, so no markup
+    reaches here.
+
+    `folded` is None on a row that cannot be folded -- an occurrence, or
+    a metric with nothing under it -- which is not the same as False.
+
+    `entry` and `occurrence` carry what the row was made from, so a
+    renderer can act on a row (open a hit in the editor, colour a diff)
+    without parsing its text back apart.
+    """
+
+    kind: RowKind
+    key: str
+    depth: int
+    cells: tuple[str, str, str]
+    folded: bool | None = None
+    entry: MetricEntry | None = None
+    occurrence: Occurrence | None = None
+    summary: GroupSummary | None = None
+
+
+@dataclass(frozen=True)
+class BrowseState:
+    """Everything a browsing session is, as data.
+
+    `sort` is a stack, most recently pushed first, so consecutive sorts
+    stack rather than replace each other. `folded` holds the keys of the
+    groups and metrics the reader has folded; it survives sorting and
+    searching untouched.
+
+    `overlay` is the fold gestures made *during* a search, keyed the same
+    way. A search reveals rows to show what it found, and an explicit
+    fold beats that reveal -- but neither may outlive the query, so they
+    are kept apart from `folded` and dropped when the query is cleared.
+    """
+
+    entries: tuple[MetricEntry, ...] = ()
+    sort: tuple[SortKey, ...] = ()
+    folded: frozenset[str] = frozenset()
+    query: str = ""
+    overlay: Mapping[str, bool] = field(default_factory=dict)
