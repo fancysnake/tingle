@@ -220,10 +220,11 @@ class _Match:
 def _matches(state: BrowseState) -> tuple[_Match, ...]:
     """Apply the query: which metrics are visible, showing which hits.
 
-    Matching is case-sensitive substring, against the metric's name, its
-    group's name, and the path of every one of its occurrences -- whether
-    or not that occurrence is currently on screen. Nobody is going to
-    unfold the whole tree before searching it.
+    Matching is case-sensitive substring, against everything a metric
+    says about itself -- its name, its group, its description and the
+    ranges it is measured over -- and against the path of every one of
+    its occurrences, whether or not that occurrence is currently on
+    screen. Nobody is going to unfold the whole tree before searching it.
     """
     if not state.query:
         return tuple(
@@ -241,9 +242,28 @@ def _matches(state: BrowseState) -> tuple[_Match, ...]:
 
 
 def _named(entry: MetricEntry, query: str) -> bool:
-    """Whether the query matched a name, rather than a file underneath it."""
-    group = entry.spec.group
-    return query in entry.spec.name or (group is not None and query in group)
+    """Whether the query matched the metric itself, not a file underneath it.
+
+    A metric's own name, its group's, its description and its range
+    names all describe the metric rather than locate anything inside it,
+    so a match on any of them leaves the metric exactly as the reader
+    had it. There is nothing underneath to single out.
+    """
+    spec = entry.spec
+    described = (spec.name, spec.group or "", spec.description or "")
+    return any(query in text for text in (*described, *_range_names(entry)))
+
+
+def _range_names(entry: MetricEntry) -> tuple[str, ...]:
+    """Name the ranges a metric covers, as resolved once it has been measured.
+
+    Before that only what the config named is known, which is nothing at
+    all for a metric that leaves the default range implied -- so the
+    default range becomes searchable when the metric's outcome lands.
+    """
+    if entry.outcome is not None:
+        return entry.outcome.range_names
+    return entry.spec.ranges
 
 
 def _occurrences(entry: MetricEntry) -> tuple[Occurrence, ...]:

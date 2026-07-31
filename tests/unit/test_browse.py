@@ -281,6 +281,42 @@ def test_a_group_name_match_shows_every_metric_in_the_group() -> None:
     assert _labels(state) == ["linting", "noqa-comment", "pylint-comment"]
 
 
+def test_a_description_match_shows_the_metric_as_the_reader_left_it() -> None:
+    spec = MetricSpec(
+        name="loc",
+        type="file_lines",
+        description="how much code there is to maintain",
+        group="size",
+    )
+    state = record(start((spec,)), _outcome(spec, 900, paths=("src/mills/browse.py",)))
+
+    state = set_query(state, "maintain")
+
+    assert _labels(state) == ["size", "loc"]
+
+
+def test_a_range_name_match_finds_the_range_the_run_resolved() -> None:
+    outcome = MetricOutcome(
+        spec=LEGACY,
+        range_names=("python-source",),
+        result=MetricResult(value=7),
+        guide=100,
+    )
+
+    assert _labels(set_query(record(start((LEGACY,)), outcome), "python-source")) == [
+        "legacy-arch"
+    ]
+    # the config left the range implied, so until the run resolves it there
+    # is no name to match -- the metric's own name is all it has
+    assert _labels(set_query(start((LEGACY,)), "python-source")) == []
+
+
+def test_a_range_named_in_the_config_matches_before_the_run_starts() -> None:
+    spec = MetricSpec(name="todo", type="regex_count", ranges=("docs",))
+
+    assert _labels(set_query(start((spec,)), "docs")) == ["todo"]
+
+
 def test_a_name_match_leaves_the_metric_folded_as_the_reader_left_it() -> None:
     state = set_fold(_measured(), metric_key("pylint-comment"), folded=True)
 
