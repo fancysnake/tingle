@@ -279,6 +279,6 @@ comparison** confirming the shared-finder refactor changed nothing. The collapse
 arithmetic, crossing directions, and `ignore_lines` interaction are thoroughly unit
 tested — trust those more.
 
-Note that `mise run shitcheck` fails on this branch, and on `main` too:
-`scripts/shitcheck.sh` does not exist in this repo. That is a pre-existing gap in the
-shared task config, not something this branch introduced.
+Ignore the `shitcheck` task inherited from the shared task config — tingle replaces it.
+The equivalent gate here is `tingle check`, against the `noqa-comment`, `type-ignores`
+and `any-uses` metrics the root `tingle.toml` already carries.

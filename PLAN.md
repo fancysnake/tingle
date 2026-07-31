@@ -180,8 +180,11 @@ $ tingle add regex_spread 'from tingle\.pacts' --name pacts-reach   # then rever
 $ mise run format          # black, ruff --fix, taplo
 $ mise run lint:py         # ruff, mypy, pylint, import-linter, codespell, vulture
 $ mise run test:py         # unit + integration
-$ mise run shitcheck       # no new noqa / Any / cast
+$ tingle check             # no new noqa / type: ignore / ANY
 ```
+
+(Not `mise run shitcheck` — that task is inherited from the shared config and
+tingle replaces it.)
 
 Then `QA.md` manual scenarios for the branch, per the usual practice on this
 repo.

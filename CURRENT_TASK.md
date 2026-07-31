@@ -36,12 +36,13 @@ number of *files* a pattern or symbol appears in rather than the number of hits.
 
 - 503 tests pass (55 new); ruff, mypy, pylint 10.00/10, import-linter 6/6,
   codespell, black all clean; `mise run docs:build` strict passes.
-- `mise run shitcheck` fails on this branch **and on `main`**:
-  `scripts/shitcheck.sh` does not exist in the repo. Pre-existing gap in the
-  shared task config, not introduced here. Its check was run manually against
-  the branch diff: one `Any` added in `src`, in
+- `tingle check` on this branch: green. The `shitcheck` task inherited from the
+  shared config is dead here — tingle is its replacement, and `tingle.toml`
+  already measures what it grepped for.
+- The branch adds one `Any` in `src`, in
   `symbol_uses._parts(params: Mapping[str, Any])`, matching the existing
-  signature convention for metric params.
+  signature convention for metric params. `any-uses` counts the `ANY`
+  sentinel, not this, so it stays at 1.
 
 ## Not done
 
