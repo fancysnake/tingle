@@ -4,6 +4,7 @@ from tingle.mills.browse import (
     UNGROUPED,
     begin,
     clear_sort,
+    fold_quiet_groups,
     group_key,
     is_folded,
     metric_key,
@@ -141,9 +142,42 @@ def test_occurrences_are_child_rows_of_an_unfolded_metric() -> None:
 
 
 def test_a_metric_with_nothing_under_it_is_not_foldable() -> None:
-    (noqa,) = [row for row in rows(_measured()) if row.cells[0] == "noqa-comment"]
+    # no hits, no description, and no range it can name: nothing to reveal
+    spec = MetricSpec(name="bare", type="regex_count")
+    outcome = MetricOutcome(
+        spec=spec, range_names=(), result=MetricResult(value=0), guide=100
+    )
 
-    assert noqa.folded is None
+    (bare,) = rows(record(start((spec,)), outcome))
+
+    assert bare.folded is None
+
+
+def test_an_unfolded_metric_says_what_it_measures_before_what_it_found() -> None:
+    spec = MetricSpec(
+        name="pylint-comment",
+        type="regex_count",
+        description="how many lint escapes we carry",
+    )
+    state = record(start((spec,)), _outcome(spec, 1, paths=("src/a.py",)))
+
+    state = toggle_fold(state, metric_key("pylint-comment"))
+
+    assert [(row.kind, row.cells[0]) for row in rows(state)] == [
+        (RowKind.METRIC, "pylint-comment"),
+        (RowKind.DETAIL, "how many lint escapes we carry"),
+        (RowKind.DETAIL, "ranges: src"),
+        (RowKind.OCCURRENCE, "src/a.py:1"),
+    ]
+
+
+def test_a_failed_metric_carries_its_error_where_the_reader_can_read_it() -> None:
+    outcome = MetricOutcome(spec=LEGACY, range_names=("src",), error="ValueError: boom")
+    state = toggle_fold(record(start((LEGACY,)), outcome), metric_key("legacy-arch"))
+
+    details = [row.cells[0] for row in rows(state) if row.kind is RowKind.DETAIL]
+
+    assert details == ["ranges: src", "ValueError: boom"]
 
 
 def test_folding_a_group_hides_its_metrics_but_not_the_others() -> None:
@@ -172,7 +206,7 @@ def test_fold_all_collapses_the_metrics_when_the_run_has_no_groups() -> None:
         record(start((spec,)), _outcome(spec, 2, paths=("src/a.py",))),
         metric_key("todo"),
     )
-    assert _labels(state) == ["todo", "src/a.py:1"]
+    assert _labels(state) == ["todo", "ranges: src", "src/a.py:1"]
 
     state = toggle_fold_all(state)
 
@@ -184,6 +218,45 @@ def test_fold_all_leaves_a_listing_with_nothing_foldable_alone() -> None:
     state = start((LEGACY,))
 
     assert toggle_fold_all(state) is state
+
+
+def test_a_finished_report_folds_away_the_groups_with_nothing_to_report() -> None:
+    state = record(start(SPECS), _outcome(NOQA, 0))
+    state = record(state, _outcome(PYLINT, 0))
+    state = record(state, _outcome(LOC, 900, guide=2000))
+    state = record(state, _outcome(LEGACY, 7))
+
+    state = fold_quiet_groups(state)
+
+    # linting measured nothing at all, so it folds; the others did, so they stay
+    assert _labels(state) == ["linting", "size", "loc", UNGROUPED, "legacy-arch"]
+
+
+def test_a_group_holding_an_error_is_never_folded_away() -> None:
+    state = record(
+        start((NOQA, PYLINT)),
+        MetricOutcome(spec=NOQA, range_names=(), error="ValueError: boom"),
+    )
+    state = record(state, _outcome(PYLINT, 0))
+
+    state = fold_quiet_groups(state)
+
+    assert not is_folded(state, group_key("linting"))
+
+
+def test_a_diff_group_the_branch_did_not_move_folds_away() -> None:
+    quiet = MetricSpec(name="still", type="file_count", group="quiet")
+    outcome = DiffOutcome(
+        spec=quiet,
+        range_names=("src",),
+        result=DiffResult(net=0, added=0, removed=0),
+        total=MetricResult(value=12),
+        guide=100,
+    )
+
+    state = fold_quiet_groups(record(start((quiet,)), outcome))
+
+    assert _labels(state) == ["quiet"]
 
 
 def test_push_sort_stacks_and_moves_a_repeated_key_to_the_front() -> None:
@@ -399,7 +472,12 @@ def test_a_name_match_leaves_the_metric_folded_as_the_reader_left_it() -> None:
 def test_a_file_match_reveals_the_metric_showing_only_the_matching_hits() -> None:
     state = set_query(_measured(), "runner.py")
 
-    assert _labels(state) == ["linting", "pylint-comment", "src/mills/runner.py:1"]
+    assert _labels(state) == [
+        "linting",
+        "pylint-comment",
+        "ranges: src",
+        "src/mills/runner.py:1",
+    ]
 
 
 def test_a_search_finds_a_file_inside_a_folded_metric_inside_a_folded_group() -> None:
@@ -409,7 +487,7 @@ def test_a_search_finds_a_file_inside_a_folded_metric_inside_a_folded_group() ->
 
     state = set_query(state, "views.py")
 
-    assert _labels(state) == [UNGROUPED, "legacy-arch", "src/views.py:1"]
+    assert _labels(state) == [UNGROUPED, "legacy-arch", "ranges: src", "src/views.py:1"]
 
 
 def test_an_explicit_fold_during_a_search_beats_the_reveal() -> None:

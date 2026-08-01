@@ -54,12 +54,18 @@ class SortKey(StrEnum):
 class RowKind(StrEnum):
     """What a visible row stands for.
 
-    One table holds all three, so a renderer reads this rather than
+    One table holds all four, so a renderer reads this rather than
     guessing from which fields happen to be set.
+
+    DETAIL is what a metric says about itself -- what it measures, over
+    which ranges, and why it failed. It sits under the metric rather than
+    beside it because the table has three columns and none of them is
+    prose.
     """
 
     GROUP = "group"
     METRIC = "metric"
+    DETAIL = "detail"
     OCCURRENCE = "occurrence"
 
 
@@ -81,13 +87,14 @@ class Row:
     """One line of the browser, ready to be drawn.
 
     `cells` is the row's text for the Group/Metric, Type and Value
-    columns, already carrying the emoji a value earns; occurrence rows
-    leave the last two blank, since a located hit has neither type nor
-    value of its own. Styling is the renderer's business, so no markup
-    reaches here.
+    columns, already carrying the emoji a value earns; occurrence and
+    detail rows leave the last two blank, since neither a located hit nor
+    a line of prose has a type or value of its own. Styling is the
+    renderer's business, so no markup reaches here.
 
-    `folded` is None on a row that cannot be folded -- an occurrence, or
-    a metric with nothing under it -- which is not the same as False.
+    `folded` is None on a row that cannot be folded -- an occurrence, a
+    detail, or a metric with nothing under it -- which is not the same as
+    False.
 
     `entry` and `occurrence` carry what the row was made from, so a
     renderer can act on a row (open a hit in the editor, colour a diff)

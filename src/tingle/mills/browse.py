@@ -194,6 +194,27 @@ def toggle_fold_all(state: BrowseState) -> BrowseState:
     return state
 
 
+def fold_quiet_groups(state: BrowseState) -> BrowseState:
+    """Fold away the groups a finished report has nothing to say about.
+
+    A run's group is quiet when it measured nothing at all, a branch's
+    when it moved nothing; either way it is noise beside the groups that
+    did have something to report. A group holding an error is never
+    quiet -- that is the one thing the reader most needs to see.
+
+    Only a finished report can be read this way. During a live run every
+    group is empty until its metrics land, so folding on emptiness would
+    fold the whole listing away at the start; that is why this is applied
+    when a finished report is presented rather than by `start`.
+    """
+    quiet = frozenset(
+        group_key(name)
+        for name, section in _sections(_matches(state), state.sort)
+        if _quiet(_section_summary(section))
+    )
+    return replace(state, folded=state.folded | quiet)
+
+
 def rows(state: BrowseState) -> tuple[Row, ...]:
     """Every row that should be drawn, in the order it should be drawn.
 
@@ -403,10 +424,7 @@ def _group_row(
     a partial sum says more than a blank, and blanking it until the last
     metric lands would leave the header saying nothing for the whole run.
     """
-    outcomes = tuple(
-        match.entry.outcome for match in section if match.entry.outcome is not None
-    )
-    summary = group_summary(outcomes)
+    summary = _section_summary(section)
     return Row(
         kind=RowKind.GROUP,
         key=key,
@@ -417,20 +435,67 @@ def _group_row(
     )
 
 
+def _section_summary(section: Sequence[_Match]) -> GroupSummary:
+    """Add up what a group's measured metrics say; the unmeasured add nothing."""
+    return group_summary(
+        tuple(
+            match.entry.outcome for match in section if match.entry.outcome is not None
+        )
+    )
+
+
+def _quiet(summary: GroupSummary) -> bool:
+    """Whether a group has nothing to report -- see `fold_quiet_groups`."""
+    if summary.has_error:
+        return False
+    if summary.net is not None:
+        return not summary.changed
+    return summary.value == 0
+
+
 def _metric_rows(state: BrowseState, match: _Match, *, depth: int) -> Iterable[Row]:
-    """Draw a metric, and the hits underneath it when it is unfolded."""
+    """Draw a metric, then what it says about itself and what it found.
+
+    The detail lines come before the hits: what a metric measures reads
+    as an introduction to the list, not a footnote after it.
+    """
     row = _metric_row(state, match, depth=depth, foldable=True)
     yield row
-    if row.folded is False:
-        for index, occurrence in enumerate(match.occurrences):
-            yield Row(
-                kind=RowKind.OCCURRENCE,
-                key=f"{row.key}/{index}",
-                depth=depth + 1,
-                cells=(str(occurrence), "", ""),
-                entry=match.entry,
-                occurrence=occurrence,
-            )
+    if row.folded is not False:
+        return
+    for index, text in enumerate(_details(match.entry)):
+        yield Row(
+            kind=RowKind.DETAIL,
+            key=f"{row.key}/detail/{index}",
+            depth=depth + 1,
+            cells=(text, "", ""),
+            entry=match.entry,
+        )
+    for index, occurrence in enumerate(match.occurrences):
+        yield Row(
+            kind=RowKind.OCCURRENCE,
+            key=f"{row.key}/{index}",
+            depth=depth + 1,
+            cells=(str(occurrence), "", ""),
+            entry=match.entry,
+            occurrence=occurrence,
+        )
+
+
+def _details(entry: MetricEntry) -> tuple[str, ...]:
+    """Gather what a metric says about itself: what, where, and why not.
+
+    A metric that failed says so here rather than leaving the reader with
+    an ERROR in the value column and nowhere to find out what happened.
+    """
+    lines = []
+    if (description := entry.spec.description) is not None:
+        lines.append(description)
+    if names := _range_names(entry):
+        lines.append(f"ranges: {', '.join(names)}")
+    if (outcome := entry.outcome) is not None and outcome.error is not None:
+        lines.append(outcome.error)
+    return tuple(lines)
 
 
 def _metric_row(
@@ -438,10 +503,9 @@ def _metric_row(
 ) -> Row:
     """One metric's own row. Nothing to fold means no fold state at all."""
     key = metric_key(match.entry.spec.name)
+    has_body = bool(match.occurrences) or bool(_details(match.entry))
     folded = (
-        _folded(state, key, revealed=match.revealed)
-        if foldable and match.occurrences
-        else None
+        _folded(state, key, revealed=match.revealed) if foldable and has_body else None
     )
     return Row(
         kind=RowKind.METRIC,
