@@ -22,15 +22,14 @@ if TYPE_CHECKING:
 
 
 class MetricStatus(StrEnum):
-    """How far one metric has got in the run.
+    """Whether a configured metric has a result, and why not if it has none.
 
-    A metric exists as a row before it has been measured, so the reader
-    sees the shape of the run at once and watches it fill; PENDING and
-    RUNNING are what that row shows in the meantime.
+    PENDING is the state a metric is in between being read out of the
+    config and having its outcome taken in; a session built from a report
+    passes through it rather than resting there.
     """
 
     PENDING = "pending"
-    RUNNING = "running"
     DONE = "done"
     ERROR = "error"
 

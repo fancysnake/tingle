@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from tingle.mills.browse import (
     UNGROUPED,
-    begin,
     clear_sort,
     fold_quiet_groups,
     group_key,
@@ -12,7 +11,6 @@ from tingle.mills.browse import (
     outlined,
     push_sort,
     record,
-    restart,
     rows,
     set_fold,
     set_query,
@@ -94,15 +92,15 @@ def test_rows_nest_metrics_under_their_group_in_config_order() -> None:
     assert [row.depth for row in rows(state)] == [0, 1, 1, 0, 1, 0, 1]
 
 
-def test_a_partly_pending_run_shows_blanks_and_a_partial_group_total() -> None:
-    state = record(begin(start(SPECS), "pylint-comment"), _outcome(NOQA, 3))
+def test_a_metric_with_no_outcome_shows_a_blank_and_adds_nothing_to_its_group() -> None:
+    state = record(start(SPECS), _outcome(NOQA, 3))
 
     header, noqa, pylint, *_ = rows(state)
-    assert header.cells[2] == "🚧 3"
+    assert header.cells[2] == "🚧 3"  # only what has an outcome counts
     assert noqa.cells[2] == "🚧 3"
-    assert pylint.cells[2] == "…"
+    assert pylint.cells[2] == ""
     assert pylint.entry is not None
-    assert pylint.entry.status is MetricStatus.RUNNING
+    assert pylint.entry.status is MetricStatus.PENDING
 
 
 def test_an_errored_metric_says_so_and_raises_its_groups_error_flag() -> None:
@@ -116,15 +114,6 @@ def test_an_errored_metric_says_so_and_raises_its_groups_error_flag() -> None:
     assert noqa.entry.status is MetricStatus.ERROR
     assert header.summary is not None
     assert header.summary.has_error
-
-
-def test_restart_sends_every_metric_back_to_pending_keeping_the_outline() -> None:
-    state = set_fold(_measured(), group_key("linting"), folded=True)
-
-    state = restart(state)
-
-    assert [entry.status for entry in state.entries] == [MetricStatus.PENDING] * 4
-    assert is_folded(state, group_key("linting"))
 
 
 def test_occurrences_are_child_rows_of_an_unfolded_metric() -> None:

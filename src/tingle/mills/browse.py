@@ -37,9 +37,6 @@ if TYPE_CHECKING:
 #: What the section holding metrics with no group of their own is called.
 UNGROUPED = "(ungrouped)"
 
-#: Shown in the value column while a metric is being measured.
-RUNNING_STAT = "…"
-
 #: Shown in the value column of a metric that could not be measured.
 ERROR_STAT = "ERROR"
 
@@ -55,27 +52,14 @@ def group_key(name: str | None) -> str:
 
 
 def start(specs: Sequence[MetricSpec]) -> BrowseState:
-    """Open a session over `specs`: every metric pending, and folded.
+    """Open a session over `specs`: every metric folded, none measured yet.
 
-    The rows exist before the run does, which is the point: the reader
-    sees the shape of what is about to happen instead of a blank screen.
-
-    Metrics start folded and groups start open, so the listing opens as
-    an outline of what is being measured rather than as every located hit
-    at once. A group cannot start folded on how little it holds, the way
-    a finished report's could: at this point it holds nothing, and folding
-    a group away just as it begins to fill is the opposite of the point.
+    Metrics start folded and groups start open, so the listing opens as an
+    outline of what was measured rather than as every located hit at once.
     """
     return BrowseState(
         entries=tuple(MetricEntry(spec=spec) for spec in specs),
         folded=frozenset(metric_key(spec.name) for spec in specs),
-    )
-
-
-def begin(state: BrowseState, name: str) -> BrowseState:
-    """Mark one metric as being measured right now."""
-    return _replace_entry(
-        state, name, change=lambda entry: replace(entry, status=MetricStatus.RUNNING)
     )
 
 
@@ -90,17 +74,6 @@ def record(state: BrowseState, outcome: MetricOutcome | DiffOutcome) -> BrowseSt
         state,
         outcome.spec.name,
         change=lambda entry: replace(entry, status=status, outcome=outcome),
-    )
-
-
-def restart(state: BrowseState) -> BrowseState:
-    """Send every metric back to pending, keeping sort, folds and query.
-
-    A re-run answers the same question again; it is not a reason to lose
-    the reader's place in the outline.
-    """
-    return replace(
-        state, entries=tuple(MetricEntry(spec=entry.spec) for entry in state.entries)
     )
 
 
@@ -211,17 +184,16 @@ def toggle_fold_all(state: BrowseState) -> BrowseState:
 
 
 def fold_quiet_groups(state: BrowseState) -> BrowseState:
-    """Fold away the groups a finished report has nothing to say about.
+    """Fold away the groups a report has nothing to say about.
 
     A run's group is quiet when it measured nothing at all, a branch's
     when it moved nothing; either way it is noise beside the groups that
     did have something to report. A group holding an error is never
     quiet -- that is the one thing the reader most needs to see.
 
-    Only a finished report can be read this way. During a live run every
-    group is empty until its metrics land, so folding on emptiness would
-    fold the whole listing away at the start; that is why this is applied
-    when a finished report is presented rather than by `start`.
+    This reads the outcomes rather than the config, so it belongs to
+    presenting a report and not to opening a session: `start` knows the
+    metrics but not yet what any of them found.
     """
     quiet = frozenset(
         group_key(name)
@@ -579,11 +551,9 @@ def _metric_cells(entry: MetricEntry) -> tuple[str, str, str]:
 
 
 def _stat(entry: MetricEntry) -> str:
-    """Fill the value column: blank while pending, then the measured number."""
+    """Fill the value column: blank until an outcome lands, then its number."""
     if entry.status is MetricStatus.PENDING:
         return ""
-    if entry.status is MetricStatus.RUNNING:
-        return RUNNING_STAT
     outcome = entry.outcome
     if outcome is None or outcome.result is None:
         return ERROR_STAT

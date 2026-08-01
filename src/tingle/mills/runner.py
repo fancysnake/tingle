@@ -13,45 +13,7 @@ from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 from tingle.pacts.report import MetricOutcome, RunReport
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Iterator, Mapping
-
-
-def iter_outcomes(
-    config: Config,
-    project: ProjectFiles,
-    *,
-    metric_types: Mapping[str, MetricType],
-    only: Collection[str] | None = None,
-) -> Iterator[MetricOutcome]:
-    """Measure every configured metric, one at a time, in config order.
-
-    Nothing is measured until the first outcome is pulled, and that
-    includes walking the tree and counting the lines a guide is derived
-    from. A caller can therefore show the shape of the run -- every
-    metric, waiting -- before any of it has cost anything.
-
-    `only` is checked before the generator is built rather than inside
-    it, so an unknown name is an error at the call and not at whatever
-    later moment the caller happens to ask for the first outcome.
-    """
-    reject_unknown(config, only)
-    return _outcomes(config, project, metric_types=metric_types, only=only)
-
-
-def _outcomes(
-    config: Config,
-    project: ProjectFiles,
-    *,
-    metric_types: Mapping[str, MetricType],
-    only: Collection[str] | None,
-) -> Iterator[MetricOutcome]:
-    walked = tuple(project.walk())
-    loc = ProjectLoc(config, project=project, walked=walked)
-    for spec in config.metrics:
-        if only is None or spec.name in only:
-            yield _outcome(
-                spec, config, project=project, metric_types=metric_types, loc=loc
-            )
+    from collections.abc import Collection, Mapping
 
 
 def run(
@@ -62,19 +24,19 @@ def run(
     only: Collection[str] | None = None,
 ) -> RunReport:
     """Run every configured metric, isolating failures per metric."""
+    if only is not None:
+        known = {spec.name for spec in config.metrics}
+        if unknown := sorted(set(only) - known):
+            raise ConfigError([f'unknown metric "{name}"' for name in unknown])
+
+    walked = tuple(project.walk())
+    loc = ProjectLoc(config, project=project, walked=walked)
     outcomes = tuple(
-        iter_outcomes(config, project, metric_types=metric_types, only=only)
+        _outcome(spec, config, project=project, metric_types=metric_types, loc=loc)
+        for spec in config.metrics
+        if only is None or spec.name in only
     )
     return RunReport(root=config.root, source=config.source, outcomes=outcomes)
-
-
-def reject_unknown(config: Config, only: Collection[str] | None) -> None:
-    """Refuse a filter naming a metric the config does not have."""
-    if only is None:
-        return
-    known = {spec.name for spec in config.metrics}
-    if unknown := sorted(set(only) - known):
-        raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
 
 def _outcome(
