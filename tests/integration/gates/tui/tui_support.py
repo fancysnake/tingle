@@ -1,0 +1,181 @@
+"""Reports and readers shared by the TUI's test modules.
+
+The suite is split by feature -- the table itself, sorting, search -- and
+all three drive the same app over the same handful of reports, so the
+arrangement lives here once. The readers pull what is actually drawn out
+of the table rather than reaching into the app's own state, so a test
+asserts what a reader would see.
+
+Named `tui_support` rather than `support` because the unit suite already
+has a module by that name, and pytest puts each test file's own directory
+on `sys.path` -- two modules called `support` would shadow each other.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from tingle.gates.tui.app import BrowseTable, MetricsApp, SearchBar, SortBar
+from tingle.links.editor import VsCodeCli
+from tingle.pacts.config import MetricSpec
+from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
+from tingle.pacts.metrics import MetricResult, Occurrence
+from tingle.pacts.report import MetricOutcome, RunReport
+
+RUN_REPORT = RunReport(
+    root=Path("/proj"),
+    source=Path("/proj/tingle.toml"),
+    outcomes=(
+        MetricOutcome(
+            spec=MetricSpec(name="noqa-comments", type="regex_count"),
+            range_names=("python",),
+            result=MetricResult(
+                value=2,
+                occurrences=(
+                    Occurrence(path="src/a.py", line=1),
+                    Occurrence(path="src/b.py", line=9),
+                ),
+            ),
+        ),
+        MetricOutcome(
+            spec=MetricSpec(name="python-files", type="file_count"),
+            range_names=("python",),
+            result=MetricResult(value=5),
+        ),
+    ),
+)
+
+DIFF_REPORT = DiffReport(
+    root=Path("/proj"),
+    source=Path("/proj/tingle.toml"),
+    base_ref="main",
+    merge_base="abc123",
+    outcomes=(
+        DiffOutcome(
+            spec=MetricSpec(name="noqa-comments", type="regex_count"),
+            range_names=("python",),
+            result=DiffResult(
+                net=1,
+                added=2,
+                removed=1,
+                added_occurrences=(
+                    Occurrence(path="src/a.py", line=3),
+                    Occurrence(path="src/new.py", line=1),
+                ),
+                removed_occurrences=(Occurrence(path="src/b.py", line=9),),
+            ),
+            total=MetricResult(value=7),
+        ),
+    ),
+)
+
+
+#: One group the branch moved and one it did not, for the folding rule.
+QUIET_DIFF_REPORT = DiffReport(
+    root=Path("/proj"),
+    source=Path("/proj/tingle.toml"),
+    base_ref="main",
+    merge_base="abc123",
+    outcomes=(
+        DiffOutcome(
+            spec=MetricSpec(name="still", type="file_count", group="quiet"),
+            range_names=(),
+            result=DiffResult(net=0, added=0, removed=0),
+            total=MetricResult(value=12),
+        ),
+        DiffOutcome(
+            spec=MetricSpec(name="moved", type="file_count", group="loud"),
+            range_names=(),
+            result=DiffResult(net=2, added=2, removed=0),
+            total=MetricResult(value=9),
+        ),
+    ),
+)
+
+
+def grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
+    """Build one metric with a single located hit, in `group`."""
+    return MetricOutcome(
+        spec=MetricSpec(name=name, type="file_count", group=group),
+        range_names=(),
+        result=MetricResult(
+            value=value, occurrences=(Occurrence(path="x.py", line=1),)
+        ),
+    )
+
+
+GROUPED_REPORT = RunReport(
+    root=Path("/proj"),
+    source=Path("/proj/tingle.toml"),
+    outcomes=(
+        grouped("type-ignores", "typing"),
+        grouped("mypy-overrides", "typing"),
+        grouped("noqa-comments", "lint"),
+        grouped("python-files", None),
+    ),
+)
+
+
+def summed_report(*outcomes: MetricOutcome) -> RunReport:
+    """Wrap outcomes in a report, for the tests that build their own."""
+    return RunReport(
+        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=outcomes
+    )
+
+
+def valued(name: str, group: str, *, value: int, guide: int = 100) -> MetricOutcome:
+    """Build a metric with a value and no hits: nothing to fold, only a number."""
+    return MetricOutcome(
+        spec=MetricSpec(name=name, type="file_count", group=group),
+        range_names=(),
+        result=MetricResult(value=value),
+        guide=guide,
+    )
+
+
+def column(app: MetricsApp, index: int) -> list[str]:
+    """Read one column of the table exactly as it is drawn."""
+    table = app.query_one(BrowseTable)
+    return [str(table.get_row_at(row)[index]) for row in range(table.row_count)]
+
+
+def outline(app: MetricsApp) -> list[str]:
+    """Read the first column: indentation, fold marker and label, verbatim."""
+    return column(app, 0)
+
+
+def labels(app: MetricsApp) -> list[str]:
+    """Read just the labels, with the outline's indent and marker stripped off."""
+    return [text.strip().lstrip("▾▸ ").strip() for text in outline(app)]
+
+
+def cursor(app: MetricsApp) -> str:
+    """Read the label of the row the cursor is on."""
+    return labels(app)[app.query_one(BrowseTable).cursor_row]
+
+
+def headers(app: MetricsApp) -> list[str]:
+    """Read the column headings, which carry the sort marker when one is set."""
+    table = app.query_one(BrowseTable)
+    return [str(heading.label) for heading in table.columns.values()]
+
+
+def status(app: MetricsApp) -> str:
+    """Read the line under the table: the sort stack, or the live query."""
+    return str(app.query_one(SortBar).render())
+
+
+def search_box(app: MetricsApp) -> SearchBar:
+    """Find the `/` query box, hidden until search mode is entered."""
+    return app.query_one(SearchBar)
+
+
+def recording_opener(*, available: bool = True) -> tuple[VsCodeCli, list[list[str]]]:
+    """Build the real VS Code adapter with its `code` spawn captured, not run."""
+    calls: list[list[str]] = []
+    opener = VsCodeCli(
+        environ={"TERM_PROGRAM": "vscode"} if available else {},
+        which=lambda name: "/usr/bin/code" if name == "code" else None,
+        spawn=lambda args: calls.append(list(args)),
+    )
+    return opener, calls

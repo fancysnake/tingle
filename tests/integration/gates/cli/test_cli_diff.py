@@ -25,7 +25,7 @@ def test_stat_diff_table() -> None:
     result = runner.invoke(app, ["stat", "--diff"])
 
     assert result.exit_code == 0
-    assert "noqa-comments" in result.output
+    assert "lint-escapes" in result.output
     assert "+3" in result.output
     assert "ruff-ignores" in result.output
     assert "+1" in result.output
@@ -41,7 +41,7 @@ def test_stat_diff_json_is_values_only() -> None:
     assert len(payload["merge_base"]) == 40
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
 
-    noqa = metrics["noqa-comments"]
+    noqa = metrics["lint-escapes"]
     assert noqa["added"] == 3
     assert noqa["net"] == 3
     assert noqa["total"] == 4
@@ -60,7 +60,7 @@ def test_report_diff_json_includes_occurrences() -> None:
     payload = json.loads(result.stdout)
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
 
-    noqa = metrics["noqa-comments"]
+    noqa = metrics["lint-escapes"]
     assert noqa["added"] == 3
     assert noqa["total"] == 4
     assert {"file": "src/a.py", "line": 2, "note": None} in noqa["added_occurrences"]
@@ -149,7 +149,7 @@ def test_raising_diff_metric_exits_1_but_others_render(
     payload = json.loads(result.stdout)
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
     assert metrics["ruff-ignores"]["error"] == "RuntimeError: boom"
-    assert metrics["noqa-comments"]["net"] == 3
+    assert metrics["lint-escapes"]["net"] == 3
     assert "error: ruff-ignores: RuntimeError: boom" in result.stderr
 
 

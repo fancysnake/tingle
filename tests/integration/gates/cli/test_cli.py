@@ -45,7 +45,7 @@ def test_bare_invocation_prints_summary_when_not_a_tty() -> None:
     result = runner.invoke(app, [])
 
     assert result.exit_code == 0
-    assert "noqa-comments" in result.output
+    assert "lint-escapes" in result.output
     assert "3" in result.output
     assert "python-files" in result.output
 
@@ -55,7 +55,7 @@ def test_stat_table() -> None:
     result = runner.invoke(app, ["stat"])
 
     assert result.exit_code == 0
-    assert "noqa-comments" in result.output
+    assert "lint-escapes" in result.output
     assert "3" in result.output
 
 
@@ -67,7 +67,7 @@ def test_stat_json_is_values_only() -> None:
     payload = json.loads(result.stdout)
     assert payload["config"].endswith("tingle.toml")
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
-    noqa = metrics["noqa-comments"]
+    noqa = metrics["lint-escapes"]
     assert noqa["value"] == 3
     assert "occurrences" not in noqa
     assert "details" not in noqa
@@ -82,7 +82,7 @@ def test_report_lists_occurrences() -> None:
     # The value is led by how bad it is against its guide, and with none set the
     # guide is derived from the size of the codebase. This fixture is a handful
     # of lines, so three noqa comments really are a dense pile of debt.
-    assert "noqa-comments (regex_count): 🔥 3" in result.output
+    assert "lint-escapes (regex_count): 🔥 3" in result.output
     assert "src/a.py:1" in result.output
     assert "src/a.py:2" in result.output
     assert "src/b.py:1" in result.output
@@ -96,7 +96,7 @@ def test_report_json_includes_occurrences() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
-    noqa = metrics["noqa-comments"]
+    noqa = metrics["lint-escapes"]
     assert noqa["value"] == 3
     assert noqa["details"] == {"src/a.py": 2, "src/b.py": 1}
     assert noqa["occurrences"] == [
@@ -163,7 +163,7 @@ def test_raising_metric_exits_1_but_others_run(monkeypatch: pytest.MonkeyPatch) 
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
     assert metrics["python-files"]["error"] == "RuntimeError: boom"
     assert metrics["python-files"]["value"] is None
-    assert metrics["noqa-comments"]["value"] == 3
+    assert metrics["lint-escapes"]["value"] == 3
     assert "error: python-files: RuntimeError: boom" in result.stderr
 
 
@@ -179,7 +179,7 @@ def test_list_shows_configured_metrics() -> None:
     result = runner.invoke(app, ["list"])
 
     assert result.exit_code == 0
-    assert "noqa-comments" in result.output
+    assert "lint-escapes" in result.output
     assert "regex_count" in result.output
 
 

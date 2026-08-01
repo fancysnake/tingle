@@ -30,141 +30,38 @@ from typing import TYPE_CHECKING
 from textual.binding import Binding
 from textual.command import CommandList, CommandPalette
 from textual.widgets import Input
+from tui_support import (
+    DIFF_REPORT,
+    GROUPED_REPORT,
+    QUIET_DIFF_REPORT,
+    RUN_REPORT,
+    BrowseTable,
+    MetricsApp,
+    MetricSpec,
+    Occurrence,
+    column,
+    cursor,
+    labels,
+    outline,
+    recording_opener,
+    summed_report,
+    valued,
+)
 
-from tingle.gates.tui.app import BrowseTable, MetricsApp, SearchBar, SortBar
-from tingle.links.editor import VsCodeCli
-from tingle.pacts.config import MetricSpec
-from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
-from tingle.pacts.metrics import MetricResult, Occurrence
-from tingle.pacts.report import MetricOutcome, RunReport
+from tingle.pacts.metrics import MetricResult
+from tingle.pacts.report import MetricOutcome
 
 if TYPE_CHECKING:
     from textual.pilot import Pilot
-
-RUN_REPORT = RunReport(
-    root=Path("/proj"),
-    source=Path("/proj/tingle.toml"),
-    outcomes=(
-        MetricOutcome(
-            spec=MetricSpec(name="noqa-comments", type="regex_count"),
-            range_names=("python",),
-            result=MetricResult(
-                value=2,
-                occurrences=(
-                    Occurrence(path="src/a.py", line=1),
-                    Occurrence(path="src/b.py", line=9),
-                ),
-            ),
-        ),
-        MetricOutcome(
-            spec=MetricSpec(name="python-files", type="file_count"),
-            range_names=("python",),
-            result=MetricResult(value=5),
-        ),
-    ),
-)
-
-DIFF_REPORT = DiffReport(
-    root=Path("/proj"),
-    source=Path("/proj/tingle.toml"),
-    base_ref="main",
-    merge_base="abc123",
-    outcomes=(
-        DiffOutcome(
-            spec=MetricSpec(name="noqa-comments", type="regex_count"),
-            range_names=("python",),
-            result=DiffResult(
-                net=1,
-                added=2,
-                removed=1,
-                added_occurrences=(
-                    Occurrence(path="src/a.py", line=3),
-                    Occurrence(path="src/new.py", line=1),
-                ),
-                removed_occurrences=(Occurrence(path="src/b.py", line=9),),
-            ),
-            total=MetricResult(value=7),
-        ),
-    ),
-)
-
-
-def _grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
-    return MetricOutcome(
-        spec=MetricSpec(name=name, type="file_count", group=group),
-        range_names=(),
-        result=MetricResult(
-            value=value, occurrences=(Occurrence(path="x.py", line=1),)
-        ),
-    )
-
-
-GROUPED_REPORT = RunReport(
-    root=Path("/proj"),
-    source=Path("/proj/tingle.toml"),
-    outcomes=(
-        _grouped("type-ignores", "typing"),
-        _grouped("mypy-overrides", "typing"),
-        _grouped("noqa-comments", "lint"),
-        _grouped("python-files", None),
-    ),
-)
-
-
-def _summed_report(*outcomes: MetricOutcome) -> RunReport:
-    return RunReport(
-        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=outcomes
-    )
-
-
-def _valued(name: str, group: str, *, value: int, guide: int = 100) -> MetricOutcome:
-    return MetricOutcome(
-        spec=MetricSpec(name=name, type="file_count", group=group),
-        range_names=(),
-        result=MetricResult(value=value),
-        guide=guide,
-    )
-
-
-def _column(app: MetricsApp, index: int) -> list[str]:
-    """One column of the table exactly as it is drawn."""
-    table = app.query_one(BrowseTable)
-    return [str(table.get_row_at(row)[index]) for row in range(table.row_count)]
-
-
-def _outline(app: MetricsApp) -> list[str]:
-    """Return the first column: indentation, fold marker and label, verbatim."""
-    return _column(app, 0)
-
-
-def _labels(app: MetricsApp) -> list[str]:
-    """Just the labels, with the outline's indent and marker stripped off."""
-    return [text.strip().lstrip("▾▸ ").strip() for text in _outline(app)]
-
-
-def _cursor(app: MetricsApp) -> str:
-    """Return the label of the row the cursor is on."""
-    return _labels(app)[app.query_one(BrowseTable).cursor_row]
-
-
-def _recording_opener(*, available: bool = True) -> tuple[VsCodeCli, list[list[str]]]:
-    """Build the real VS Code adapter with its `code` spawn captured, not run."""
-    calls: list[list[str]] = []
-    opener = VsCodeCli(
-        environ={"TERM_PROGRAM": "vscode"} if available else {},
-        which=lambda name: "/usr/bin/code" if name == "code" else None,
-        spawn=lambda args: calls.append(list(args)),
-    )
-    return opener, calls
 
 
 def test_the_table_has_a_row_per_metric_with_its_type_and_value() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test():
-            assert _labels(app) == ["noqa-comments", "python-files"]
-            assert _column(app, 1) == ["regex_count", "file_count"]
-            assert _column(app, 2) == ["🦠 2", "🚧 5"]
+            assert labels(app) == ["noqa-comments", "python-files"]
+            assert column(app, 1) == ["regex_count", "file_count"]
+            assert column(app, 2) == ["🦠 2", "🚧 5"]
 
     asyncio.run(scenario())
 
@@ -173,11 +70,11 @@ def test_metrics_start_folded_and_unfold_in_place() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
-            assert _outline(app) == ["▸ noqa-comments", "▸ python-files"]
+            assert outline(app) == ["▸ noqa-comments", "▸ python-files"]
 
             await pilot.press("right")
 
-            assert _labels(app) == [
+            assert labels(app) == [
                 "noqa-comments",
                 "ranges: python",
                 "src/a.py:1",
@@ -190,7 +87,7 @@ def test_metrics_start_folded_and_unfold_in_place() -> None:
 
 def test_a_metric_says_what_it_measures_above_what_it_found() -> None:
     async def scenario() -> None:
-        report = _summed_report(
+        report = summed_report(
             MetricOutcome(
                 spec=MetricSpec(
                     name="noqa-comments",
@@ -207,7 +104,7 @@ def test_a_metric_says_what_it_measures_above_what_it_found() -> None:
         async with app.run_test() as pilot:
             await pilot.press("right")
 
-            assert _labels(app) == [
+            assert labels(app) == [
                 "noqa-comments",
                 "how many lint escapes we carry",
                 "ranges: python",
@@ -224,18 +121,18 @@ def test_a_folded_metric_hides_what_it_says_about_itself() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("right")
-            assert "ranges: python" in _labels(app)
+            assert "ranges: python" in labels(app)
 
             await pilot.press("left")
 
-            assert _labels(app) == ["noqa-comments", "python-files"]
+            assert labels(app) == ["noqa-comments", "python-files"]
 
     asyncio.run(scenario())
 
 
 def test_a_failed_metric_shows_the_error_where_it_can_be_read() -> None:
     async def scenario() -> None:
-        report = _summed_report(
+        report = summed_report(
             MetricOutcome(
                 spec=MetricSpec(name="broken", type="file_count"),
                 range_names=("python",),
@@ -244,11 +141,11 @@ def test_a_failed_metric_shows_the_error_where_it_can_be_read() -> None:
         )
         app = MetricsApp(report)
         async with app.run_test() as pilot:
-            assert _column(app, 2) == ["ERROR"]
+            assert column(app, 2) == ["ERROR"]
 
             await pilot.press("right")
 
-            assert "ValueError: boom" in _labels(app)
+            assert "ValueError: boom" in labels(app)
 
     asyncio.run(scenario())
 
@@ -257,13 +154,13 @@ def test_arrows_move_between_rows() -> None:
     async def scenario() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
-            assert _cursor(app) == "noqa-comments"
+            assert cursor(app) == "noqa-comments"
 
             await pilot.press("down")
-            assert _cursor(app) == "python-files"
+            assert cursor(app) == "python-files"
 
             await pilot.press("up")
-            assert _cursor(app) == "noqa-comments"
+            assert cursor(app) == "noqa-comments"
 
     asyncio.run(scenario())
 
@@ -273,10 +170,10 @@ def test_jk_still_work_as_hidden_aliases() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("j")
-            assert _cursor(app) == "python-files"
+            assert cursor(app) == "python-files"
 
             await pilot.press("k")
-            assert _cursor(app) == "noqa-comments"
+            assert cursor(app) == "noqa-comments"
 
     asyncio.run(scenario())
 
@@ -285,15 +182,15 @@ def test_right_unfolds_and_left_folds_the_row_under_the_cursor() -> None:
     async def scenario() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
-            assert _cursor(app) == "typing"
+            assert cursor(app) == "typing"
 
             await pilot.press("left")
-            assert _outline(app)[0] == "▸ typing"
-            assert "type-ignores" not in _labels(app)
+            assert outline(app)[0] == "▸ typing"
+            assert "type-ignores" not in labels(app)
 
             await pilot.press("right")
-            assert _outline(app)[0] == "▾ typing"
-            assert "type-ignores" in _labels(app)
+            assert outline(app)[0] == "▾ typing"
+            assert "type-ignores" in labels(app)
 
     asyncio.run(scenario())
 
@@ -303,10 +200,10 @@ def test_hl_still_fold_and_unfold_as_hidden_aliases() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("h")
-            assert _outline(app)[0] == "▸ typing"
+            assert outline(app)[0] == "▸ typing"
 
             await pilot.press("l")
-            assert _outline(app)[0] == "▾ typing"
+            assert outline(app)[0] == "▾ typing"
 
     asyncio.run(scenario())
 
@@ -316,12 +213,12 @@ def test_folding_from_a_hit_folds_the_metric_and_lands_the_cursor_on_it() -> Non
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("right", "down", "down")
-            assert _cursor(app) == "src/a.py:1"
+            assert cursor(app) == "src/a.py:1"
 
             await pilot.press("left")
 
-            assert _cursor(app) == "noqa-comments"
-            assert _labels(app) == ["noqa-comments", "python-files"]
+            assert cursor(app) == "noqa-comments"
+            assert labels(app) == ["noqa-comments", "python-files"]
 
     asyncio.run(scenario())
 
@@ -331,10 +228,10 @@ def test_space_toggles_the_row_under_the_cursor() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("space")
-            assert "ranges: python" in _labels(app)
+            assert "ranges: python" in labels(app)
 
             await pilot.press("space")
-            assert _labels(app) == ["noqa-comments", "python-files"]
+            assert labels(app) == ["noqa-comments", "python-files"]
 
     asyncio.run(scenario())
 
@@ -344,10 +241,10 @@ def test_groups_and_metrics_fold_independently() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("down", "space")  # unfold type-ignores
-            assert _labels(app)[:3] == ["typing", "type-ignores", "x.py:1"]
+            assert labels(app)[:3] == ["typing", "type-ignores", "x.py:1"]
 
             await pilot.press("up", "space")  # fold the group around it
-            assert _labels(app)[:2] == ["typing", "lint"]
+            assert labels(app)[:2] == ["typing", "lint"]
 
     asyncio.run(scenario())
 
@@ -356,7 +253,7 @@ def test_a_grouped_report_nests_metrics_under_their_group() -> None:
     async def scenario() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test():
-            assert _outline(app) == [
+            assert outline(app) == [
                 "▾ typing",
                 "  ▸ type-ignores",
                 "  ▸ mypy-overrides",
@@ -371,11 +268,11 @@ def test_a_grouped_report_nests_metrics_under_their_group() -> None:
 
 def test_space_on_an_occurrence_opens_it_at_its_line() -> None:
     async def scenario() -> None:
-        opener, calls = _recording_opener()
+        opener, calls = recording_opener()
         app = MetricsApp(RUN_REPORT, opener)
         async with app.run_test() as pilot:
             await pilot.press("right", "down", "down")
-            assert _cursor(app) == "src/a.py:1"
+            assert cursor(app) == "src/a.py:1"
 
             await pilot.press("space")
 
@@ -387,7 +284,7 @@ def test_space_on_an_occurrence_opens_it_at_its_line() -> None:
 
 def test_a_diff_occurrence_opens_too() -> None:
     async def scenario() -> None:
-        opener, calls = _recording_opener()
+        opener, calls = recording_opener()
         app = MetricsApp(DIFF_REPORT, opener)
         async with app.run_test() as pilot:
             await pilot.press("right", "down", "down")
@@ -401,7 +298,7 @@ def test_a_diff_occurrence_opens_too() -> None:
 
 def test_space_does_not_open_when_no_editor_is_reachable() -> None:
     async def scenario() -> None:
-        opener, calls = _recording_opener(available=False)
+        opener, calls = recording_opener(available=False)
         app = MetricsApp(RUN_REPORT, opener)
         async with app.run_test() as pilot:
             await pilot.press("right", "down", "down")
@@ -415,13 +312,13 @@ def test_space_does_not_open_when_no_editor_is_reachable() -> None:
 
 def test_space_on_a_metric_toggles_rather_than_opening() -> None:
     async def scenario() -> None:
-        opener, calls = _recording_opener()
+        opener, calls = recording_opener()
         app = MetricsApp(RUN_REPORT, opener)
         async with app.run_test() as pilot:
             await pilot.press("space")
 
             assert not calls
-            assert "ranges: python" in _labels(app)
+            assert "ranges: python" in labels(app)
 
     asyncio.run(scenario())
 
@@ -431,10 +328,10 @@ def test_f_folds_and_unfolds_every_group() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("f")
-            assert _labels(app) == ["typing", "lint", "(ungrouped)"]
+            assert labels(app) == ["typing", "lint", "(ungrouped)"]
 
             await pilot.press("f")
-            assert _labels(app) == [
+            assert labels(app) == [
                 "typing",
                 "type-ignores",
                 "mypy-overrides",
@@ -452,11 +349,11 @@ def test_f_folds_all_when_only_some_groups_are_open() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("left")  # fold just the first group
-            assert _labels(app)[:2] == ["typing", "lint"]
+            assert labels(app)[:2] == ["typing", "lint"]
 
             await pilot.press("f")
 
-            assert _labels(app) == ["typing", "lint", "(ungrouped)"]
+            assert labels(app) == ["typing", "lint", "(ungrouped)"]
 
     asyncio.run(scenario())
 
@@ -466,12 +363,12 @@ def test_f_leaves_a_metrics_own_fold_state_untouched() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("down", "space")  # unfold type-ignores
-            assert "x.py:1" in _labels(app)
+            assert "x.py:1" in labels(app)
 
             await pilot.press("f")
             await pilot.press("f")
 
-            assert _labels(app)[:3] == ["typing", "type-ignores", "x.py:1"]
+            assert labels(app)[:3] == ["typing", "type-ignores", "x.py:1"]
 
     asyncio.run(scenario())
 
@@ -481,11 +378,11 @@ def test_f_folds_metrics_when_the_report_has_no_groups() -> None:
         app = MetricsApp(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("right")
-            assert "ranges: python" in _labels(app)
+            assert "ranges: python" in labels(app)
 
             await pilot.press("f")
 
-            assert _labels(app) == ["noqa-comments", "python-files"]
+            assert labels(app) == ["noqa-comments", "python-files"]
 
     asyncio.run(scenario())
 
@@ -495,11 +392,11 @@ def test_f_parks_the_cursor_on_the_group_that_survives_the_fold() -> None:
         app = MetricsApp(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("down", "down")  # onto mypy-overrides, inside typing
-            assert _cursor(app) == "mypy-overrides"
+            assert cursor(app) == "mypy-overrides"
 
             await pilot.press("f")
 
-            assert _cursor(app) == "typing"
+            assert cursor(app) == "typing"
 
     asyncio.run(scenario())
 
@@ -515,7 +412,7 @@ def test_the_arrows_still_work_after_folding_from_inside_a_group() -> None:
 
             await pilot.press("down")
 
-            assert _cursor(app) == "lint"
+            assert cursor(app) == "lint"
 
     asyncio.run(scenario())
 
@@ -524,11 +421,11 @@ def test_diff_report_shows_the_branch_impact_and_signed_occurrences() -> None:
     async def scenario() -> None:
         app = MetricsApp(DIFF_REPORT)
         async with app.run_test() as pilot:
-            assert _column(app, 2) == ["+2 / -1 (net +1 of 🚧 7)"]
+            assert column(app, 2) == ["+2 / -1 (net +1 of 🚧 7)"]
 
             await pilot.press("right")
 
-            assert _labels(app) == [
+            assert labels(app) == [
                 "noqa-comments",
                 "ranges: python",
                 "src/a.py:3",
@@ -542,10 +439,10 @@ def test_diff_report_shows_the_branch_impact_and_signed_occurrences() -> None:
 def test_metric_rows_carry_their_severity_emoji() -> None:
     async def scenario() -> None:
         app = MetricsApp(
-            _summed_report(_valued("a", "g", value=0), _valued("b", "g", value=3))
+            summed_report(valued("a", "g", value=0), valued("b", "g", value=3))
         )
         async with app.run_test():
-            values = _column(app, 2)
+            values = column(app, 2)
 
             assert any("🎉" in value for value in values)  # measured nothing
             assert any("🚧" in value for value in values)  # 3, against a guide of 100
@@ -556,14 +453,14 @@ def test_metric_rows_carry_their_severity_emoji() -> None:
 def test_group_header_carries_the_sum_of_its_metrics() -> None:
     async def scenario() -> None:
         app = MetricsApp(
-            _summed_report(
-                _valued("a", "g", value=2, guide=100),
-                _valued("b", "g", value=3, guide=100),
+            summed_report(
+                valued("a", "g", value=2, guide=100),
+                valued("b", "g", value=3, guide=100),
             )
         )
         async with app.run_test():
             # 5 against the two metrics' guides added together, not one of them
-            assert _column(app, 2)[0] == "🚧 5"
+            assert column(app, 2)[0] == "🚧 5"
 
     asyncio.run(scenario())
 
@@ -571,15 +468,15 @@ def test_group_header_carries_the_sum_of_its_metrics() -> None:
 def test_a_group_summing_to_zero_starts_folded() -> None:
     async def scenario() -> None:
         app = MetricsApp(
-            _summed_report(
-                _valued("a", "clean", value=0),
-                _valued("b", "clean", value=0),
-                _valued("c", "dirty", value=4),
+            summed_report(
+                valued("a", "clean", value=0),
+                valued("b", "clean", value=0),
+                valued("c", "dirty", value=4),
             )
         )
         async with app.run_test():
             # nothing to show, so "clean" keeps out of the way
-            assert _labels(app) == ["clean", "dirty", "c"]
+            assert labels(app) == ["clean", "dirty", "c"]
 
     asyncio.run(scenario())
 
@@ -589,8 +486,8 @@ def test_a_zero_group_holding_an_error_stays_open() -> None:
 
     async def scenario() -> None:
         app = MetricsApp(
-            _summed_report(
-                _valued("a", "clean", value=0),
+            summed_report(
+                valued("a", "clean", value=0),
                 MetricOutcome(
                     spec=MetricSpec(name="b", type="file_count", group="clean"),
                     range_names=(),
@@ -599,7 +496,7 @@ def test_a_zero_group_holding_an_error_stays_open() -> None:
             )
         )
         async with app.run_test():
-            assert _labels(app) == ["clean", "a", "b"]
+            assert labels(app) == ["clean", "a", "b"]
 
     asyncio.run(scenario())
 
@@ -608,452 +505,9 @@ def test_an_unchanged_diff_group_starts_folded() -> None:
     """A branch that moved nothing here has nothing to say, whatever it stands on."""
 
     async def scenario() -> None:
-        report = DiffReport(
-            root=Path("/proj"),
-            source=Path("/proj/tingle.toml"),
-            base_ref="main",
-            merge_base="abc123",
-            outcomes=(
-                DiffOutcome(
-                    spec=MetricSpec(name="still", type="file_count", group="quiet"),
-                    range_names=(),
-                    result=DiffResult(net=0, added=0, removed=0),
-                    total=MetricResult(value=12),
-                ),
-                DiffOutcome(
-                    spec=MetricSpec(name="moved", type="file_count", group="loud"),
-                    range_names=(),
-                    result=DiffResult(net=2, added=2, removed=0),
-                    total=MetricResult(value=9),
-                ),
-            ),
-        )
-        app = MetricsApp(report)
+        app = MetricsApp(QUIET_DIFF_REPORT)
         async with app.run_test():
-            assert _labels(app) == ["quiet", "loud", "moved"]
-
-    asyncio.run(scenario())
-
-
-def _sortable(
-    name: str, kind: str, group: str, *, value: int, guide: int = 100
-) -> MetricOutcome:
-    return MetricOutcome(
-        spec=MetricSpec(name=name, type=kind, group=group),
-        range_names=(),
-        result=MetricResult(value=value),
-        guide=guide,
-    )
-
-
-#: Deliberately disagreeing orders: config, name, type, value and score each
-#: rank these three differently, so a test can tell which one is in charge.
-#: `mid` is the worst by score (20 of 20) and the middle one by value.
-SORTABLE = _summed_report(
-    _sortable("zeta", "regex_count", "typing", value=5),
-    _sortable("alpha", "file_count", "typing", value=90),
-    _sortable("mid", "regex_count", "lint", value=20, guide=20),
-)
-
-
-def _sort_bar(app: MetricsApp) -> str:
-    return str(app.query_one(SortBar).render())
-
-
-def _headers(app: MetricsApp) -> list[str]:
-    table = app.query_one(BrowseTable)
-    return [str(column.label) for column in table.columns.values()]
-
-
-def test_sorting_by_name_flattens_the_view_and_orders_every_metric() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("n")
-
-            assert _labels(app) == ["alpha", "mid", "zeta"]
-
-    asyncio.run(scenario())
-
-
-def test_sorting_by_name_then_type_gives_type_major_order() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("n", "t")
-
-            assert _labels(app) == ["alpha", "mid", "zeta"]  # file_count, then regex
-            assert _column(app, 1) == ["file_count", "regex_count", "regex_count"]
-
-    asyncio.run(scenario())
-
-
-def test_a_lowercase_key_sorts_up_and_its_shifted_twin_sorts_down() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("v")
-            assert _column(app, 2) == ["🚧 5", "🚨 20", "🚨 90"]
-
-            await pilot.press("V")
-            assert _column(app, 2) == ["🚨 90", "🚨 20", "🚧 5"]
-
-    asyncio.run(scenario())
-
-
-def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            # mid is 20 against a guide of 20, so it is worse than alpha's
-            # 90 against 100 even though it is the smaller number
-            await pilot.press("C")
-
-            assert _labels(app) == ["mid", "alpha", "zeta"]
-
-    asyncio.run(scenario())
-
-
-def test_the_sorted_columns_header_says_which_way_it_is_running() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            assert _headers(app) == ["Group / Metric", "Type", "Value"]
-
-            await pilot.press("v")
-            assert _headers(app) == ["Group / Metric", "Type", "Value ▲"]
-
-            await pilot.press("V")
-            assert _headers(app) == ["Group / Metric", "Type", "Value ▼"]
-
-            await pilot.press("n")
-            assert _headers(app) == ["Group / Metric ▲", "Type", "Value"]
-
-            await pilot.press("0")
-            assert _headers(app) == ["Group / Metric", "Type", "Value"]
-
-    asyncio.run(scenario())
-
-
-def test_sorting_by_group_keeps_the_outline_and_orders_groups_by_name() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("g")
-
-            # no occurrences and no ranges, so no metric here is foldable
-            assert _outline(app) == [
-                "▾ lint",
-                "    mid",
-                "▾ typing",
-                "    alpha",
-                "    zeta",
-            ]
-
-            await pilot.press("G")
-
-            assert _labels(app)[0] == "typing"  # turned over, outline intact
-
-    asyncio.run(scenario())
-
-
-def test_zero_restores_config_order_the_outline_and_the_fold_state() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
-        async with app.run_test() as pilot:
-            await pilot.press("left")  # fold the first group
-            assert _labels(app)[:2] == ["typing", "lint"]
-
-            await pilot.press("n")
-            assert _labels(app) == [
-                "mypy-overrides",
-                "noqa-comments",
-                "python-files",
-                "type-ignores",
-            ]
-
-            await pilot.press("0")
-
-            # config order is back, and so is the fold the sort hid
-            assert _labels(app)[:2] == ["typing", "lint"]
-
-    asyncio.run(scenario())
-
-
-def test_a_flat_sort_puts_occurrences_out_of_reach_until_the_sort_is_cleared() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
-        async with app.run_test() as pilot:
-            await pilot.press("right")
-            assert "src/a.py:1" in _labels(app)
-
-            await pilot.press("n")
-            assert _outline(app) == ["  noqa-comments", "  python-files"]
-            await pilot.press("right")  # nothing to unfold while flat
-            assert "src/a.py:1" not in _labels(app)
-
-            await pilot.press("0")
-
-            assert "src/a.py:1" in _labels(app)
-
-    asyncio.run(scenario())
-
-
-def test_the_sort_bar_says_what_is_deciding_the_order() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            assert _sort_bar(app) == "sort: config order"
-
-            await pilot.press("g")
-            assert _sort_bar(app) == "sort: group asc"
-
-            await pilot.press("N")
-            assert _sort_bar(app) == (
-                "sort: name desc then group asc  ·  flat, no folding — 0 to reset"
-            )
-
-            await pilot.press("0")
-            assert _sort_bar(app) == "sort: config order"
-
-    asyncio.run(scenario())
-
-
-def test_pushing_a_key_already_in_the_stack_moves_it_to_the_front() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("n", "t", "n")
-
-            assert _sort_bar(app).startswith("sort: name asc then type asc")
-
-    asyncio.run(scenario())
-
-
-def test_asking_for_a_stacked_key_the_other_way_turns_it_over_in_place() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("t", "v")
-            assert _sort_bar(app).startswith("sort: value asc then type asc")
-
-            await pilot.press("V")
-
-            # the stack is the same depth: value turned over, not stacked twice
-            assert _sort_bar(app).startswith("sort: value desc then type asc")
-
-    asyncio.run(scenario())
-
-
-SEARCHABLE = _summed_report(
-    MetricOutcome(
-        spec=MetricSpec(
-            name="noqa-comments",
-            type="regex_count",
-            group="linting",
-            description="lint escapes we carry",
-        ),
-        range_names=("python",),
-        result=MetricResult(
-            value=2,
-            occurrences=(
-                Occurrence(path="src/views.py", line=1),
-                Occurrence(path="src/models.py", line=9),
-            ),
-        ),
-    ),
-    MetricOutcome(
-        spec=MetricSpec(name="legacy-arch", type="symbol_uses", group="typing"),
-        range_names=("python",),
-        result=MetricResult(
-            value=1, occurrences=(Occurrence(path="src/views.py", line=4),)
-        ),
-    ),
-)
-
-
-def _search_box(app: MetricsApp) -> SearchBar:
-    return app.query_one(SearchBar)
-
-
-def test_slash_opens_the_search_box_and_puts_the_cursor_in_it() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            assert _search_box(app).has_class("hidden")
-
-            await pilot.press("/")
-
-            assert not _search_box(app).has_class("hidden")
-            assert isinstance(app.focused, SearchBar)
-
-    asyncio.run(scenario())
-
-
-def test_every_bare_letter_the_app_binds_reaches_the_search_box_as_text() -> None:
-    """The whole binding risk in one test: f folds, q quits, 0 and V sort."""
-
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("/")
-
-            await pilot.press("f", "q", "0", "V", "g", "n", "t", "c", "j", "k")
-
-            assert _search_box(app).value == "fq0Vgntcjk"
-            assert app.is_running  # q did not quit
-            assert _sort_bar(app).startswith("search:")  # 0 and V did not sort
-
-    asyncio.run(scenario())
-
-
-def test_a_file_query_opens_a_fully_folded_tree_onto_that_file_alone() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("f")
-            assert _labels(app) == ["linting", "typing"]
-
-            await pilot.press("/")
-            await pilot.press(*"models.py")
-
-            # one keystroke from a shut tree to the one file that matched
-            assert _labels(app) == [
-                "linting",
-                "noqa-comments",
-                "lint escapes we carry",
-                "ranges: python",
-                "src/models.py:9",
-            ]
-
-    asyncio.run(scenario())
-
-
-def test_escape_leaves_search_mode_and_restores_the_outline_untouched() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("f")
-            before = _outline(app)
-
-            await pilot.press("/")
-            await pilot.press(*"views.py")
-            assert _labels(app) != ["linting", "typing"]
-
-            await pilot.press("escape")
-
-            assert _outline(app) == before
-            assert _search_box(app).value == ""
-            assert _search_box(app).has_class("hidden")
-            assert isinstance(app.focused, BrowseTable)
-
-    asyncio.run(scenario())
-
-
-def test_a_name_match_leaves_the_metric_as_the_reader_had_it() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("/")
-            await pilot.press(*"legacy")
-
-            # matched on the row's own text, so nothing underneath is singled out
-            assert _labels(app) == ["typing", "legacy-arch"]
-
-    asyncio.run(scenario())
-
-
-def test_a_description_match_opens_the_metric_on_the_words_that_matched() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("/")
-            await pilot.press(*"escapes")
-
-            # the matching words are in a detail row, so the row is shown
-            assert _labels(app) == [
-                "linting",
-                "noqa-comments",
-                "lint escapes we carry",
-                "ranges: python",
-                "src/views.py:1",
-                "src/models.py:9",
-            ]
-
-    asyncio.run(scenario())
-
-
-def test_search_is_case_sensitive_and_empties_the_view_when_nothing_matches() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("/")
-            await pilot.press(*"Legacy")
-
-            assert _labels(app) == []
-            assert _sort_bar(app) == "search: 'Legacy' — 0 metrics — esc to leave"
-
-    asyncio.run(scenario())
-
-
-def test_a_group_with_no_matching_metric_disappears() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("/")
-            await pilot.press(*"models.py")
-
-            assert "typing" not in _labels(app)
-
-    asyncio.run(scenario())
-
-
-def test_a_fold_made_during_a_search_beats_the_reveal_and_dies_with_it() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("/")
-            await pilot.press(*"views.py")
-            assert "src/views.py:1" in _labels(app)
-
-            await pilot.press("enter")  # hand the rows back, keeping the query
-            await pilot.press("down", "left")  # fold the revealed metric
-
-            assert "src/views.py:1" not in _labels(app)
-
-            await pilot.press("escape")
-
-            # the gesture went with the query; the reader's outline is intact
-            assert _labels(app)[:2] == ["linting", "noqa-comments"]
-
-    asyncio.run(scenario())
-
-
-def test_enter_hands_the_rows_back_without_giving_up_the_query() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("/")
-            await pilot.press(*"legacy")
-
-            await pilot.press("enter")
-
-            assert isinstance(app.focused, BrowseTable)
-            assert _labels(app) == ["typing", "legacy-arch"]
-
-    asyncio.run(scenario())
-
-
-def test_the_status_line_counts_what_the_query_found() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
-        async with app.run_test() as pilot:
-            await pilot.press("/")
-            await pilot.press(*"views.py")
-            assert _sort_bar(app) == "search: 'views.py' — 2 metrics — esc to leave"
-
-            await pilot.press(*"1")  # no such path
-            assert _sort_bar(app) == "search: 'views.py1' — 0 metrics — esc to leave"
+            assert labels(app) == ["quiet", "loud", "moved"]
 
     asyncio.run(scenario())
 
@@ -1140,7 +594,7 @@ def test_letter_bindings_do_not_eat_the_palette_search_box() -> None:
             assert app.is_running  # "q" did not quit
             app.pop_screen()
             await pilot.pause()
-            assert "type-ignores" in _labels(app)  # "f" folded nothing
+            assert "type-ignores" in labels(app)  # "f" folded nothing
 
     asyncio.run(scenario())
 

@@ -104,7 +104,7 @@ def test_any_policy_rejects_the_trade_sum_allows(repo: Path) -> None:
     result = runner.invoke(app, ["check"])
 
     assert result.exit_code == 1
-    assert "noqa-comments grew (policy: any)" in result.stderr
+    assert "lint-escapes grew (policy: any)" in result.stderr
 
 
 @pytest.mark.usefixtures("repo")
@@ -119,25 +119,25 @@ def test_policy_flag_overrides_the_config(repo: Path) -> None:
 
 @pytest.mark.usefixtures("repo")
 def test_ignored_metric_neither_fails_nor_prints(repo: Path) -> None:
-    _configure(repo, '[check]\npolicy = "any"\nignore = ["noqa-comments"]')
+    _configure(repo, '[check]\npolicy = "any"\nignore = ["lint-escapes"]')
 
     result = runner.invoke(app, ["check"])
 
     assert result.exit_code == 1  # ruff-ignores still grew
-    assert "noqa-comments" not in result.output
+    assert "lint-escapes" not in result.output
     assert "src/a.py" not in result.output
     assert "ruff-ignores" in result.output
 
 
 def test_ignoring_every_grown_metric_passes(repo: Path) -> None:
-    _configure(repo, '[check]\nignore = ["noqa-comments", "ruff-ignores"]')
+    _configure(repo, '[check]\nignore = ["lint-escapes", "ruff-ignores"]')
 
     result = runner.invoke(app, ["check"])
 
     assert result.exit_code == 0
     # nothing to answer for, and the ignored metrics are not even counted
     assert "🎉 no new debt" in result.output
-    assert "noqa-comments" not in result.output
+    assert "lint-escapes" not in result.output
 
 
 @pytest.mark.usefixtures("repo")
@@ -146,7 +146,7 @@ def test_metric_filter_narrows_the_verdict() -> None:
 
     assert result.exit_code == 1
     assert "ruff-ignores" in result.output
-    assert "noqa-comments" not in result.output
+    assert "lint-escapes" not in result.output
 
 
 @pytest.mark.usefixtures("repo")

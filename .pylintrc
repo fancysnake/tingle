@@ -68,7 +68,11 @@ ignored-modules=
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-#init-hook=
+# Each test directory holding a shared helper module goes on the path, so
+# `from support import ...` resolves the way it does under pytest, which puts
+# a test file's own directory there. source-roots cannot do this job: which of
+# several nested roots it picks depends on the order pylint walks them in.
+init-hook='import sys; sys.path[:0] = ["tests/unit", "tests/integration/gates/tui"]'
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use, and will cap the count on Windows to
@@ -123,9 +127,7 @@ recursive=no
 # source root is an absolute path or a path relative to the current working
 # directory used to determine a package namespace for modules located under the
 # source root.
-# tests/unit is a root so that `from support import ...` resolves the way it
-# does under pytest, which puts a test file's own directory on sys.path.
-source-roots=src,tests/unit
+source-roots=src
 
 # Allow loading of arbitrary C extensions. Extensions are imported into the
 # active Python interpreter and may run arbitrary code.

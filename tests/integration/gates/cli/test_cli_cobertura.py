@@ -39,10 +39,10 @@ def test_cobertura_marks_occurrence_lines_uncovered() -> None:
     assert root.get("lines-covered") == "0"
 
     packages = {p.get("name"): p for p in root.iter("package")}
-    assert list(packages) == ["noqa-comments"]
+    assert list(packages) == ["lint-escapes"]
     lines = [
         (cls.get("filename"), line.get("number"), line.get("hits"))
-        for cls in packages["noqa-comments"].iter("class")
+        for cls in packages["lint-escapes"].iter("class")
         for line in cls.iter("line")
     ]
     assert lines == [("src/a.py", "1", "0"), ("src/a.py", "3", "0")]

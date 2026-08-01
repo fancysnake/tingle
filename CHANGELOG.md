@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The interactive TUI is a sortable table. Group headers, metrics and their
+  located hits are rows in one outline instead of a three-level accordion,
+  so a metric name lines up with its type and value in columns rather than
+  in hand-padded text.
+- Sort the table by group, name, type, value or score — `g` `n` `t` `v` `c`
+  for ascending, `G` `N` `T` `V` `C` for descending. Sorts stack, so `n`
+  then `t` gives type-major order with names ordered inside each type, and
+  asking for a stacked key the other way up turns it over in place. `0`
+  clears the stack. The header of the column deciding the order carries ▲ or
+  ▼, and a line under the table names the whole stack. Sorting by anything
+  but `group` flattens the outline, folding and occurrence rows with it,
+  until `0`.
+- `value` and `score` are separate sorts: the raw count, and the same number
+  against the metric's own guide. Only `score` compares metrics whose guides
+  differ.
+- Search with `/`. Case-sensitive substring, matched against a metric's name,
+  its group's, its description and its range names — and against the path of
+  every occurrence, whether or not it is on screen, so a fully folded tree is
+  still searchable. A metric found by name is left as you had it; found by
+  description or range, it opens on those words; found through its files, it
+  opens showing only the files that matched. ++enter++ keeps the query and
+  hands the rows back, ++escape++ leaves and restores the outline untouched.
+- A metric's description and the ranges it measures over are rows under it,
+  shown when it is unfolded. A metric that failed puts its error there too,
+  instead of only saying `ERROR` in the value column.
+
+### Changed
+
+- TUI: folding a metric now hides its description, which the accordion kept
+  visible at rest. Descriptions became rows so they could live somewhere the
+  table has room for.
+
+### Removed
+
+- `Occurrence.sort_key`, which ordered hits by path, then line, then note.
+  Nothing asked for that order — occurrences are emitted as a metric finds
+  them and rendered the same way.
+
 ## [0.4.0] - 2026-07-16
 
 ### Added

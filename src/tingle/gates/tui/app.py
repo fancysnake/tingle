@@ -359,13 +359,25 @@ def _mark_sorted_header(table: BrowseTable, state: BrowseState) -> None:
     primary = state.sort[0] if state.sort else None
     marked = SORT_COLUMNS[primary.key] if primary is not None else None
     for index, column in enumerate(table.columns.values()):
-        label = str(column.label).rstrip(ASCENDING + DESCENDING).rstrip()
+        label = _unmarked(str(column.label))
         if index == marked and primary is not None:
             arrow = DESCENDING if primary.descending else ASCENDING
             column.label = Text(label + arrow, style="bold")
         else:
             column.label = Text(label)
     table.refresh()
+
+
+def _unmarked(label: str) -> str:
+    """Take last redraw's arrow back off a heading, if it had one.
+
+    Whole suffixes rather than a set of characters to strip: a heading is
+    allowed to end in an arrow of its own, and only the one this put there
+    should come off.
+    """
+    for marker in (ASCENDING, DESCENDING):
+        label = label.removesuffix(marker)
+    return label
 
 
 def _sort_line(state: BrowseState) -> str:

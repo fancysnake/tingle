@@ -21,7 +21,7 @@ include = ["src/**/*.py"]
 default = true
 
 [[metrics]]
-name = "noqa-comments"
+name = "lint-escapes"
 type = "regex_count"
 pattern = '#\\s*noqa'
 
@@ -39,7 +39,7 @@ include = ["src/**/*.py"]
 default = true
 
 [[metrics]]
-name = "noqa-comments"
+name = "lint-escapes"
 type = "regex_count"
 range = "python"
 pattern = '#\\s*noqa'
