@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from support import PROJECT, FakeProject, make_config
+from support import PROJECT, FakeProject, WatchfulProject, make_config
 
-from tingle.mills.runner import run
+from tingle.mills.runner import iter_outcomes, run
 from tingle.pacts.config import ConfigError, DisplaySpec, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
@@ -21,6 +21,64 @@ METRIC_TYPES = {
     "file_count": MetricType(name="file_count", func=_file_count),
     "boom": MetricType(name="boom", func=_boom),
 }
+
+
+def test_outcomes_arrive_one_at_a_time_in_config_order() -> None:
+    measured: list[str] = []
+
+    def spy(ctx: MetricContext) -> MetricResult:
+        measured.append("ran")
+        return MetricResult(value=len(ctx.files))
+
+    types = {"spy": MetricType(name="spy", func=spy)}
+    config = make_config(
+        MetricSpec(name="first", type="spy"),
+        MetricSpec(name="second", type="spy"),
+        MetricSpec(name="third", type="spy"),
+    )
+
+    outcomes = iter_outcomes(config, PROJECT, metric_types=types)
+
+    names = []
+    for expected, outcome in enumerate(outcomes, start=1):
+        names.append(outcome.spec.name)
+        # each metric is measured as it is pulled, not all of them up front
+        assert len(measured) == expected
+    assert names == ["first", "second", "third"]
+
+
+def test_nothing_is_measured_or_even_walked_until_the_first_pull() -> None:
+    """The whole point: a caller can draw the run before it costs anything."""
+    project = WatchfulProject({"a.py": "", "b.py": ""})
+    config = make_config(MetricSpec(name="files", type="file_count"))
+
+    outcomes = iter_outcomes(config, project, metric_types=METRIC_TYPES)
+
+    assert project.walks == 0
+
+    assert next(outcomes).spec.name == "files"
+    assert project.walks == 1
+
+
+def test_an_unknown_only_name_is_refused_at_the_call_not_at_the_first_pull() -> None:
+    config = make_config(MetricSpec(name="files", type="file_count"))
+
+    with pytest.raises(ConfigError) as excinfo:
+        iter_outcomes(config, PROJECT, metric_types=METRIC_TYPES, only=["nope"])
+
+    assert 'unknown metric "nope"' in excinfo.value.errors
+
+
+def test_the_tree_is_walked_once_however_many_metrics_there_are() -> None:
+    project = WatchfulProject({"a.py": "", "b.py": ""})
+    config = make_config(
+        MetricSpec(name="first", type="file_count"),
+        MetricSpec(name="second", type="file_count"),
+    )
+
+    list(iter_outcomes(config, project, metric_types=METRIC_TYPES))
+
+    assert project.walks == 1
 
 
 def test_runs_metrics_and_reports_values() -> None:

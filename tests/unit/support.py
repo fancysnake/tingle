@@ -36,6 +36,22 @@ class FakeProject:
         return str(path) in self._contents
 
 
+class WatchfulProject(FakeProject):
+    """A project that counts how many times it has been walked.
+
+    Walking is the first cost a run pays, so it is what a test watches to
+    tell "nothing has happened yet" from "the run has started".
+    """
+
+    def __init__(self, contents: Mapping[str, str]) -> None:
+        super().__init__(contents)
+        self.walks = 0
+
+    def walk(self) -> Iterable[PurePath]:
+        self.walks += 1
+        return super().walk()
+
+
 PYTHON_RANGE = RangeSpec(name="python", include=("**/*.py",), default=True)
 
 #: Two Python files and one that no Python range should match.

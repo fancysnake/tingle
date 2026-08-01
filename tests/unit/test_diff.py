@@ -4,7 +4,7 @@ from pathlib import PurePath
 from typing import TYPE_CHECKING
 
 import pytest
-from support import PROJECT, make_config
+from support import PROJECT, WatchfulProject, make_config
 
 from tingle.mills.diff import DiffRunner
 from tingle.pacts.config import ConfigError, MetricSpec, RangeSpec
@@ -74,6 +74,36 @@ BRANCH = BranchDiff(
         FileDiff(path=PurePath("notes.md"), status=FileStatus.ADDED),
     ),
 )
+
+
+def test_start_settles_the_header_and_the_skips_before_measuring_anything() -> None:
+    config = make_config(
+        MetricSpec(name="plain", type="no_diff"),
+        MetricSpec(name="files", type="touched"),
+    )
+    project = WatchfulProject({"a.py": "", "b.py": "", "notes.md": ""})
+    source = FakeDiffSource(BRANCH, {})
+
+    started = DiffRunner(config, project, source, METRIC_TYPES).start("main")
+
+    # which branch, against what, and what has no diff variant at all --
+    # all known before a single metric has been measured
+    assert (started.base_ref, started.merge_base) == ("main", "abc123")
+    assert started.skipped == ("plain",)
+    assert project.walks == 0
+
+    assert [outcome.spec.name for outcome in started.outcomes] == ["files"]
+    assert project.walks == 1
+
+
+def test_start_refuses_an_unknown_only_name_before_it_asks_git_anything() -> None:
+    config = make_config(MetricSpec(name="files", type="touched"))
+    source = FakeDiffSource(BRANCH, {})
+
+    with pytest.raises(ConfigError):
+        DiffRunner(config, PROJECT, source, METRIC_TYPES).start("main", only=["nope"])
+
+    assert source.requested_base is None
 
 
 def test_runs_diff_and_total() -> None:
