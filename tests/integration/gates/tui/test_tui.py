@@ -31,7 +31,7 @@ from textual.binding import Binding
 from textual.command import CommandList, CommandPalette
 from textual.widgets import Input
 
-from tingle.gates.tui.app import BrowseTable, MetricsApp
+from tingle.gates.tui.app import BrowseTable, MetricsApp, SortBar
 from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
@@ -631,6 +631,217 @@ def test_an_unchanged_diff_group_starts_folded() -> None:
         app = MetricsApp(report)
         async with app.run_test():
             assert _labels(app) == ["quiet", "loud", "moved"]
+
+    asyncio.run(scenario())
+
+
+def _sortable(
+    name: str, kind: str, group: str, *, value: int, guide: int = 100
+) -> MetricOutcome:
+    return MetricOutcome(
+        spec=MetricSpec(name=name, type=kind, group=group),
+        range_names=(),
+        result=MetricResult(value=value),
+        guide=guide,
+    )
+
+
+#: Deliberately disagreeing orders: config, name, type, value and score each
+#: rank these three differently, so a test can tell which one is in charge.
+#: `mid` is the worst by score (20 of 20) and the middle one by value.
+SORTABLE = _summed_report(
+    _sortable("zeta", "regex_count", "typing", value=5),
+    _sortable("alpha", "file_count", "typing", value=90),
+    _sortable("mid", "regex_count", "lint", value=20, guide=20),
+)
+
+
+def _sort_bar(app: MetricsApp) -> str:
+    return str(app.query_one(SortBar).render())
+
+
+async def _click_header(pilot: Pilot[None], index: int) -> None:
+    """Select a column header the way a mouse click on it would."""
+    table = pilot.app.query_one(BrowseTable)
+    key = list(table.columns)[index]
+    table.post_message(
+        BrowseTable.HeaderSelected(table, key, index, table.columns[key].label)
+    )
+    await pilot.pause()
+
+
+def test_sorting_by_name_flattens_the_view_and_orders_every_metric() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            await pilot.press("n")
+
+            assert _labels(app) == ["alpha", "mid", "zeta"]
+
+    asyncio.run(scenario())
+
+
+def test_sorting_by_name_then_type_gives_type_major_order() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            await pilot.press("n", "t")
+
+            assert _labels(app) == ["alpha", "mid", "zeta"]  # file_count, then regex
+            assert _column(app, 1) == ["file_count", "regex_count", "regex_count"]
+
+    asyncio.run(scenario())
+
+
+def test_sorting_by_value_puts_the_biggest_first() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            await pilot.press("v")
+
+            assert _labels(app) == ["alpha", "mid", "zeta"]
+            assert _column(app, 2) == ["🚨 90", "🚨 20", "🚧 5"]
+
+    asyncio.run(scenario())
+
+
+def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            # mid is 20 against a guide of 20, so it is worse than alpha's
+            # 90 against 100 even though it is the smaller number
+            await pilot.press("c")
+
+            assert _labels(app) == ["mid", "alpha", "zeta"]
+
+    asyncio.run(scenario())
+
+
+def test_sorting_by_group_keeps_the_outline_and_orders_groups_by_name() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            await pilot.press("g")
+
+            # no occurrences and no ranges, so no metric here is foldable
+            assert _outline(app) == [
+                "▾ lint",
+                "    mid",
+                "▾ typing",
+                "    zeta",
+                "    alpha",
+            ]
+
+    asyncio.run(scenario())
+
+
+def test_zero_restores_config_order_the_outline_and_the_fold_state() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(GROUPED_REPORT)
+        async with app.run_test() as pilot:
+            await pilot.press("left")  # fold the first group
+            assert _labels(app)[:2] == ["typing", "lint"]
+
+            await pilot.press("n")
+            assert _labels(app) == [
+                "mypy-overrides",
+                "noqa-comments",
+                "python-files",
+                "type-ignores",
+            ]
+
+            await pilot.press("0")
+
+            # config order is back, and so is the fold the sort hid
+            assert _labels(app)[:2] == ["typing", "lint"]
+
+    asyncio.run(scenario())
+
+
+def test_a_flat_sort_puts_occurrences_out_of_reach_until_the_sort_is_cleared() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test() as pilot:
+            await pilot.press("right")
+            assert "src/a.py:1" in _labels(app)
+
+            await pilot.press("n")
+            assert _outline(app) == ["  noqa-comments", "  python-files"]
+            await pilot.press("right")  # nothing to unfold while flat
+            assert "src/a.py:1" not in _labels(app)
+
+            await pilot.press("0")
+
+            assert "src/a.py:1" in _labels(app)
+
+    asyncio.run(scenario())
+
+
+def test_the_sort_bar_says_what_is_deciding_the_order() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            assert _sort_bar(app) == "sort: config order"
+
+            await pilot.press("g")
+            assert _sort_bar(app) == "sort: group"
+
+            await pilot.press("n")
+            assert _sort_bar(app) == (
+                "sort: name then group  ·  flat, no folding — 0 to reset"
+            )
+
+            await pilot.press("0")
+            assert _sort_bar(app) == "sort: config order"
+
+    asyncio.run(scenario())
+
+
+def test_pushing_a_key_already_in_the_stack_moves_it_to_the_front() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            await pilot.press("n", "t", "n")
+
+            assert _sort_bar(app).startswith("sort: name then type")
+
+    asyncio.run(scenario())
+
+
+def test_clicking_the_type_and_value_headers_sorts_by_them() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            await _click_header(pilot, 1)
+            assert _sort_bar(app).startswith("sort: type")
+
+            await _click_header(pilot, 2)
+            assert _sort_bar(app).startswith("sort: value then type")
+
+    asyncio.run(scenario())
+
+
+def test_clicking_the_first_header_sorts_a_grouped_run_by_group() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            await _click_header(pilot, 0)
+
+            assert _sort_bar(app) == "sort: group"
+            assert _labels(app)[0] == "lint"  # the outline survives
+
+    asyncio.run(scenario())
+
+
+def test_clicking_the_first_header_sorts_a_groupless_run_by_name() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(RUN_REPORT)
+        async with app.run_test() as pilot:
+            await _click_header(pilot, 0)
+
+            assert _sort_bar(app).startswith("sort: name")
+            assert _labels(app) == ["noqa-comments", "python-files"]
 
     asyncio.run(scenario())
 

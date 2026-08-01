@@ -6,6 +6,7 @@ from tingle.mills.browse import (
     clear_sort,
     fold_quiet_groups,
     group_key,
+    grouped,
     is_folded,
     metric_key,
     outlined,
@@ -257,6 +258,17 @@ def test_a_diff_group_the_branch_did_not_move_folds_away() -> None:
     state = fold_quiet_groups(record(start((quiet,)), outcome))
 
     assert _labels(state) == ["quiet"]
+
+
+def test_grouped_reads_the_config_not_whatever_the_view_left_visible() -> None:
+    state = _measured()
+
+    assert grouped(state)
+    # a search that spared only the ungrouped metric, and a sort that
+    # flattened the outline, both leave it a grouped run
+    assert grouped(set_query(state, "legacy"))
+    assert grouped(push_sort(state, SortKey.NAME))
+    assert not grouped(start((LEGACY,)))
 
 
 def test_push_sort_stacks_and_moves_a_repeated_key_to_the_front() -> None:

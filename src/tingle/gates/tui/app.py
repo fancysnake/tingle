@@ -12,12 +12,16 @@ from typing import TYPE_CHECKING, ClassVar
 from rich.text import Text
 from textual.app import App
 from textual.binding import Binding
-from textual.widgets import DataTable, Footer, Header
+from textual.widgets import DataTable, Footer, Header, Static
 
 from tingle.mills.browse import (
+    clear_sort,
     fold_quiet_groups,
     group_key,
+    grouped,
     metric_key,
+    outlined,
+    push_sort,
     record,
     rows,
     set_fold,
@@ -25,7 +29,7 @@ from tingle.mills.browse import (
     toggle_fold,
     toggle_fold_all,
 )
-from tingle.pacts.browse import RowKind
+from tingle.pacts.browse import RowKind, SortKey
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -44,6 +48,24 @@ NO_MARKER = "  "
 
 #: One level of the outline.
 INDENT = "  "
+
+#: Which key pushes which sort. Value and score are both here because they
+#: answer different questions: what is biggest, and what is worst.
+SORT_KEYS = {
+    "g": SortKey.GROUP,
+    "n": SortKey.NAME,
+    "t": SortKey.TYPE,
+    "v": SortKey.VALUE,
+    "c": SortKey.SCORE,
+}
+
+#: Which sort a column header click pushes, so the mouse agrees with the
+#: keyboard. Score has no column of its own -- it is the emoji the value
+#: column already leads with -- so it stays a keyboard-only sort.
+HEADER_SORTS = (None, SortKey.TYPE, SortKey.VALUE)
+
+#: Separates the sort stack, most significant first.
+SORT_SEPARATOR = " then "
 
 
 class BrowseTable(DataTable[Text]):
@@ -67,6 +89,15 @@ class BrowseTable(DataTable[Text]):
     ]
 
 
+class SortBar(Static):
+    """One line saying why the rows are in the order they are in.
+
+    Without it a stacked sort is guesswork: the reader can see that the
+    order changed but not which key is deciding it, nor which earlier key
+    is still breaking its ties.
+    """
+
+
 class MetricsApp(App[None]):
     """Everything a run measured, as one foldable table.
 
@@ -82,9 +113,16 @@ class MetricsApp(App[None]):
     COMMAND_PALETTE_BINDING = "p"
     CSS = """
     BrowseTable { height: 1fr; }
+    SortBar { height: auto; color: $text-muted; }
     """
     BINDINGS: ClassVar = [
         Binding("f", "toggle_fold_all", "Fold all"),
+        Binding("g", "sort('g')", "Sort group"),
+        Binding("n", "sort('n')", "Sort name"),
+        Binding("t", "sort('t')", "Sort type"),
+        Binding("v", "sort('v')", "Sort value"),
+        Binding("c", "sort('c')", "Sort score"),
+        Binding("0", "clear_sort", "Reset sort"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -107,6 +145,7 @@ class MetricsApp(App[None]):
         table.add_column("Type", key="type")
         table.add_column("Value", key="value")
         yield table
+        yield SortBar()
         yield Footer()
 
     def on_mount(self) -> None:
@@ -138,6 +177,31 @@ class MetricsApp(App[None]):
             self._state = toggle_fold(self._state, row.key)
             self._draw(land_on=row.key)
 
+    def action_sort(self, key: str) -> None:
+        """Push a sort key, keeping the sorts already in the stack as ties."""
+        if (sort := SORT_KEYS.get(key)) is not None:
+            self._state = push_sort(self._state, sort)
+            self._draw()
+
+    def action_clear_sort(self) -> None:
+        """Drop every sort, bringing back config order and the outline."""
+        self._state = clear_sort(self._state)
+        self._draw()
+
+    def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
+        """Sort by a clicked column, so the mouse and the keyboard agree.
+
+        The first column heads both groups and metrics, so it pushes
+        whichever of the two the run actually has -- sorting a grouped run
+        by group is what keeps its outline, which is the point of clicking
+        the column the outline lives in.
+        """
+        sort = HEADER_SORTS[event.column_index]
+        if sort is None:
+            sort = SortKey.GROUP if grouped(self._state) else SortKey.NAME
+        self._state = push_sort(self._state, sort)
+        self._draw()
+
     def action_toggle_fold_all(self) -> None:
         """Collapse the listing to its top row and back.
 
@@ -161,6 +225,7 @@ class MetricsApp(App[None]):
         for row in self._rows:
             table.add_row(*_cells(row), key=row.key)
         table.move_cursor(row=self._index_of(wanted))
+        self.query_one(SortBar).update(_sort_line(self._state))
 
     def _current(self) -> Row | None:
         """Return the row the cursor is on, if the table has any."""
@@ -224,6 +289,21 @@ def _loaded(report: RunReport | DiffReport) -> BrowseState:
     for outcome in report.outcomes:
         state = record(state, outcome)
     return state
+
+
+def _sort_line(state: BrowseState) -> str:
+    """Say what is deciding the order, and what folding costs.
+
+    A flattened view is worth saying out loud: the reader has just lost
+    the group outline and every occurrence row with it, and the way back
+    is one key they cannot see from the rows alone.
+    """
+    if not state.sort:
+        return "sort: config order"
+    stack = SORT_SEPARATOR.join(key.value for key in state.sort)
+    if outlined(state):
+        return f"sort: {stack}"
+    return f"sort: {stack}  ·  flat, no folding — 0 to reset"
 
 
 def _cells(row: Row) -> tuple[Text, Text, Text]:

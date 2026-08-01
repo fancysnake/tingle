@@ -130,6 +130,16 @@ def outlined(state: BrowseState) -> bool:
     return not state.sort or state.sort[0] is SortKey.GROUP
 
 
+def grouped(state: BrowseState) -> bool:
+    """Whether the run has groups at all, whatever the view is doing to them.
+
+    Read off the config rather than the visible rows, so a search that
+    spared only ungrouped metrics -- or a sort that flattened the
+    outline -- does not make a grouped run look like a flat one.
+    """
+    return any(entry.spec.group is not None for entry in state.entries)
+
+
 def set_query(state: BrowseState, query: str) -> BrowseState:
     """Search for `query`, or leave search mode when it is empty.
 
@@ -307,12 +317,10 @@ def _occurrences(entry: MetricEntry) -> tuple[Occurrence, ...]:
 
 def _outline_rows(state: BrowseState, matches: tuple[_Match, ...]) -> Iterable[Row]:
     """Group headers with their metrics, and their metrics' hits, nested."""
-    # whether the run has groups at all, not whether the query left any: a
-    # search must not restyle the rows it spared into a different outline
-    grouped = any(entry.spec.group is not None for entry in state.entries)
+    has_groups = grouped(state)
     for name, section in _sections(matches, state.sort):
         depth = 0
-        if grouped:
+        if has_groups:
             key = group_key(name)
             # a search reveals every group holding something it found, or
             # the metric it found would stay hidden one level up
