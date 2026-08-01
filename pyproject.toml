@@ -56,6 +56,7 @@ pylint = "^4.0.6"
 # `mise run docs:build` and `docs:serve` install it on demand.
 deptry = "^0.25.1"
 pip-audit = "^2.10.1"
+vulture = "^2.16"
 [tool.poetry.group.docs]
 optional = true
 
@@ -167,3 +168,8 @@ name = "gates does not import links or inits"
 type = "forbidden"
 source_modules = ["tingle.gates"]
 forbidden_modules = ["tingle.links", "tingle.inits"]
+
+# Vulture
+
+[tool.vulture]
+ignore_names = ["on_*", "action_*", "compose", "sub_title"]

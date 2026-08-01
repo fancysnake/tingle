@@ -11,8 +11,15 @@ python = "3.14.6"
 
 [env]
 _.python.venv = { path = ".venv", create = true }
+# the shared task file reads .env.test itself, but only for its test and
+# type-check tasks; loading it here as well is what gives the lint and format
+# tasks the same SRC_PATHS/TEST_PATHS/SCRIPT_PATHS/TOML_PATHS.
+_.file = ".env.test"
 PACKAGE = "tingle"
-EXTRA_PATHS = ""
+SRC_PATHS = "src"
+TEST_PATHS = "tests"
+SCRIPT_PATHS = ""
+TOML_PATHS = "*.toml"
 
 [task_config]
 includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"]
