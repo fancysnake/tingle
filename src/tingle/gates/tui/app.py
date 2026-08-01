@@ -18,7 +18,6 @@ from tingle.mills.browse import (
     clear_sort,
     fold_quiet_groups,
     group_key,
-    grouped,
     metric_key,
     outlined,
     push_sort,
@@ -49,8 +48,12 @@ NO_MARKER = "  "
 #: One level of the outline.
 INDENT = "  "
 
-#: Which key pushes which sort. Value and score are both here because they
+#: Which key sorts by what. Value and score are both here because they
 #: answer different questions: what is biggest, and what is worst.
+#:
+#: The letter sorts upwards and the shifted letter sorts downwards, so the
+#: reader asks for a direction rather than remembering which one each key
+#: happens to prefer.
 SORT_KEYS = {
     "g": SortKey.GROUP,
     "n": SortKey.NAME,
@@ -59,10 +62,19 @@ SORT_KEYS = {
     "c": SortKey.SCORE,
 }
 
-#: Which sort a column header click pushes, so the mouse agrees with the
-#: keyboard. Score has no column of its own -- it is the emoji the value
-#: column already leads with -- so it stays a keyboard-only sort.
-HEADER_SORTS = (None, SortKey.TYPE, SortKey.VALUE)
+#: Which column each sort key lives in, so the header of the one in charge
+#: can be picked out. Group and name share the first column; score shares
+#: the third with value, being the emoji that column already leads with.
+SORT_COLUMNS = {
+    SortKey.GROUP: 0,
+    SortKey.NAME: 0,
+    SortKey.TYPE: 1,
+    SortKey.VALUE: 2,
+    SortKey.SCORE: 2,
+}
+
+#: Marks the header of the column currently deciding the order.
+ASCENDING, DESCENDING = " ▲", " ▼"
 
 #: Separates the sort stack, most significant first.
 SORT_SEPARATOR = " then "
@@ -122,6 +134,12 @@ class MetricsApp(App[None]):
         Binding("t", "sort('t')", "Sort type"),
         Binding("v", "sort('v')", "Sort value"),
         Binding("c", "sort('c')", "Sort score"),
+        # the shifted letter is the same sort the other way up
+        Binding("G", "sort_desc('g')", "Sort group desc", show=False),
+        Binding("N", "sort_desc('n')", "Sort name desc", show=False),
+        Binding("T", "sort_desc('t')", "Sort type desc", show=False),
+        Binding("V", "sort_desc('v')", "Sort value desc", show=False),
+        Binding("C", "sort_desc('c')", "Sort score desc", show=False),
         Binding("0", "clear_sort", "Reset sort"),
         Binding("q", "quit", "Quit"),
     ]
@@ -178,28 +196,21 @@ class MetricsApp(App[None]):
             self._draw(land_on=row.key)
 
     def action_sort(self, key: str) -> None:
-        """Push a sort key, keeping the sorts already in the stack as ties."""
+        """Sort upwards by `key`, keeping the stack below it as ties."""
+        self._push_sort(key, descending=False)
+
+    def action_sort_desc(self, key: str) -> None:
+        """Sort downwards by `key`: the same sort turned over."""
+        self._push_sort(key, descending=True)
+
+    def _push_sort(self, key: str, *, descending: bool) -> None:
         if (sort := SORT_KEYS.get(key)) is not None:
-            self._state = push_sort(self._state, sort)
+            self._state = push_sort(self._state, sort, descending=descending)
             self._draw()
 
     def action_clear_sort(self) -> None:
         """Drop every sort, bringing back config order and the outline."""
         self._state = clear_sort(self._state)
-        self._draw()
-
-    def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
-        """Sort by a clicked column, so the mouse and the keyboard agree.
-
-        The first column heads both groups and metrics, so it pushes
-        whichever of the two the run actually has -- sorting a grouped run
-        by group is what keeps its outline, which is the point of clicking
-        the column the outline lives in.
-        """
-        sort = HEADER_SORTS[event.column_index]
-        if sort is None:
-            sort = SortKey.GROUP if grouped(self._state) else SortKey.NAME
-        self._state = push_sort(self._state, sort)
         self._draw()
 
     def action_toggle_fold_all(self) -> None:
@@ -225,6 +236,7 @@ class MetricsApp(App[None]):
         for row in self._rows:
             table.add_row(*_cells(row), key=row.key)
         table.move_cursor(row=self._index_of(wanted))
+        _mark_sorted_header(table, self._state)
         self.query_one(SortBar).update(_sort_line(self._state))
 
     def _current(self) -> Row | None:
@@ -291,6 +303,25 @@ def _loaded(report: RunReport | DiffReport) -> BrowseState:
     return state
 
 
+def _mark_sorted_header(table: BrowseTable, state: BrowseState) -> None:
+    """Point the column headings at the one currently deciding the order.
+
+    The arrow says which way that column is running, which the labels
+    alone cannot: `value` and `score` share a column, and either can be
+    pointing either way.
+    """
+    primary = state.sort[0] if state.sort else None
+    marked = SORT_COLUMNS[primary.key] if primary is not None else None
+    for index, column in enumerate(table.columns.values()):
+        label = str(column.label).rstrip(ASCENDING + DESCENDING).rstrip()
+        if index == marked and primary is not None:
+            arrow = DESCENDING if primary.descending else ASCENDING
+            column.label = Text(label + arrow, style="bold")
+        else:
+            column.label = Text(label)
+    table.refresh()
+
+
 def _sort_line(state: BrowseState) -> str:
     """Say what is deciding the order, and what folding costs.
 
@@ -300,7 +331,10 @@ def _sort_line(state: BrowseState) -> str:
     """
     if not state.sort:
         return "sort: config order"
-    stack = SORT_SEPARATOR.join(key.value for key in state.sort)
+    stack = SORT_SEPARATOR.join(
+        f"{step.key.value} {'desc' if step.descending else 'asc'}"
+        for step in state.sort
+    )
     if outlined(state):
         return f"sort: {stack}"
     return f"sort: {stack}  ·  flat, no folding — 0 to reset"

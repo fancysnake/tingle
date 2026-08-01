@@ -660,14 +660,9 @@ def _sort_bar(app: MetricsApp) -> str:
     return str(app.query_one(SortBar).render())
 
 
-async def _click_header(pilot: Pilot[None], index: int) -> None:
-    """Select a column header the way a mouse click on it would."""
-    table = pilot.app.query_one(BrowseTable)
-    key = list(table.columns)[index]
-    table.post_message(
-        BrowseTable.HeaderSelected(table, key, index, table.columns[key].label)
-    )
-    await pilot.pause()
+def _headers(app: MetricsApp) -> list[str]:
+    table = app.query_one(BrowseTable)
+    return [str(column.label) for column in table.columns.values()]
 
 
 def test_sorting_by_name_flattens_the_view_and_orders_every_metric() -> None:
@@ -693,13 +688,14 @@ def test_sorting_by_name_then_type_gives_type_major_order() -> None:
     asyncio.run(scenario())
 
 
-def test_sorting_by_value_puts_the_biggest_first() -> None:
+def test_a_lowercase_key_sorts_up_and_its_shifted_twin_sorts_down() -> None:
     async def scenario() -> None:
         app = MetricsApp(SORTABLE)
         async with app.run_test() as pilot:
             await pilot.press("v")
+            assert _column(app, 2) == ["🚧 5", "🚨 20", "🚨 90"]
 
-            assert _labels(app) == ["alpha", "mid", "zeta"]
+            await pilot.press("V")
             assert _column(app, 2) == ["🚨 90", "🚨 20", "🚧 5"]
 
     asyncio.run(scenario())
@@ -711,9 +707,30 @@ def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
         async with app.run_test() as pilot:
             # mid is 20 against a guide of 20, so it is worse than alpha's
             # 90 against 100 even though it is the smaller number
-            await pilot.press("c")
+            await pilot.press("C")
 
             assert _labels(app) == ["mid", "alpha", "zeta"]
+
+    asyncio.run(scenario())
+
+
+def test_the_sorted_columns_header_says_which_way_it_is_running() -> None:
+    async def scenario() -> None:
+        app = MetricsApp(SORTABLE)
+        async with app.run_test() as pilot:
+            assert _headers(app) == ["Group / Metric", "Type", "Value"]
+
+            await pilot.press("v")
+            assert _headers(app) == ["Group / Metric", "Type", "Value ▲"]
+
+            await pilot.press("V")
+            assert _headers(app) == ["Group / Metric", "Type", "Value ▼"]
+
+            await pilot.press("n")
+            assert _headers(app) == ["Group / Metric ▲", "Type", "Value"]
+
+            await pilot.press("0")
+            assert _headers(app) == ["Group / Metric", "Type", "Value"]
 
     asyncio.run(scenario())
 
@@ -729,9 +746,13 @@ def test_sorting_by_group_keeps_the_outline_and_orders_groups_by_name() -> None:
                 "▾ lint",
                 "    mid",
                 "▾ typing",
-                "    zeta",
                 "    alpha",
+                "    zeta",
             ]
+
+            await pilot.press("G")
+
+            assert _labels(app)[0] == "typing"  # turned over, outline intact
 
     asyncio.run(scenario())
 
@@ -785,11 +806,11 @@ def test_the_sort_bar_says_what_is_deciding_the_order() -> None:
             assert _sort_bar(app) == "sort: config order"
 
             await pilot.press("g")
-            assert _sort_bar(app) == "sort: group"
+            assert _sort_bar(app) == "sort: group asc"
 
-            await pilot.press("n")
+            await pilot.press("N")
             assert _sort_bar(app) == (
-                "sort: name then group  ·  flat, no folding — 0 to reset"
+                "sort: name desc then group asc  ·  flat, no folding — 0 to reset"
             )
 
             await pilot.press("0")
@@ -804,44 +825,22 @@ def test_pushing_a_key_already_in_the_stack_moves_it_to_the_front() -> None:
         async with app.run_test() as pilot:
             await pilot.press("n", "t", "n")
 
-            assert _sort_bar(app).startswith("sort: name then type")
+            assert _sort_bar(app).startswith("sort: name asc then type asc")
 
     asyncio.run(scenario())
 
 
-def test_clicking_the_type_and_value_headers_sorts_by_them() -> None:
+def test_asking_for_a_stacked_key_the_other_way_turns_it_over_in_place() -> None:
     async def scenario() -> None:
         app = MetricsApp(SORTABLE)
         async with app.run_test() as pilot:
-            await _click_header(pilot, 1)
-            assert _sort_bar(app).startswith("sort: type")
+            await pilot.press("t", "v")
+            assert _sort_bar(app).startswith("sort: value asc then type asc")
 
-            await _click_header(pilot, 2)
-            assert _sort_bar(app).startswith("sort: value then type")
+            await pilot.press("V")
 
-    asyncio.run(scenario())
-
-
-def test_clicking_the_first_header_sorts_a_grouped_run_by_group() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
-        async with app.run_test() as pilot:
-            await _click_header(pilot, 0)
-
-            assert _sort_bar(app) == "sort: group"
-            assert _labels(app)[0] == "lint"  # the outline survives
-
-    asyncio.run(scenario())
-
-
-def test_clicking_the_first_header_sorts_a_groupless_run_by_name() -> None:
-    async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
-        async with app.run_test() as pilot:
-            await _click_header(pilot, 0)
-
-            assert _sort_bar(app).startswith("sort: name")
-            assert _labels(app) == ["noqa-comments", "python-files"]
+            # the stack is the same depth: value turned over, not stacked twice
+            assert _sort_bar(app).startswith("sort: value desc then type asc")
 
     asyncio.run(scenario())
 

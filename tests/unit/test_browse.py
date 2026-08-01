@@ -20,7 +20,7 @@ from tingle.mills.browse import (
     toggle_fold,
     toggle_fold_all,
 )
-from tingle.pacts.browse import BrowseState, MetricStatus, RowKind, SortKey
+from tingle.pacts.browse import BrowseState, MetricStatus, RowKind, Sort, SortKey
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
@@ -276,7 +276,51 @@ def test_push_sort_stacks_and_moves_a_repeated_key_to_the_front() -> None:
         push_sort(push_sort(start(SPECS), SortKey.NAME), SortKey.TYPE), SortKey.NAME
     )
 
-    assert state.sort == (SortKey.NAME, SortKey.TYPE)
+    assert state.sort == (Sort(SortKey.NAME), Sort(SortKey.TYPE))
+
+
+def test_pushing_a_key_the_other_way_up_turns_it_over_rather_than_stacking() -> None:
+    state = push_sort(push_sort(start(SPECS), SortKey.VALUE), SortKey.NAME)
+
+    state = push_sort(state, SortKey.VALUE, descending=True)
+
+    assert state.sort == (Sort(SortKey.VALUE, descending=True), Sort(SortKey.NAME))
+
+
+def test_a_descending_sort_is_the_ascending_one_turned_over() -> None:
+    state = record(start((NOQA, PYLINT, LOC)), _outcome(NOQA, 5))
+    state = record(state, _outcome(PYLINT, 40))
+    state = record(state, _outcome(LOC, 900))
+
+    assert _metric_names(push_sort(state, SortKey.VALUE)) == [
+        "noqa-comment",
+        "pylint-comment",
+        "loc",
+    ]
+    assert _metric_names(push_sort(state, SortKey.VALUE, descending=True)) == [
+        "loc",
+        "pylint-comment",
+        "noqa-comment",
+    ]
+
+
+def test_the_unmeasured_stay_last_whichever_way_the_sort_runs() -> None:
+    state = record(start(SPECS), _outcome(NOQA, 5))
+    state = record(state, _outcome(LOC, 900))
+
+    for descending in (False, True):
+        names = _metric_names(push_sort(state, SortKey.VALUE, descending=descending))
+
+        assert names[-2:] == ["legacy-arch", "pylint-comment"]
+
+
+def test_the_ungrouped_section_stays_last_whichever_way_groups_run() -> None:
+    ascending = _labels(push_sort(_measured(), SortKey.GROUP))
+    descending = _labels(push_sort(_measured(), SortKey.GROUP, descending=True))
+
+    assert ascending[0] == "linting"
+    assert descending[0] == "size"
+    assert ascending[-2] == descending[-2] == UNGROUPED
 
 
 def test_sorting_by_name_then_by_type_gives_type_major_order() -> None:
@@ -323,7 +367,7 @@ def test_sorting_by_value_puts_the_biggest_first_and_the_unmeasured_last() -> No
     state = record(start(SPECS), _outcome(NOQA, 5))
     state = record(state, _outcome(LOC, 900))
 
-    state = push_sort(state, SortKey.VALUE)
+    state = push_sort(state, SortKey.VALUE, descending=True)
 
     assert _metric_names(state) == [
         "loc",
@@ -347,13 +391,16 @@ def test_sorting_a_diff_run_by_value_ranks_the_standing_total_not_the_net() -> N
     state = record(state, _outcome(LOC, 30))
 
     # noqa's branch impact is the bigger number; the debt it sits on is not
-    assert _metric_names(push_sort(state, SortKey.VALUE)) == ["loc", "noqa-comment"]
+    assert _metric_names(push_sort(state, SortKey.VALUE, descending=True)) == [
+        "loc",
+        "noqa-comment",
+    ]
 
 
 def test_sorting_by_score_puts_a_metric_with_no_score_last() -> None:
     state = record(start((NOQA, PYLINT)), _outcome(NOQA, 5))
 
-    assert _metric_names(push_sort(state, SortKey.SCORE)) == [
+    assert _metric_names(push_sort(state, SortKey.SCORE, descending=True)) == [
         "noqa-comment",
         "pylint-comment",  # never measured, so it has no score to rank
     ]
@@ -363,8 +410,11 @@ def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
     state = record(start((NOQA, LOC)), _outcome(NOQA, 5, guide=5))
     state = record(state, _outcome(LOC, 900, guide=100_000))
 
-    assert _metric_names(push_sort(state, SortKey.VALUE)) == ["loc", "noqa-comment"]
-    assert _metric_names(push_sort(state, SortKey.SCORE)) == ["noqa-comment", "loc"]
+    by_value = push_sort(state, SortKey.VALUE, descending=True)
+    by_score = push_sort(state, SortKey.SCORE, descending=True)
+
+    assert _metric_names(by_value) == ["loc", "noqa-comment"]
+    assert _metric_names(by_score) == ["noqa-comment", "loc"]
 
 
 def test_folds_survive_a_sort_that_hid_them_and_come_back_on_reset() -> None:

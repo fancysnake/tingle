@@ -70,6 +70,19 @@ class RowKind(StrEnum):
 
 
 @dataclass(frozen=True)
+class Sort:
+    """One key in the sort stack, and which way it runs.
+
+    Direction is the reader's to choose rather than the key's: `v` asks
+    for the biggest values and `V` for the smallest, and neither is more
+    natural than the other once the question is theirs to ask.
+    """
+
+    key: SortKey
+    descending: bool = False
+
+
+@dataclass(frozen=True)
 class MetricEntry:
     """One configured metric and everything known about it so far.
 
@@ -127,7 +140,7 @@ class BrowseState:
     """
 
     entries: tuple[MetricEntry, ...] = ()
-    sort: tuple[SortKey, ...] = ()
+    sort: tuple[Sort, ...] = ()
     folded: frozenset[str] = frozenset()
     query: str = ""
     overlay: Mapping[str, bool] = field(default_factory=dict)

@@ -13,7 +13,7 @@ knows what a widget is.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from tingle.mills.display import group_summary, severity_emoji, severity_ratio
 from tingle.pacts.browse import (
@@ -22,6 +22,7 @@ from tingle.pacts.browse import (
     MetricStatus,
     Row,
     RowKind,
+    Sort,
     SortKey,
 )
 from tingle.pacts.diff import DiffOutcome
@@ -103,14 +104,19 @@ def restart(state: BrowseState) -> BrowseState:
     )
 
 
-def push_sort(state: BrowseState, key: SortKey) -> BrowseState:
+def push_sort(
+    state: BrowseState, key: SortKey, *, descending: bool = False
+) -> BrowseState:
     """Sort by `key`, keeping the previous sorts as tie-breakers.
 
     Sorting by name and then by type gives type-major order with names
     ordered inside each type -- the stack is what makes that work. A key
-    already in the stack moves to the front rather than appearing twice.
+    already in the stack moves to the front rather than appearing twice,
+    so asking for the same key the other way round turns the order over
+    instead of stacking the key on itself.
     """
-    return replace(state, sort=(key, *(k for k in state.sort if k is not key)))
+    step = Sort(key=key, descending=descending)
+    return replace(state, sort=(step, *(s for s in state.sort if s.key is not key)))
 
 
 def clear_sort(state: BrowseState) -> BrowseState:
@@ -127,7 +133,7 @@ def outlined(state: BrowseState) -> bool:
     row per metric and there is nothing left to fold. Clearing the sort
     brings the outline, the folds and the occurrence rows back.
     """
-    return not state.sort or state.sort[0] is SortKey.GROUP
+    return not state.sort or state.sort[0].key is SortKey.GROUP
 
 
 def grouped(state: BrowseState) -> bool:
@@ -334,72 +340,95 @@ def _outline_rows(state: BrowseState, matches: tuple[_Match, ...]) -> Iterable[R
 
 
 def _sections(
-    matches: tuple[_Match, ...], sort: tuple[SortKey, ...]
+    matches: tuple[_Match, ...], sort: tuple[Sort, ...]
 ) -> list[tuple[str | None, list[_Match]]]:
     """Split the metrics into their groups, in the order to draw them.
 
-    Config order by default, as everywhere else in tingle; alphabetical
-    when the reader sorted by group. Either way the ungrouped section
-    comes last -- it is a remainder, not a group with an empty name.
+    Config order by default, as everywhere else in tingle; by name when
+    the reader sorted by group, and backwards when they asked for it that
+    way. Either way the ungrouped section comes last -- it is a remainder,
+    not a group with an empty name, so turning the order over does not
+    lift it to the top.
     """
     sections: dict[str | None, list[_Match]] = {}
     for match in matches:
         sections.setdefault(match.entry.spec.group, []).append(match)
     ungrouped = sections.pop(None, None)
     ordered: list[tuple[str | None, list[_Match]]] = list(sections.items())
-    if sort and sort[0] is SortKey.GROUP:
-        ordered.sort(key=lambda section: section[0] or "")
+    if sort and sort[0].key is SortKey.GROUP:
+        ordered.sort(key=lambda section: section[0] or "", reverse=sort[0].descending)
     if ungrouped is not None:
         ordered.append((None, ungrouped))
     return [(name, _sorted(section, sort)) for name, section in ordered]
 
 
-def _sorted(matches: Iterable[_Match], sort: tuple[SortKey, ...]) -> list[_Match]:
+def _sorted(matches: Iterable[_Match], sort: tuple[Sort, ...]) -> list[_Match]:
     """Apply the sort stack, least significant key first.
 
     Python's sort is stable, so sorting by each key in turn from the
     bottom of the stack up leaves the most recently pushed key in charge
-    and every earlier one deciding its ties. Metrics the sort cannot
-    place -- nothing measured yet, or a metric that failed -- go last
-    rather than counting as zero, which would rank them as debt-free.
+    and every earlier one deciding its ties. Name breaks whatever ties
+    are left, so a sort is the same order twice running.
     """
-    ordered = list(matches)
-    for key in reversed(sort):
-        ordered.sort(key=_SORTERS[key])
+    if not sort:
+        return list(matches)
+    ordered = sorted(matches, key=lambda match: match.entry.spec.name)
+    for step in reversed(sort):
+        ordered = _sorted_by(ordered, step)
     return ordered
 
 
-def _group_sort(match: _Match) -> tuple[bool, float, str]:
-    group = match.entry.spec.group
-    return (group is None, 0.0, group or "")
+def _sorted_by(matches: list[_Match], step: Sort) -> list[_Match]:
+    """Sort by one key, leaving what that key cannot place at the end.
+
+    Nothing measured yet, a metric that failed, a metric in no group at
+    all: these have no position under the key being applied. They go last
+    whichever way the sort runs, rather than counting as zero -- which
+    under `value` would rank them debt-free, and under a reversed `value`
+    would put them first.
+    """
+    placeable = _PLACEABLE[step.key]
+    placed = [match for match in matches if placeable(match)]
+    unplaced = [match for match in matches if not placeable(match)]
+    placed.sort(key=_SORTERS[step.key], reverse=step.descending)
+    return [*placed, *unplaced]
 
 
-def _name_sort(match: _Match) -> tuple[bool, float, str]:
-    return (False, 0.0, match.entry.spec.name)
+def _group_sort(match: _Match) -> str:
+    return match.entry.spec.group or ""
 
 
-def _type_sort(match: _Match) -> tuple[bool, float, str]:
-    return (False, 0.0, match.entry.spec.type)
+def _name_sort(match: _Match) -> str:
+    return match.entry.spec.name
 
 
-def _value_sort(match: _Match) -> tuple[bool, float, str]:
-    """Biggest first: the question is what is largest, not what is smallest."""
-    value = _value(match.entry)
-    return (value is None, -float(value or 0), match.entry.spec.name)
+def _type_sort(match: _Match) -> str:
+    return match.entry.spec.type
 
 
-def _score_sort(match: _Match) -> tuple[bool, float, str]:
-    """Worst first, against each metric's own guide rather than its raw size."""
-    score = _score(match.entry)
-    return (score is None, -(score or 0.0), match.entry.spec.name)
+def _value_sort(match: _Match) -> float:
+    return float(_value(match.entry) or 0)
 
 
-_SORTERS: dict[SortKey, Callable[[_Match], tuple[bool, float, str]]] = {
+def _score_sort(match: _Match) -> float:
+    return _score(match.entry) or 0.0
+
+
+_SORTERS: dict[SortKey, Callable[[_Match], Any]] = {
     SortKey.GROUP: _group_sort,
     SortKey.NAME: _name_sort,
     SortKey.TYPE: _type_sort,
     SortKey.VALUE: _value_sort,
     SortKey.SCORE: _score_sort,
+}
+
+#: Whether a key has anywhere to put a metric at all -- see `_sorted_by`.
+_PLACEABLE: dict[SortKey, Callable[[_Match], bool]] = {
+    SortKey.GROUP: lambda match: match.entry.spec.group is not None,
+    SortKey.NAME: lambda _: True,
+    SortKey.TYPE: lambda _: True,
+    SortKey.VALUE: lambda match: _value(match.entry) is not None,
+    SortKey.SCORE: lambda match: _score(match.entry) is not None,
 }
 
 
