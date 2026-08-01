@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import PurePath
 from typing import TYPE_CHECKING
 
+from support import diff_context, modified
+
 from tingle.mills.metrics.symbol_uses import symbol_uses_diff
-from tingle.pacts.diff import DiffMetricContext, DiffResult, FileDiff, FileStatus
+from tingle.pacts.diff import DiffResult, FileDiff, FileStatus
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -16,12 +18,7 @@ def _run(
     file: FileDiff, current: Mapping[str, str | None], *, base: Mapping[str, str | None]
 ) -> DiffResult:
     return symbol_uses_diff(
-        DiffMetricContext(
-            files=(file,),
-            read=lambda path: current.get(str(path)),
-            read_base=lambda path: base.get(str(path)),
-            params={"symbol": SYMBOL},
-        )
+        diff_context(current, files=(file,), base=base, params={"symbol": SYMBOL})
     )
 
 
@@ -32,9 +29,7 @@ def test_counts_uses_on_added_lines() -> None:
         "first = OldClient()\n"
         "new = OldClient()\n"
     )
-    file = FileDiff(
-        path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({4})
-    )
+    file = modified("a.py", added=frozenset({4}))
 
     result = _run(file, {"a.py": code}, base={})
 
@@ -46,9 +41,7 @@ def test_counts_uses_on_added_lines() -> None:
 
 def test_counts_uses_on_removed_lines_from_base() -> None:
     base_code = "from myapp.legacy import OldClient\n\ngone = OldClient()\n"
-    file = FileDiff(
-        path=PurePath("a.py"), status=FileStatus.MODIFIED, removed_lines=frozenset({3})
-    )
+    file = modified("a.py", removed=frozenset({3}))
 
     result = _run(file, {"a.py": "clean = 1\n"}, base={"a.py": base_code})
 
@@ -70,9 +63,7 @@ def test_import_line_counts_as_use() -> None:
 
 def test_untouched_uses_do_not_count() -> None:
     code = "from myapp.legacy import OldClient\n\nold = OldClient()\nx = 1\n"
-    file = FileDiff(
-        path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({4})
-    )
+    file = modified("a.py", added=frozenset({4}))
 
     result = _run(file, {"a.py": code}, base={})
 
@@ -81,12 +72,7 @@ def test_untouched_uses_do_not_count() -> None:
 
 
 def test_base_syntax_error_warns_and_skips_side() -> None:
-    file = FileDiff(
-        path=PurePath("a.py"),
-        status=FileStatus.MODIFIED,
-        added_lines=frozenset({1}),
-        removed_lines=frozenset({1}),
-    )
+    file = modified("a.py", added=frozenset({1}), removed=frozenset({1}))
 
     result = _run(
         file,
@@ -100,9 +86,7 @@ def test_base_syntax_error_warns_and_skips_side() -> None:
 
 
 def test_unreadable_current_side_warns() -> None:
-    file = FileDiff(
-        path=PurePath("a.py"), status=FileStatus.MODIFIED, added_lines=frozenset({1})
-    )
+    file = modified("a.py", added=frozenset({1}))
 
     result = _run(file, {}, base={})
 

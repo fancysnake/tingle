@@ -18,32 +18,15 @@ if TYPE_CHECKING:
 runner = CliRunner()
 app = CliGate(Services()).app
 
-CONFIG = """
-[ranges.python]
-include = ["src/**/*.py"]
-default = true
-
-[[metrics]]
-name = "noqa-comments"
-type = "regex_count"
-range = "python"
-pattern = '#\\s*noqa'
-
-[[metrics]]
-name = "python-files"
-type = "file_count"
-"""
-
 
 @pytest.fixture
-def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    (tmp_path / "tingle.toml").write_text(CONFIG)
-    src = tmp_path / "src"
+def project(workdir: Path, counting_config_text: str) -> Path:
+    (workdir / "tingle.toml").write_text(counting_config_text)
+    src = workdir / "src"
     src.mkdir()
     (src / "a.py").write_text("x = 1  # noqa\ny = 2  # noqa\n")
     (src / "b.py").write_text("z = 3  # noqa\n")
-    monkeypatch.chdir(tmp_path)
-    return tmp_path
+    return workdir
 
 
 def test_version() -> None:

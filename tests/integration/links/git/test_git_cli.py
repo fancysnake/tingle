@@ -9,17 +9,6 @@ from tingle.links.git.cli import GitCli
 from tingle.pacts.diff import DiffSourceError, FileDiff, FileStatus
 
 
-@pytest.fixture(autouse=True)
-def isolated_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
-    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
-    monkeypatch.setenv("GIT_AUTHOR_NAME", "tingle-tests")
-    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "tests@tingle.invalid")
-    monkeypatch.setenv("GIT_COMMITTER_NAME", "tingle-tests")
-    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "tests@tingle.invalid")
-    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
-
-
 def _git(cwd: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 

@@ -15,32 +15,15 @@ if TYPE_CHECKING:
 runner = CliRunner()
 app = CliGate(Services()).app
 
-CONFIG = """
-[ranges.python]
-include = ["src/**/*.py"]
-default = true
-
-[[metrics]]
-name = "noqa-comments"
-type = "regex_count"
-pattern = '#\\s*noqa'
-
-[[metrics]]
-name = "ruff-ignores"
-type = "toml_list_length"
-key = "tool.ruff.lint.ignore"
-"""
-
 
 @pytest.fixture
-def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    (tmp_path / "tingle.toml").write_text(CONFIG)
-    (tmp_path / "pyproject.toml").write_text('[tool.ruff.lint]\nignore = ["E501"]\n')
-    src = tmp_path / "src"
+def project(workdir: Path, config_text: str) -> Path:
+    (workdir / "tingle.toml").write_text(config_text)
+    (workdir / "pyproject.toml").write_text('[tool.ruff.lint]\nignore = ["E501"]\n')
+    src = workdir / "src"
     src.mkdir()
     (src / "a.py").write_text("x = 1  # noqa\ny = 2\nz = 3  # noqa\n")
-    monkeypatch.chdir(tmp_path)
-    return tmp_path
+    return workdir
 
 
 @pytest.mark.usefixtures("project")

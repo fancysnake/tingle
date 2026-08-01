@@ -1,30 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path, PurePath
-from typing import TYPE_CHECKING
-
 import pytest
+from support import PROJECT, FakeProject, make_config
 
 from tingle.mills.runner import run
-from tingle.pacts.config import Config, ConfigError, DisplaySpec, MetricSpec, RangeSpec
+from tingle.pacts.config import ConfigError, DisplaySpec, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
-
-
-class FakeProject:
-    def __init__(self, contents: Mapping[str, str]) -> None:
-        self._contents = dict(contents)
-
-    def walk(self) -> Iterable[PurePath]:
-        return sorted(PurePath(name) for name in self._contents)
-
-    def read(self, path: PurePath) -> str | None:
-        return self._contents.get(str(path))
-
-    def exists(self, path: PurePath) -> bool:
-        return str(path) in self._contents
 
 
 def _file_count(ctx: MetricContext) -> MetricResult:
@@ -41,24 +22,11 @@ METRIC_TYPES = {
     "boom": MetricType(name="boom", func=_boom),
 }
 
-PYTHON_RANGE = RangeSpec(name="python", include=("**/*.py",), default=True)
-
-
-def _config(*metrics: MetricSpec) -> Config:
-    return Config(
-        root=Path("/proj"),
-        source=Path("/proj/tingle.toml"),
-        ranges={"python": PYTHON_RANGE},
-        metrics=metrics,
-        default_range=PYTHON_RANGE,
-    )
-
-
-PROJECT = FakeProject({"a.py": "", "b.py": "", "notes.md": ""})
-
 
 def test_runs_metrics_and_reports_values() -> None:
-    config = _config(MetricSpec(name="files", type="file_count", ranges=("python",)))
+    config = make_config(
+        MetricSpec(name="files", type="file_count", ranges=("python",))
+    )
 
     report = run(config, PROJECT, metric_types=METRIC_TYPES)
 
@@ -70,7 +38,7 @@ def test_runs_metrics_and_reports_values() -> None:
 
 
 def test_default_range_applies_when_none_given() -> None:
-    config = _config(MetricSpec(name="files", type="file_count"))
+    config = make_config(MetricSpec(name="files", type="file_count"))
 
     report = run(config, PROJECT, metric_types=METRIC_TYPES)
 
@@ -81,7 +49,7 @@ def test_default_range_applies_when_none_given() -> None:
 
 
 def test_raising_metric_is_isolated() -> None:
-    config = _config(
+    config = make_config(
         MetricSpec(name="broken", type="boom"),
         MetricSpec(name="files", type="file_count"),
     )
@@ -96,13 +64,9 @@ def test_raising_metric_is_isolated() -> None:
 
 
 def test_empty_explicit_ranges_warn() -> None:
-    empty = RangeSpec(name="empty", include=("nothing/**",))
-    config = Config(
-        root=Path("/proj"),
-        source=Path("/proj/tingle.toml"),
-        ranges={"python": PYTHON_RANGE, "empty": empty},
-        metrics=(MetricSpec(name="files", type="file_count", ranges=("empty",)),),
-        default_range=PYTHON_RANGE,
+    config = make_config(
+        MetricSpec(name="files", type="file_count", ranges=("empty",)),
+        extra_ranges={"empty": RangeSpec(name="empty", include=("nothing/**",))},
     )
 
     report = run(config, PROJECT, metric_types=METRIC_TYPES)
@@ -114,7 +78,7 @@ def test_empty_explicit_ranges_warn() -> None:
 
 
 def test_only_filter_selects_metrics() -> None:
-    config = _config(
+    config = make_config(
         MetricSpec(name="first", type="file_count"),
         MetricSpec(name="second", type="file_count"),
     )
@@ -125,7 +89,7 @@ def test_only_filter_selects_metrics() -> None:
 
 
 def test_only_filter_rejects_unknown_names() -> None:
-    config = _config(MetricSpec(name="files", type="file_count"))
+    config = make_config(MetricSpec(name="files", type="file_count"))
 
     with pytest.raises(ConfigError) as excinfo:
         run(config, PROJECT, metric_types=METRIC_TYPES, only=["nope"])
@@ -133,20 +97,9 @@ def test_only_filter_rejects_unknown_names() -> None:
     assert 'unknown metric "nope"' in excinfo.value.errors
 
 
-def _config_with_display(display: DisplaySpec, *metrics: MetricSpec) -> Config:
-    return Config(
-        root=Path("/proj"),
-        source=Path("/proj/tingle.toml"),
-        ranges={"python": PYTHON_RANGE},
-        metrics=metrics,
-        default_range=PYTHON_RANGE,
-        display=display,
-    )
-
-
 def test_outcome_carries_the_global_guide_when_the_metric_sets_none() -> None:
-    config = _config_with_display(
-        DisplaySpec(guide=25), MetricSpec(name="files", type="file_count")
+    config = make_config(
+        MetricSpec(name="files", type="file_count"), display=DisplaySpec(guide=25)
     )
 
     report = run(config, PROJECT, metric_types=METRIC_TYPES)
@@ -155,8 +108,9 @@ def test_outcome_carries_the_global_guide_when_the_metric_sets_none() -> None:
 
 
 def test_outcome_carries_the_metric_guide_over_the_global_one() -> None:
-    config = _config_with_display(
-        DisplaySpec(guide=25), MetricSpec(name="files", type="file_count", guide=5)
+    config = make_config(
+        MetricSpec(name="files", type="file_count", guide=5),
+        display=DisplaySpec(guide=25),
     )
 
     report = run(config, PROJECT, metric_types=METRIC_TYPES)
@@ -167,7 +121,7 @@ def test_outcome_carries_the_metric_guide_over_the_global_one() -> None:
 def test_outcome_derives_its_guide_from_the_size_of_the_codebase() -> None:
     """With nothing pinned, debt is judged as a density: one unit per 100 lines."""
     project = FakeProject({"a.py": "x\n" * 250, "b.py": "y\n" * 50, "notes.md": ""})
-    config = _config(MetricSpec(name="files", type="file_count"))
+    config = make_config(MetricSpec(name="files", type="file_count"))
 
     report = run(config, project, metric_types=METRIC_TYPES)
 
@@ -178,14 +132,10 @@ def test_outcome_derives_its_guide_from_the_size_of_the_codebase() -> None:
 def test_the_loc_range_overrides_which_files_are_counted() -> None:
     """400 lines in a.py, 100 in b.py: the default range would count all 500."""
     project = FakeProject({"a.py": "x\n" * 400, "b.py": "y\n" * 100})
-    just_a = RangeSpec(name="just-a", include=("a.py",))
-    config = Config(
-        root=Path("/proj"),
-        source=Path("/proj/tingle.toml"),
-        ranges={"python": PYTHON_RANGE, "just-a": just_a},
-        metrics=(MetricSpec(name="files", type="file_count"),),
-        default_range=PYTHON_RANGE,
+    config = make_config(
+        MetricSpec(name="files", type="file_count"),
         display=DisplaySpec(loc_range="just-a"),
+        extra_ranges={"just-a": RangeSpec(name="just-a", include=("a.py",))},
     )
 
     report = run(config, project, metric_types=METRIC_TYPES)
@@ -195,7 +145,7 @@ def test_the_loc_range_overrides_which_files_are_counted() -> None:
 
 def test_an_empty_project_still_yields_a_guide() -> None:
     """Nothing to divide by is not an option: the guide is floored at 1."""
-    config = _config(MetricSpec(name="files", type="file_count"))
+    config = make_config(MetricSpec(name="files", type="file_count"))
 
     report = run(config, FakeProject({"a.py": ""}), metric_types=METRIC_TYPES)
 
@@ -204,8 +154,8 @@ def test_an_empty_project_still_yields_a_guide() -> None:
 
 def test_a_failed_metric_still_carries_its_guide() -> None:
     """The error row is rendered like any other, so it needs a guide too."""
-    config = _config_with_display(
-        DisplaySpec(guide=25), MetricSpec(name="bad", type="boom", guide=7)
+    config = make_config(
+        MetricSpec(name="bad", type="boom", guide=7), display=DisplaySpec(guide=25)
     )
 
     report = run(config, PROJECT, metric_types=METRIC_TYPES)
