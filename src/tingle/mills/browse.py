@@ -279,24 +279,36 @@ def _matches(state: BrowseState) -> tuple[_Match, ...]:
     matches: list[_Match] = []
     for entry in state.entries:
         occurrences = _occurrences(entry)
-        if _named(entry, state.query):
+        if _titled(entry, state.query):
             matches.append(_Match(entry, occurrences, revealed=False))
+        elif _described(entry, state.query):
+            matches.append(_Match(entry, occurrences, revealed=True))
         elif hits := tuple(o for o in occurrences if state.query in o.path):
             matches.append(_Match(entry, hits, revealed=True))
     return tuple(matches)
 
 
-def _named(entry: MetricEntry, query: str) -> bool:
-    """Whether the query matched the metric itself, not a file underneath it.
+def _titled(entry: MetricEntry, query: str) -> bool:
+    """Whether the query matched text the metric's own row already shows.
 
-    A metric's own name, its group's, its description and its range
-    names all describe the metric rather than locate anything inside it,
-    so a match on any of them leaves the metric exactly as the reader
-    had it. There is nothing underneath to single out.
+    Its name and its group's are on screen the moment the metric is, so
+    the row carries its own reason for being there and is left exactly as
+    the reader had it.
     """
-    spec = entry.spec
-    described = (spec.name, spec.group or "", spec.description or "")
-    return any(query in text for text in (*described, *_range_names(entry)))
+    return query in entry.spec.name or query in (entry.spec.group or "")
+
+
+def _described(entry: MetricEntry, query: str) -> bool:
+    """Whether the query matched what the metric says in its detail rows.
+
+    A description or a range name is as much the metric's own word as its
+    name is, but it is a row underneath rather than the row itself, so a
+    metric found through one is opened to show it. Leaving it folded would
+    give the reader a row with no visible reason for being there -- the
+    very thing revealing a matched file avoids.
+    """
+    described = (entry.spec.description or "", *_range_names(entry))
+    return any(query in text for text in described)
 
 
 def _range_names(entry: MetricEntry) -> tuple[str, ...]:

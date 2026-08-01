@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, ClassVar
 from rich.text import Text
 from textual.app import App
 from textual.binding import Binding
-from textual.widgets import DataTable, Footer, Header, Static
+from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from tingle.mills.browse import (
     clear_sort,
@@ -24,6 +24,7 @@ from tingle.mills.browse import (
     record,
     rows,
     set_fold,
+    set_query,
     start,
     toggle_fold,
     toggle_fold_all,
@@ -110,6 +111,18 @@ class SortBar(Static):
     """
 
 
+class SearchBar(Input):
+    """The `/` query, and the only thing on screen that eats bare letters.
+
+    Every letter the app binds -- fold, quit, the five sorts and their
+    shifted twins -- has to reach this as text while it holds focus.
+    Textual offers a key to the focused widget first, so an Input gets
+    them all; escape is bound here to give the reader a way back out.
+    """
+
+    BINDINGS: ClassVar = [Binding("escape", "app.end_search", "Leave search")]
+
+
 class MetricsApp(App[None]):
     """Everything a run measured, as one foldable table.
 
@@ -126,8 +139,11 @@ class MetricsApp(App[None]):
     CSS = """
     BrowseTable { height: 1fr; }
     SortBar { height: auto; color: $text-muted; }
+    SearchBar { border: none; height: 1; padding: 0 1; }
+    SearchBar.hidden { display: none; }
     """
     BINDINGS: ClassVar = [
+        Binding("slash", "search", "Search"),
         Binding("f", "toggle_fold_all", "Fold all"),
         Binding("g", "sort('g')", "Sort group"),
         Binding("n", "sort('n')", "Sort name"),
@@ -163,6 +179,7 @@ class MetricsApp(App[None]):
         table.add_column("Type", key="type")
         table.add_column("Value", key="value")
         yield table
+        yield SearchBar(placeholder="search", classes="hidden")
         yield SortBar()
         yield Footer()
 
@@ -212,6 +229,35 @@ class MetricsApp(App[None]):
         """Drop every sort, bringing back config order and the outline."""
         self._state = clear_sort(self._state)
         self._draw()
+
+    def action_search(self) -> None:
+        """Open the query box and put the cursor in it."""
+        search = self.query_one(SearchBar)
+        search.remove_class("hidden")
+        search.focus()
+
+    def action_end_search(self) -> None:
+        """Leave search mode, restoring the outline the reader had.
+
+        The query goes with the mode, and so does every fold made while it
+        was up -- the model drops the overlay when the query empties, so
+        the outline comes back exactly as it was left.
+        """
+        search = self.query_one(SearchBar)
+        search.value = ""
+        search.add_class("hidden")
+        self._state = set_query(self._state, "")
+        self._draw()
+        self.query_one(BrowseTable).focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Filter as the query is typed, so the reader sees it narrowing."""
+        self._state = set_query(self._state, event.value)
+        self._draw()
+
+    def on_input_submitted(self, _: Input.Submitted) -> None:
+        """Enter hands the rows back without giving up the query."""
+        self.query_one(BrowseTable).focus()
 
     def action_toggle_fold_all(self) -> None:
         """Collapse the listing to its top row and back.
@@ -327,8 +373,14 @@ def _sort_line(state: BrowseState) -> str:
 
     A flattened view is worth saying out loud: the reader has just lost
     the group outline and every occurrence row with it, and the way back
-    is one key they cannot see from the rows alone.
+    is one key they cannot see from the rows alone. A live query says so
+    instead: while one is up it is the thing deciding what is on screen,
+    and escape is the way out of it.
     """
+    if state.query:
+        found = sum(1 for row in rows(state) if row.kind is RowKind.METRIC)
+        matched = f"{found} metric{'' if found == 1 else 's'}"
+        return f"search: {state.query!r} — {matched} — esc to leave"
     if not state.sort:
         return "sort: config order"
     stack = SORT_SEPARATOR.join(
