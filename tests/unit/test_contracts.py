@@ -44,19 +44,6 @@ def test_occurrence_rendering() -> None:
     assert str(Occurrence(path="src/a.py")) == "src/a.py"
 
 
-def test_occurrence_sort_key_handles_missing_fields() -> None:
-    occurrences = [
-        Occurrence(path="b.py", line=2),
-        Occurrence(path="a.py", note="E501"),
-        Occurrence(path="a.py", line=5),
-        Occurrence(path="a.py"),
-    ]
-
-    ordered = sorted(occurrences, key=lambda o: o.sort_key)
-
-    assert [str(o) for o in ordered] == ["a.py", "a.py: E501", "a.py:5", "b.py:2"]
-
-
 def test_occurrence_is_immutable() -> None:
     occurrence = Occurrence(path="a.py", line=1)
     with pytest.raises(dataclasses.FrozenInstanceError):

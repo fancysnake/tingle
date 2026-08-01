@@ -55,11 +55,6 @@ class Occurrence:
     line: int | None = None
     note: str | None = None
 
-    @property
-    def sort_key(self) -> tuple[str, int, str]:
-        """Deterministic ordering: by path, then line, then note."""
-        return (self.path, self.line or 0, self.note or "")
-
     def __str__(self) -> str:
         """Render as path:line, path: note, or bare path."""
         if self.line is not None:
