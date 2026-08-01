@@ -166,6 +166,26 @@ def test_fold_all_folds_every_group_then_unfolds_them_together() -> None:
     ]
 
 
+def test_fold_all_collapses_the_metrics_when_the_run_has_no_groups() -> None:
+    spec = MetricSpec(name="todo", type="regex_count")
+    state = toggle_fold(
+        record(start((spec,)), _outcome(spec, 2, paths=("src/a.py",))),
+        metric_key("todo"),
+    )
+    assert _labels(state) == ["todo", "src/a.py:1"]
+
+    state = toggle_fold_all(state)
+
+    assert _labels(state) == ["todo"]
+
+
+def test_fold_all_leaves_a_listing_with_nothing_foldable_alone() -> None:
+    # ungrouped, and unmeasured, so no group header and no hits underneath
+    state = start((LEGACY,))
+
+    assert toggle_fold_all(state) is state
+
+
 def test_push_sort_stacks_and_moves_a_repeated_key_to_the_front() -> None:
     state = push_sort(
         push_sort(push_sort(start(SPECS), SortKey.NAME), SortKey.TYPE), SortKey.NAME
@@ -228,6 +248,32 @@ def test_sorting_by_value_puts_the_biggest_first_and_the_unmeasured_last() -> No
     ]
 
 
+def test_sorting_a_diff_run_by_value_ranks_the_standing_total_not_the_net() -> None:
+    state = record(
+        start((NOQA, LOC)),
+        DiffOutcome(
+            spec=NOQA,
+            range_names=("src",),
+            result=DiffResult(net=9),
+            total=MetricResult(value=2),
+            guide=100,
+        ),
+    )
+    state = record(state, _outcome(LOC, 30))
+
+    # noqa's branch impact is the bigger number; the debt it sits on is not
+    assert _metric_names(push_sort(state, SortKey.VALUE)) == ["loc", "noqa-comment"]
+
+
+def test_sorting_by_score_puts_a_metric_with_no_score_last() -> None:
+    state = record(start((NOQA, PYLINT)), _outcome(NOQA, 5))
+
+    assert _metric_names(push_sort(state, SortKey.SCORE)) == [
+        "noqa-comment",
+        "pylint-comment",  # never measured, so it has no score to rank
+    ]
+
+
 def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
     state = record(start((NOQA, LOC)), _outcome(NOQA, 5, guide=5))
     state = record(state, _outcome(LOC, 900, guide=100_000))
@@ -263,6 +309,31 @@ def test_a_diff_row_shows_the_branch_impact_beside_the_standing_total() -> None:
     header, noqa, *_ = rows(record(start((NOQA,)), outcome))
     assert noqa.cells[2] == "+3 / -1 (net +2 of 🚨 24)"
     assert header.cells[2] == "net +2 of 🚨 24"
+
+
+def test_a_diff_with_no_standing_total_says_the_total_is_unknown() -> None:
+    outcome = DiffOutcome(
+        spec=NOQA,
+        range_names=("src",),
+        result=DiffResult(net=2, added=3, removed=1),
+        guide=100,
+    )
+
+    _, noqa, *_ = rows(record(start((NOQA,)), outcome))
+    assert noqa.cells[2] == "net +2 of ?"
+
+
+def test_a_diff_reporting_only_a_net_shows_the_standing_total_alone() -> None:
+    outcome = DiffOutcome(
+        spec=NOQA,
+        range_names=("src",),
+        result=DiffResult(net=-3),
+        total=MetricResult(value=24),
+        guide=100,
+    )
+
+    _, noqa, *_ = rows(record(start((NOQA,)), outcome))
+    assert noqa.cells[2] == "net -3 of 🚨 24"
 
 
 def test_search_matches_a_metric_by_its_own_name() -> None:

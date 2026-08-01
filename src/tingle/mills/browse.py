@@ -149,6 +149,10 @@ def is_folded(state: BrowseState, key: str) -> bool:
     reveal a row to show what it found, and an explicit fold beats that
     reveal -- an outright gesture outranks something the query did on the
     reader's behalf.
+
+    This answers one key at a time and derives the search matches to do
+    it, so a renderer drawing a listing should read `Row.folded`, which
+    `rows` has already resolved for every row in a single pass.
     """
     return _folded(state, key, revealed=_revealed(state, key))
 
@@ -177,12 +181,16 @@ def toggle_fold_all(state: BrowseState) -> BrowseState:
     A run with no groups anywhere has metric rows at the top level, so
     there the metrics fold instead -- whatever the outline's top row is,
     that is what this collapses the listing to.
+
+    The rows are read for their fold state rather than asked for it again:
+    `is_folded` re-derives the search matches on every call, so resolving
+    one key at a time would rescan every occurrence once per top row.
     """
-    if not (keys := _fold_all_keys(state)):
+    if not (top := _fold_all_rows(state)):
         return state
-    folded = any(not is_folded(state, key) for key in keys)
-    for key in keys:
-        state = set_fold(state, key, folded=folded)
+    folded = any(row.folded is False for row in top)
+    for row in top:
+        state = set_fold(state, row.key, folded=folded)
     return state
 
 
@@ -509,15 +517,13 @@ def _revealed(state: BrowseState, key: str) -> bool:
     )
 
 
-def _fold_all_keys(state: BrowseState) -> list[str]:
-    """Name the rows `fold all` acts on: the groups, or the metrics if none."""
+def _fold_all_rows(state: BrowseState) -> list[Row]:
+    """Find the rows `fold all` acts on: the groups, or the metrics if none."""
     rendered = rows(state)
-    if groups := [row.key for row in rendered if row.kind is RowKind.GROUP]:
+    if groups := [row for row in rendered if row.kind is RowKind.GROUP]:
         return groups
     return [
-        row.key
-        for row in rendered
-        if row.kind is RowKind.METRIC and row.folded is not None
+        row for row in rendered if row.kind is RowKind.METRIC and row.folded is not None
     ]
 
 
