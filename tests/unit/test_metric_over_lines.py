@@ -28,7 +28,7 @@ def test_without_over_lines_no_file_is_ever_read() -> None:
     """A plain file_count opens nothing, so a binary cannot make it warn."""
     reads: list[PurePath] = []
 
-    def spy(path: PurePath) -> str | None:
+    def spy(path: PurePath) -> None:
         reads.append(path)  # returns None, as an unreadable binary would
 
     ctx = MetricContext(
@@ -78,13 +78,13 @@ def test_an_unreadable_file_warns_once_the_gate_is_set() -> None:
 
 @pytest.mark.parametrize(
     "case",
-    [
+    (
         # (lines before, lines now, expected added, expected removed)
         (900, 1200, 1, 0),  # grew past the gate: new debt
         (1200, 900, 0, 1),  # refactored back under it: debt paid
         (1200, 1300, 0, 0),  # already over, still over
         (100, 200, 0, 0),  # under all along
-    ],
+    ),
 )
 def test_diff_counts_crossings(case: tuple[int, int, int, int]) -> None:
     before, now, added, removed = case
@@ -158,7 +158,7 @@ def test_diff_without_the_gate_still_counts_created_and_deleted() -> None:
     assert (result.added, result.removed, result.net) == (1, 1, 0)
 
 
-@pytest.mark.parametrize("gate", [0, -1, "1000", 1.5, True])
+@pytest.mark.parametrize("gate", (0, -1, "1000", 1.5, True))
 def test_over_lines_must_be_a_positive_integer(gate: object) -> None:
     assert validate_count_params({"over_lines": gate}) == [
         "over_lines must be a positive integer"

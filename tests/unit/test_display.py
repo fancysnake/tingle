@@ -83,12 +83,12 @@ def test_a_pinned_guide_never_counts_the_lines() -> None:
 
 @pytest.mark.parametrize(
     ("loc", "guide"),
-    [
+    (
         (94_000, 940),
         (10_131, 101),
         (49, 0 + 1),  # rounds to zero, floored at 1: nothing to divide by otherwise
         (0, 1),  # an empty project
-    ],
+    ),
 )
 def test_loc_guide_is_a_density_floored_at_one(loc: int, guide: int) -> None:
     assert loc_guide(loc) == guide
@@ -96,19 +96,19 @@ def test_loc_guide_is_a_density_floored_at_one(loc: int, guide: int) -> None:
 
 @pytest.mark.parametrize(
     ("value", "emoji"),
-    [
+    (
         (0, "🎉"),  # not a band but a state
         (1, "🦠"),
         (3, "🚧"),  # log bites early: 3 of a guide of 100 is already a quarter up
         (100, "🚨"),  # value == guide: ratio exactly 1.0, as it was linearly
         (10_403, "💀"),  # about guide squared: ratio 2.0, past the last band
-    ],
+    ),
 )
 def test_severity_emoji_anchors(value: int, emoji: str) -> None:
     assert severity_emoji(value, guide=100) == emoji
 
 
-@pytest.mark.parametrize("guide", [1, 5, 100, 940, 20_000])
+@pytest.mark.parametrize("guide", (1, 5, 100, 940, 20_000))
 def test_the_guide_is_always_the_top_of_the_siren_band(guide: int) -> None:
     """Whatever the guide, `value == guide` means full-size debt: 🚨, not past it."""
     assert severity_emoji(guide, guide=guide) == "🚨"

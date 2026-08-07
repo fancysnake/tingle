@@ -284,10 +284,10 @@ class _BareCounter(ast.NodeVisitor):
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
-            if self._name in (alias.name.split(".")[-1], alias.asname):
+            if self._name in {alias.name.split(".")[-1], alias.asname}:
                 self.lines.append(node.lineno)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         for alias in node.names:
-            if self._name in (alias.name, alias.asname):
+            if self._name in {alias.name, alias.asname}:
                 self.lines.append(node.lineno)

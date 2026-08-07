@@ -15,6 +15,9 @@ _.python.venv = { path = ".venv", create = true }
 # type-check tasks; loading it here as well is what gives the lint and format
 # tasks the same SRC_PATHS/TEST_PATHS/SCRIPT_PATHS/TOML_PATHS.
 _.file = ".env.test"
+# integration tests chdir into tmpdirs, so coverage must be told an absolute
+# destination or the data file is written into a directory that then vanishes
+COVERAGE_FILE = "{{ config_root }}/.coverage.unit"
 PACKAGE = "tingle"
 SRC_PATHS = "src"
 TEST_PATHS = "tests"
@@ -39,3 +42,26 @@ run = "poetry run mkdocs serve"
 depends = ["docs:_install"]
 description = "Build the documentation site (fails on broken links)"
 run = "poetry run mkdocs build --strict"
+
+# Two checks the shared lint:py cannot express, because an included task
+# cannot be overridden by name: it runs mypy on source only, and it runs
+# pylint over src and tests in one pass, which forces duplicate-code off
+# repo-wide. Both are re-applied here at the scope where they mean something.
+[tasks."lint:strict"]
+description = "Type-check the tests, and hold source to duplicate-code"
+run = [
+    "mypy {{ env.TEST_PATHS }}",
+    "pylint -j 0 --enable=duplicate-code {{ env.SRC_PATHS }} {{ env.SCRIPT_PATHS }}",
+]
+
+# check:py plus the gates CI cares about: the scoped checks above, coverage
+# of the lines this branch changed, and tingle's own debt report
+[tasks.fullcheck]
+description = "Run every check: formatters, linters, diff coverage, tingle"
+run = [
+    { task = "format:py" },
+    { task = "lint:py" },
+    { task = "lint:strict" },
+    { task = "test:py:cov:diff" },
+    { task = "lint:tingle" },
+]
