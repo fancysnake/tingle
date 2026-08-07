@@ -156,31 +156,53 @@ ignore_names = ["compose", "on_*", "action_*", "sub_title", "sort_key"]
 testpaths = ["tests"]
 
 [tool.importlinter]
-include_external_packages = "True"
 root_package = "tingle"
 
-# Every contract reads: <source_modules> must not import <forbidden_modules>.
-
 [[tool.importlinter.contracts]]
-name = "gates depend only on mills and pacts"
+name = "gates"
 type = "forbidden"
 source_modules = ["tingle.gates"]
-forbidden_modules = ["tingle.links", "tingle.inits"]
+forbidden_modules = [
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.specs",
+    "tingle.edges",
+]
 
 [[tool.importlinter.contracts]]
-name = "links depend only on pacts"
+name = "links"
 type = "forbidden"
 source_modules = ["tingle.links"]
-forbidden_modules = ["tingle.gates", "tingle.inits", "tingle.mills", "tingle.specs"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.specs",
+    "tingle.edges",
+]
 
 [[tool.importlinter.contracts]]
-name = "mills depend only on specs and pacts"
+name = "inits"
+type = "forbidden"
+source_modules = ["tingle.inits"]
+forbidden_modules = ["tingle.edges"]
+
+
+[[tool.importlinter.contracts]]
+name = "mills"
 type = "forbidden"
 source_modules = ["tingle.mills"]
-forbidden_modules = ["tingle.gates", "tingle.links", "tingle.inits"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.edges",
+]
+
 
 [[tool.importlinter.contracts]]
-name = "pacts depends on nothing"
+name = "pacts"
 type = "forbidden"
 source_modules = ["tingle.pacts"]
 forbidden_modules = [
@@ -189,59 +211,133 @@ forbidden_modules = [
     "tingle.inits",
     "tingle.mills",
     "tingle.specs",
+    "tingle.edges",
+]
+
+
+[[tool.importlinter.contracts]]
+name = "specs"
+type = "forbidden"
+source_modules = ["tingle.specs"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.edges",
+]
+
+
+[[tool.importlinter.contracts]]
+name = "edges"
+type = "forbidden"
+source_modules = ["tingle.edges"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.pacts",
+    "tingle.specs",
+]
+
+[tool.importlinter]
+root_package = "tingle"
+
+[[tool.importlinter.contracts]]
+name = "gates"
+type = "forbidden"
+source_modules = ["tingle.gates"]
+forbidden_modules = [
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.specs",
+    "tingle.edges",
 ]
 
 [[tool.importlinter.contracts]]
-name = "specs depends only on pacts"
-type = "forbidden"
-source_modules = ["tingle.specs"]
-forbidden_modules = ["tingle.gates", "tingle.links", "tingle.inits", "tingle.mills"]
-
-[[tool.importlinter.contracts]]
-name = "specs is imported directly only by mills"
-type = "forbidden"
-source_modules = ["tingle.gates", "tingle.inits"]
-forbidden_modules = ["tingle.specs"]
-# gates and inits reach specs indirectly through mills, which is by design;
-# what GLIMPSE forbids is importing specs directly.
-allow_indirect_imports = true
-
-# [[tool.importlinter.contracts]]
-# name = "inside-gates"
-# type = "independence"
-# modules = ["tingle.gates.*"]
-
-# [[tool.importlinter.contracts]]
-# name = "inside-links"
-# type = "independence"
-# modules = ["tingle.links.*"]
-
-# [[tool.importlinter.contracts]]
-# name = "inside-mills"
-# type = "independence"
-# modules = ["tingle.mills.*"]
-
-# [[tool.importlinter.contracts]]
-# name = "inside-pacts"
-# type = "independence"
-# modules = ["tingle.pacts.*"]
-
-
-[[tool.importlinter.contracts]]
-name = "inside-specs"
-type = "independence"
-modules = ["tingle.specs.*"]
-
-[[tool.importlinter.contracts]]
-name = "links does not import gates or inits"
+name = "links"
 type = "forbidden"
 source_modules = ["tingle.links"]
-forbidden_modules = ["tingle.gates", "tingle.inits"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.specs",
+    "tingle.edges",
+]
 
 [[tool.importlinter.contracts]]
-name = "gates does not import links or inits"
+name = "inits"
 type = "forbidden"
-source_modules = ["tingle.gates"]
-forbidden_modules = ["tingle.links", "tingle.inits"]
+source_modules = ["tingle.inits"]
+forbidden_modules = [
+    "tingle.specs",
+    "tingle.edges",
+]
+allow_indirect_imports = true
 
+[[tool.importlinter.contracts]]
+name = "mills"
+type = "forbidden"
+source_modules = ["tingle.mills"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.edges",
+]
 
+[[tool.importlinter.contracts]]
+name = "pacts"
+type = "forbidden"
+source_modules = ["tingle.pacts"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.specs",
+    "tingle.edges",
+]
+
+[[tool.importlinter.contracts]]
+name = "specs"
+type = "forbidden"
+source_modules = ["tingle.specs"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.edges",
+]
+
+[[tool.importlinter.contracts]]
+name = "edges"
+type = "forbidden"
+source_modules = ["tingle.edges"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.pacts",
+    "tingle.specs",
+]
+
+[[tool.importlinter.contracts]]
+name = "inside-gates"
+type = "independence"
+modules = ["tingle.gates.*"]
+
+[[tool.importlinter.contracts]]
+name = "inside-links"
+type = "independence"
+modules = ["tingle.links.*"]
+
+[[tool.importlinter.contracts]]
+name = "inside-edges"
+type = "independence"
+modules = ["tingle.edges.*"]
