@@ -61,8 +61,8 @@ class DiffSource(Protocol):
         """Diff the working tree against merge-base(base, HEAD)."""
 
     @abstractmethod
-    def read_base(self, path: PurePath) -> str | None:
-        """Return base-side file text, or None if missing/binary/undecodable."""
+    def read_base(self, path: PurePath) -> bytes | None:
+        """Return the base-side file's raw bytes, mirroring worktree read()."""
 
 
 class DiffSourceFactory(Protocol):

@@ -19,6 +19,22 @@ from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
+
+
+class FakeProject:
+    def __init__(self, contents: Mapping[str, str]) -> None:
+        self._contents = dict(contents)
+
+    def walk(self) -> Iterable[PurePath]:
+        return sorted(PurePath(name) for name in self._contents)
+
+    def read(self, path: PurePath) -> bytes | None:
+        text = self._contents.get(str(path))
+        return None if text is None else text.encode()
+
+    def exists(self, path: PurePath) -> bool:
+        return str(path) in self._contents
 
 
 class FakeDiffSource:
@@ -31,8 +47,9 @@ class FakeDiffSource:
         self.requested_base = base
         return self._branch
 
-    def read_base(self, path: PurePath) -> str | None:
-        return self._base.get(str(path))
+    def read_base(self, path: PurePath) -> bytes | None:
+        text = self._base.get(str(path))
+        return None if text is None else text.encode()
 
 
 def _touched_files(ctx: DiffMetricContext) -> DiffResult:

@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from tingle.mills.ranges import resolve
+from tingle.mills.text import decode_text
 
 if TYPE_CHECKING:
     from pathlib import PurePath
@@ -58,6 +59,6 @@ class ProjectLoc:
         """Sum the lines of every readable file in the loc range."""
         total = 0
         for path in resolve(self.walked, [self.range_spec()]):
-            if (text := self._project.read(path)) is not None:
+            if (text := decode_text(self._project.read(path))) is not None:
                 total += len(text.splitlines())
         return total

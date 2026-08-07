@@ -9,6 +9,7 @@ from tingle.mills.display import effective_guide
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.mills.runner import ranges_for
+from tingle.mills.text import text_reader
 from tingle.pacts.config import Config, ConfigError, MetricSpec
 from tingle.pacts.diff import (
     BranchDiff,
@@ -81,13 +82,13 @@ class DiffRunner:
         guide = effective_guide(spec, self.config.display, loc=loc.lines)
         diff_context = DiffMetricContext(
             files=_filter_files(branch_diff.files, range_specs),
-            read=self.project.read,
-            read_base=self.diff_source.read_base,
+            read=text_reader(self.project.read),
+            read_base=text_reader(self.diff_source.read_base),
             params=spec.params,
         )
         total_context = MetricContext(
             files=resolve(loc.walked, range_specs),
-            read=self.project.read,
+            read=text_reader(self.project.read),
             exists=self.project.exists,
             params=spec.params,
         )

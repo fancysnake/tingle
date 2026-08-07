@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from tingle.mills.display import effective_guide
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
+from tingle.mills.text import text_reader
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 from tingle.pacts.report import MetricOutcome, RunReport
@@ -52,7 +53,10 @@ def _outcome(
     files = resolve(loc.walked, range_specs)
     guide = effective_guide(spec, config.display, loc=loc.lines)
     context = MetricContext(
-        files=files, read=project.read, exists=project.exists, params=spec.params
+        files=files,
+        read=text_reader(project.read),
+        exists=project.exists,
+        params=spec.params,
     )
     try:
         result = metric_types[spec.type].func(context)

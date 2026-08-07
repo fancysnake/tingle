@@ -193,12 +193,7 @@ forbidden_modules = ["tingle.edges"]
 name = "mills"
 type = "forbidden"
 source_modules = ["tingle.mills"]
-forbidden_modules = [
-    "tingle.gates",
-    "tingle.links",
-    "tingle.inits",
-    "tingle.edges",
-]
+forbidden_modules = ["tingle.gates", "tingle.links", "tingle.inits", "tingle.edges"]
 
 
 [[tool.importlinter.contracts]]

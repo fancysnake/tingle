@@ -200,7 +200,7 @@ def test_config_root_in_repo_subdirectory(tmp_path: Path) -> None:
     files = _by_path(git.branch_diff("main").files)
 
     assert list(files) == ["inside.py"]
-    assert git.read_base(PurePath("inside.py")) == "one\n"
+    assert git.read_base(PurePath("inside.py")) == b"one\n"
 
 
 def test_read_base_returns_merge_base_content(tmp_path: Path) -> None:
@@ -211,7 +211,7 @@ def test_read_base_returns_merge_base_content(tmp_path: Path) -> None:
     git = GitCli(repo)
     git.branch_diff("main")
 
-    assert git.read_base(PurePath("src/a.py")) == "original\n"
+    assert git.read_base(PurePath("src/a.py")) == b"original\n"
     assert git.read_base(PurePath("src/new.py")) is None
 
 

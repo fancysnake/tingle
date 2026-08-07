@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
-from tingle.links.text import decode_text
 from tingle.pacts.diff import BranchDiff, DiffSourceError, FileDiff, FileStatus
 
 if TYPE_CHECKING:
@@ -35,6 +34,11 @@ _DIFF_ARGS = (
 )
 
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+
+#: Window git sniffs for a NUL before calling a file binary and diffing no
+#: lines of it. Untracked files never reach git's differ, so they are judged
+#: here by the same window.
+_BINARY_SNIFF_BYTES = 8192
 
 
 class GitCli:
@@ -63,8 +67,8 @@ class GitCli:
             base_ref=base_ref, merge_base=merge_base, files=(*diff_files, *untracked)
         )
 
-    def read_base(self, path: PurePath) -> str | None:
-        """Return the file's text at the merge-base, mirroring worktree read()."""
+    def read_base(self, path: PurePath) -> bytes | None:
+        """Return the file's bytes at the merge-base, mirroring worktree read()."""
         if self._merge_base is None:
             msg = "read_base() called before branch_diff()"
             raise DiffSourceError(msg)
@@ -72,7 +76,7 @@ class GitCli:
         result = self._git("show", blob_ref)
         if result.returncode != 0:
             return None
-        return decode_text(result.stdout)
+        return result.stdout
 
     def _resolve_ref(self, base: str) -> str:
         for candidate in (base, f"origin/{base}"):
@@ -117,11 +121,22 @@ class GitCli:
         return untracked
 
     def _worktree_line_numbers(self, path: PurePath) -> Iterable[int]:
+        """Every line of an untracked file, which the branch wholly added.
+
+        Git reports no line numbers for a binary file it diffs, so the same
+        judgement is made here for the files it never diffed. This mirrors
+        git, not tingle's own rule about what a metric may read -- that one
+        lives in mills and applies after the diff is built.
+        """
         try:
             data = (self._root / path).read_bytes()
         except OSError:
             return ()
-        if (text := decode_text(data)) is None:
+        if b"\0" in data[:_BINARY_SNIFF_BYTES]:
+            return ()
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
             return ()
         return range(1, len(text.splitlines()) + 1)
 

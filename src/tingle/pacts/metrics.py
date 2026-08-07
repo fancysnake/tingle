@@ -21,8 +21,12 @@ class ProjectFiles(Protocol):
         """Yield every file under the project root as a relative path."""
 
     @abstractmethod
-    def read(self, path: PurePath) -> str | None:
-        """Return file text, or None if missing, binary, or undecodable."""
+    def read(self, path: PurePath) -> bytes | None:
+        """Return the file's raw bytes, or None if it cannot be read.
+
+        Adapters do not decode: whether bytes are text is a measurement
+        rule, and it is applied in one place upstream of every metric.
+        """
 
     @abstractmethod
     def exists(self, path: PurePath) -> bool:
