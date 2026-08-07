@@ -18,7 +18,6 @@ from tingle.pacts.diff import (
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
     from collections.abc import Iterable, Mapping
 
 

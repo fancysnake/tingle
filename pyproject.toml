@@ -186,103 +186,14 @@ forbidden_modules = [
 name = "inits"
 type = "forbidden"
 source_modules = ["tingle.inits"]
-forbidden_modules = ["tingle.edges"]
-
-
-[[tool.importlinter.contracts]]
-name = "mills"
-type = "forbidden"
-source_modules = ["tingle.mills"]
-forbidden_modules = ["tingle.gates", "tingle.links", "tingle.inits", "tingle.edges"]
-
-
-[[tool.importlinter.contracts]]
-name = "pacts"
-type = "forbidden"
-source_modules = ["tingle.pacts"]
-forbidden_modules = [
-    "tingle.gates",
-    "tingle.links",
-    "tingle.inits",
-    "tingle.mills",
-    "tingle.specs",
-    "tingle.edges",
-]
-
-
-[[tool.importlinter.contracts]]
-name = "specs"
-type = "forbidden"
-source_modules = ["tingle.specs"]
-forbidden_modules = [
-    "tingle.gates",
-    "tingle.links",
-    "tingle.inits",
-    "tingle.mills",
-    "tingle.edges",
-]
-
-
-[[tool.importlinter.contracts]]
-name = "edges"
-type = "forbidden"
-source_modules = ["tingle.edges"]
-forbidden_modules = [
-    "tingle.gates",
-    "tingle.links",
-    "tingle.inits",
-    "tingle.mills",
-    "tingle.pacts",
-    "tingle.specs",
-]
-
-[tool.importlinter]
-root_package = "tingle"
-
-[[tool.importlinter.contracts]]
-name = "gates"
-type = "forbidden"
-source_modules = ["tingle.gates"]
-forbidden_modules = [
-    "tingle.links",
-    "tingle.inits",
-    "tingle.mills",
-    "tingle.specs",
-    "tingle.edges",
-]
-
-[[tool.importlinter.contracts]]
-name = "links"
-type = "forbidden"
-source_modules = ["tingle.links"]
-forbidden_modules = [
-    "tingle.gates",
-    "tingle.inits",
-    "tingle.mills",
-    "tingle.specs",
-    "tingle.edges",
-]
-
-[[tool.importlinter.contracts]]
-name = "inits"
-type = "forbidden"
-source_modules = ["tingle.inits"]
-forbidden_modules = [
-    "tingle.specs",
-    "tingle.edges",
-]
+forbidden_modules = ["tingle.specs", "tingle.edges"]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "mills"
 type = "forbidden"
 source_modules = ["tingle.mills"]
-forbidden_modules = [
-    "tingle.gates",
-    "tingle.links",
-    "tingle.inits",
-    "tingle.edges",
-]
+forbidden_modules = ["tingle.gates", "tingle.links", "tingle.inits", "tingle.edges"]
 
 [[tool.importlinter.contracts]]
 name = "pacts"

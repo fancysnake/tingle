@@ -7,24 +7,6 @@ from tingle.mills.runner import run
 from tingle.pacts.config import ConfigError, DisplaySpec, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
-
-
-class FakeProject:
-    def __init__(self, contents: Mapping[str, str]) -> None:
-        self._contents = dict(contents)
-
-    def walk(self) -> Iterable[PurePath]:
-        return sorted(PurePath(name) for name in self._contents)
-
-    def read(self, path: PurePath) -> bytes | None:
-        text = self._contents.get(str(path))
-        return None if text is None else text.encode()
-
-    def exists(self, path: PurePath) -> bool:
-        return str(path) in self._contents
-
 
 def _file_count(ctx: MetricContext) -> MetricResult:
     return MetricResult(value=len(ctx.files))

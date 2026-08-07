@@ -7,7 +7,6 @@ module's whole job is turning `Row`s into cells and keys into gestures.
 
 from __future__ import annotations
 
-from itertools import starmap
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.text import Text

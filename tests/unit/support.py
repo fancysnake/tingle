@@ -29,8 +29,9 @@ class FakeProject:
     def walk(self) -> Iterable[PurePath]:
         return sorted(PurePath(name) for name in self._contents)
 
-    def read(self, path: PurePath) -> str | None:
-        return self._contents.get(str(path))
+    def read(self, path: PurePath) -> bytes | None:
+        text = self._contents.get(str(path))
+        return None if text is None else text.encode()
 
     def exists(self, path: PurePath) -> bool:
         return str(path) in self._contents
