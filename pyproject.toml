@@ -85,6 +85,7 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+    "CPY001", # the licence lives in LICENSE, not atop all 85 source files
     # conflicts with the ruff formatter and each other; standard exclusions
     "COM812", # trailing commas are the formatter's job
     "D203",   # incompatible with D211 (blank line before class docstring)
