@@ -65,7 +65,7 @@ def _finder(pattern: re.Pattern[str]) -> LocatedFinder:
 def _line_starts(text: str) -> list[int]:
     """Offsets where each line begins; bisect_right(starts, i) is i's line."""
     starts = [0]
-    starts.extend(match.end() for match in re.finditer("\n", text))
+    starts.extend(match.end() for match in re.finditer(r"\n", text))
     return starts
 
 

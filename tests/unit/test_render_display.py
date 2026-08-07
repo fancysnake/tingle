@@ -215,6 +215,25 @@ def test_diff_listing_prints_a_description() -> None:
     assert "Files over 1k lines." in _plain(diff_listing(report))
 
 
+def test_listing_renders_an_errored_metric_as_a_red_heading() -> None:
+    text = _plain(run_listing(_report(_failed("boom"), _outcome("a"))))
+
+    assert "boom (file_count): ERROR" in text
+    assert "a (file_count):" in text  # the rest of the listing still renders
+
+
+def test_diff_listing_renders_an_errored_metric_as_a_red_heading() -> None:
+    errored = DiffOutcome(
+        spec=MetricSpec(name="boom", type="file_count"),
+        range_names=(),
+        error="ValueError: boom",
+    )
+    text = _plain(diff_listing(_diff_report(errored, _diff_outcome("a"))))
+
+    assert "boom (file_count): ERROR" in text
+    assert "a (file_count)" in text
+
+
 def test_diff_table_group_row_judges_the_standing_total_not_the_net() -> None:
     """A net of zero does not mean the group carries no debt."""
     text = _rendered(

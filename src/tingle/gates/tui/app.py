@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from itertools import starmap
 from typing import TYPE_CHECKING, ClassVar
 
 from textual.app import App
@@ -343,7 +344,7 @@ def _detail_widgets(outcome: MetricOutcome | DiffOutcome) -> list[Static]:
         if isinstance(outcome, DiffOutcome)
         else occurrence_rows(outcome.result)
     )
-    widgets.extend(_occurrence_widget(text, occurrence) for text, occurrence in rows)
+    widgets.extend(starmap(_occurrence_widget, rows))
     return widgets
 
 

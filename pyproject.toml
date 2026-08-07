@@ -56,6 +56,10 @@ pylint = "^4.0.6"
 # `mise run docs:build` and `docs:serve` install it on demand.
 deptry = "^0.25.1"
 pip-audit = "^2.10.1"
+pytest-xdist = "^3.8.0"
+pytest-cov = "^7.1.0"
+diff-cover = "^10.4.1"
+vulture = "^2.16"
 [tool.poetry.group.docs]
 optional = true
 
@@ -74,12 +78,14 @@ skip-magic-trailing-comma = true
 target-version = ['py311']
 
 [tool.ruff]
-target-version = "py311"
+line-length = 88
+output-format = 'concise'
 src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+    "CPY001", # the licence lives in LICENSE, not atop all 85 source files
     # conflicts with the ruff formatter and each other; standard exclusions
     "COM812", # trailing commas are the formatter's job
     "D203",   # incompatible with D211 (blank line before class docstring)
@@ -112,58 +118,117 @@ required-imports = ["from __future__ import annotations"]
 # and this one runs the resolved VS Code `code` executable (no shell, no path search)
 "src/tingle/links/editor.py" = ["S603"]
 
+[tool.ruff.lint.flake8-pytest-style]
+parametrize-values-type = "tuple"
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
 [tool.mypy]
-strict = true
 files = ["src", "tests"]
 python_version = "3.11"
+strict = true
+# beyond what `strict` bundles; everything `strict` already implies is left
+# to `strict`, so a future mypy that widens the bundle widens this too
+disallow_any_decorated = true
+disallow_any_unimported = true
+extra_checks = true
+warn_unreachable = true
+color_output = true
+explicit_package_bases = true
+mypy_path = "src"
+pretty = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+# textual mutates widget attributes across awaits; mypy keeps the narrowed
+# literal and calls every assertion after the first one unreachable
+warn_unreachable = false
+
+[tool.vulture]
+# textual calls these by name, so no call site is visible: compose and on_*
+# are lifecycle hooks and action_* are keybinding targets. sort_key is
+# exercised by the tests, which vulture is not pointed at.
+ignore_names = ["compose", "on_*", "action_*", "sub_title", "sort_key"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.importlinter]
+include_external_packages = "True"
 root_package = "tingle"
+
+# Every contract reads: <source_modules> must not import <forbidden_modules>.
+
+[[tool.importlinter.contracts]]
+name = "gates depend only on mills and pacts"
+type = "forbidden"
+source_modules = ["tingle.gates"]
+forbidden_modules = ["tingle.links", "tingle.inits"]
+
+[[tool.importlinter.contracts]]
+name = "links depend only on pacts"
+type = "forbidden"
+source_modules = ["tingle.links"]
+forbidden_modules = ["tingle.gates", "tingle.inits", "tingle.mills", "tingle.specs"]
+
+[[tool.importlinter.contracts]]
+name = "mills depend only on specs and pacts"
+type = "forbidden"
+source_modules = ["tingle.mills"]
+forbidden_modules = ["tingle.gates", "tingle.links", "tingle.inits"]
 
 [[tool.importlinter.contracts]]
 name = "pacts depends on nothing"
 type = "forbidden"
 source_modules = ["tingle.pacts"]
 forbidden_modules = [
-    "tingle.specs",
-    "tingle.mills",
-    "tingle.links",
     "tingle.gates",
+    "tingle.links",
     "tingle.inits",
+    "tingle.mills",
+    "tingle.specs",
 ]
 
 [[tool.importlinter.contracts]]
 name = "specs depends only on pacts"
 type = "forbidden"
 source_modules = ["tingle.specs"]
-forbidden_modules = ["tingle.mills", "tingle.links", "tingle.gates", "tingle.inits"]
+forbidden_modules = ["tingle.gates", "tingle.links", "tingle.inits", "tingle.mills"]
 
 [[tool.importlinter.contracts]]
-name = "specs is imported only by mills"
+name = "specs is imported directly only by mills"
 type = "forbidden"
-source_modules = ["tingle.links", "tingle.gates", "tingle.inits"]
+source_modules = ["tingle.gates", "tingle.inits"]
 forbidden_modules = ["tingle.specs"]
-# Gates and inits reach specs indirectly through mills, which is by design;
+# gates and inits reach specs indirectly through mills, which is by design;
 # what GLIMPSE forbids is importing specs directly.
 allow_indirect_imports = true
 
-[[tool.importlinter.contracts]]
-name = "mills depends only on pacts and specs"
-type = "forbidden"
-source_modules = ["tingle.mills"]
-forbidden_modules = ["tingle.links", "tingle.gates", "tingle.inits"]
+# [[tool.importlinter.contracts]]
+# name = "inside-gates"
+# type = "independence"
+# modules = ["tingle.gates.*"]
+
+# [[tool.importlinter.contracts]]
+# name = "inside-links"
+# type = "independence"
+# modules = ["tingle.links.*"]
+
+# [[tool.importlinter.contracts]]
+# name = "inside-mills"
+# type = "independence"
+# modules = ["tingle.mills.*"]
+
+# [[tool.importlinter.contracts]]
+# name = "inside-pacts"
+# type = "independence"
+# modules = ["tingle.pacts.*"]
 
 [[tool.importlinter.contracts]]
-name = "links does not import gates or inits"
-type = "forbidden"
-source_modules = ["tingle.links"]
-forbidden_modules = ["tingle.gates", "tingle.inits"]
-
-[[tool.importlinter.contracts]]
-name = "gates does not import links or inits"
-type = "forbidden"
-source_modules = ["tingle.gates"]
-forbidden_modules = ["tingle.links", "tingle.inits"]
+name = "inside-specs"
+type = "independence"
+modules = ["tingle.specs.*"]

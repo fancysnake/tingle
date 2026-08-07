@@ -397,7 +397,7 @@ def test_display_must_be_table() -> None:
     assert "[display] must be a table" in errors
 
 
-@pytest.mark.parametrize("guide", [0, -1, "100", 1.5])
+@pytest.mark.parametrize("guide", (0, -1, "100", 1.5))
 def test_display_guide_must_be_a_positive_integer(guide: object) -> None:
     errors = _errors_of({"display": {"guide": guide}, "metrics": []})
 
@@ -425,7 +425,7 @@ def test_metric_guide_overrides_the_global_one() -> None:
     assert config.metrics[0].guide == 5
 
 
-@pytest.mark.parametrize("guide", [0, -1, "5", True])
+@pytest.mark.parametrize("guide", (0, -1, "5", True))
 def test_metric_guide_must_be_a_positive_integer(guide: object) -> None:
     errors = _errors_of({"metrics": [{**_metric("loc"), "guide": guide}]})
 
@@ -446,7 +446,7 @@ def test_metric_description_defaults_to_none() -> None:
     assert config.metrics[0].description is None
 
 
-@pytest.mark.parametrize("description", ["", 5])
+@pytest.mark.parametrize("description", ("", 5))
 def test_metric_description_must_be_a_non_empty_string(description: object) -> None:
     errors = _errors_of({"metrics": [{**_metric("loc"), "description": description}]})
 
