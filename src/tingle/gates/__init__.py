@@ -1,1 +1,1 @@
-"""GLIMPSE gates: delivery mechanisms. Depends on pacts and mills."""
+"""GLIMPSE gates: delivery mechanisms. Depends on pacts only."""
