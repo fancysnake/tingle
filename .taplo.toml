@@ -1,5 +1,3 @@
-include = [".taplo.toml", "pyproject.toml", "mise.toml", "tingle.toml"]
-
 [formatting]
 column_width = 88
 inline_table_expand = false

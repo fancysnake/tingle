@@ -98,6 +98,18 @@ def test_bare_mode_counts_imports() -> None:
     assert _run(code, symbol="OldClient").value == 2
 
 
+def test_bare_mode_counts_a_plain_import_by_its_last_segment() -> None:
+    code = "import myapp.OldClient\n\nx = OldClient()\n"
+
+    assert _run(code, symbol="OldClient").value == 2
+
+
+def test_bare_mode_counts_an_aliased_plain_import() -> None:
+    code = "import somewhere as OldClient\n\nx = OldClient()\n"
+
+    assert _run(code, symbol="OldClient").value == 2
+
+
 def test_star_import_falls_back_to_bare_counting() -> None:
     code = "from myapp.legacy import *\n\nclient = OldClient()\n"
 

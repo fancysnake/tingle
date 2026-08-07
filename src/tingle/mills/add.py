@@ -67,8 +67,10 @@ def _merge_params(
         if primary is None:
             raise ConfigError(
                 [
-                    f'metric type "{draft.type_name}" takes no positional value;'
-                    " use --param key=value"
+                    (
+                        f'metric type "{draft.type_name}" takes no positional '
+                        "value; use --param key=value"
+                    )
                 ]
             )
         if primary in all_params:

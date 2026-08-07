@@ -51,6 +51,8 @@ pattern = '#\s*noqa'
 
 
 class TomlConfigStore(ConfigStore):
+    # the receiver is required by the ConfigStore protocol, not by the bodies
+    # pylint: disable=no-self-use
     """Reads and edits tingle's configuration as TOML."""
 
     def load_raw(
