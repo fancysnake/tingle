@@ -59,7 +59,7 @@ def test_without_over_lines_no_file_is_ever_read() -> None:
     """A plain file_count opens nothing, so a binary cannot make it warn."""
     reads: list[PurePath] = []
 
-    def spy(path: PurePath) -> str | None:
+    def spy(path: PurePath) -> None:
         reads.append(path)  # returns None, as an unreadable binary would
 
     ctx = MetricContext(

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any, TypeVar
-from xml.etree import ElementTree as ET  # ruff: ignore [suspicious-xml-etree-import]
+
+# cobertura output is built here and written out; nothing parses foreign XML
+from xml.etree import ElementTree as ET
 
 from rich.table import Table
 from rich.text import Text
@@ -211,6 +213,14 @@ def _diff_cells(outcome: DiffOutcome, width: int) -> tuple[str, str, str, str]:
     )
 
 
+def _error_lines(outcome: MetricOutcome | DiffOutcome) -> list[Text]:
+    """Render an errored outcome: a red heading and a blank spacer."""
+    return [
+        Text(f"{outcome.spec.name} ({outcome.spec.type}): ERROR", style="bold red"),
+        Text(""),
+    ]
+
+
 def run_listing(report: RunReport) -> list[Text]:
     """Full report: every metric with its located occurrences."""
     lines: list[Text] = []
@@ -223,15 +233,7 @@ def run_listing(report: RunReport) -> list[Text]:
             lines.append(heading)
         for outcome in outcomes:
             if outcome.result is None:
-                lines.extend(
-                    [
-                        Text(
-                            f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
-                            style="bold red",
-                        ),
-                        Text(""),
-                    ]
-                )
+                lines.extend(_error_lines(outcome))
                 continue
             stat = _valued(outcome.result.value, outcome.guide)
             lines.append(
@@ -294,15 +296,7 @@ def diff_listing(report: DiffReport) -> list[Text]:
             lines.append(heading)
         for outcome in outcomes:
             if outcome.result is None:
-                lines.extend(
-                    [
-                        Text(
-                            f"{outcome.spec.name} ({outcome.spec.type}): ERROR",
-                            style="bold red",
-                        ),
-                        Text(""),
-                    ]
-                )
+                lines.extend(_error_lines(outcome))
                 continue
             lines.append(_diff_heading(outcome))
             if (description := description_line(outcome)) is not None:

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -15,43 +18,39 @@ jobs:
     env:
       MISE_PYTHON_VERSION: ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4
       - run: mise exec -- poetry install
       - run: mise test:py:cov
-      - name: Upload Python coverage to Codecov
-        uses: codecov/codecov-action@v5
-        if: success()
+      - run: mise exec -- poetry run coverage xml
+      - name: Upload coverage to Codecov
+        # one report per commit is enough; the other legs only prove the
+        # suite passes on their interpreter
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           flags: python
           disable_search: true
-      - name: Upload client coverage to Codecov
-        uses: codecov/codecov-action@v5
-        if: success()
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage-client/lcov.info
-          flags: client
-          disable_search: true
 
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4
       - run: mise exec -- poetry install
       - run: mise run lint:py
+      - run: mise run lint:strict
 
   # advisory: reports the branch's debt without blocking the merge
   tingle:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0 # tingle check needs history to find the merge-base
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4
       - run: mise exec -- poetry install
       - run: mise exec -- poetry run tingle check

@@ -5,6 +5,9 @@ loc_range = "python"
 include = ["src/**/*.py", "tests/**/*.py"]
 default = true
 
+[ranges.config]
+include = ["pyproject.toml", "mise.toml", ".pylintrc"]
+
 # A branch may take on debt in one metric if it pays off as much elsewhere.
 [check]
 policy = "sum"
@@ -92,6 +95,17 @@ group = "typing"
 key = "tool.mypy.overrides"
 label = "module"
 description = "Modules given relaxed mypy strictness."
+
+# architecture
+
+[[metrics]]
+name = "deferred-import-contracts"
+type = "regex_count"
+group = "architecture"
+range = "config"
+pattern = '^#\s*\[\[tool\.importlinter\.contracts\]\]'
+flags = ["MULTILINE"]
+description = "Import-linter contracts commented out instead of enforced."
 
 [[metrics]]
 name = "long-files"

@@ -460,7 +460,10 @@ confidence=HIGH,
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
-disable=magic-value-comparison,missing-docstring,duplicate-code,arguments-differ
+# duplicate-code compares a whole run at once, and the shared lint:pylint task
+# runs src and tests together, where near-identical test bodies are expected.
+# The `lint:strict` mise task re-enables it for src on its own.
+disable=magic-value-comparison,missing-docstring,duplicate-code
 
 
 # Enable the message, report, category or checker with the given id(s). You can
