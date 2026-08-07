@@ -12,7 +12,6 @@ from rich.console import Console
 from rich.table import Table
 
 from tingle.gates.cli import render
-from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.pacts.config import (
     CheckPolicy,
     Config,
@@ -23,7 +22,10 @@ from tingle.pacts.config import (
 from tingle.pacts.diff import DiffReport, DiffSourceError
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from tingle.pacts.check import CheckVerdict
+    from tingle.pacts.metrics import MetricType
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ServicesProtocol
 
@@ -240,7 +242,7 @@ class CliGate:
     ) -> None:
         """List configured metrics, or available metric types with --types."""
         if types:
-            self._stdout.print(_types_table())
+            self._stdout.print(_types_table(self._services.config.list_metric_types()))
             return
         self._stdout.print(_metrics_table(self._load(config)))
 
@@ -442,9 +444,9 @@ class CliGate:
         raise typer.Exit(2)
 
 
-def _types_table() -> Table:
+def _types_table(metric_types: Sequence[MetricType]) -> Table:
     table = Table("Type", "Required params", "Optional params", "Description")
-    for metric_type in sorted(METRIC_TYPES.values(), key=lambda t: t.name):
+    for metric_type in metric_types:
         table.add_row(
             metric_type.name,
             ", ".join(metric_type.params.required),

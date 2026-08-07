@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from tingle.pacts.config import CheckPolicy, Config, MetricDraft
     from tingle.pacts.diff import DiffReport
     from tingle.pacts.editor import EditorOpener
+    from tingle.pacts.metrics import MetricType
     from tingle.pacts.report import RunReport
 
 
@@ -34,6 +35,10 @@ class ConfigServiceProtocol(Protocol):
     @abstractmethod
     def write_starter(self, cwd: Path) -> Path:
         """Create the starter config; raises FileExistsError if present."""
+
+    @abstractmethod
+    def list_metric_types(self) -> tuple[MetricType, ...]:
+        """Every metric type a config may name, in name order."""
 
 
 class MetricsServiceProtocol(Protocol):
