@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import asyncio
 
-from textual_support import labels, outline, search_box, status, summed_report
+from textual_support import (
+    labels,
+    metrics_app,
+    outline,
+    search_box,
+    status,
+    summed_report,
+)
 
-from tingle.gates.cli.textual import BrowseTable, MetricsApp, SearchBar
+from tingle.gates.cli.textual import BrowseTable, SearchBar
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.metrics import MetricResult, Occurrence
 from tingle.pacts.report import MetricOutcome
@@ -40,7 +47,7 @@ SEARCHABLE = summed_report(
 
 def test_slash_opens_the_search_box_and_puts_the_cursor_in_it() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             assert search_box(app).has_class("hidden")
 
@@ -56,7 +63,7 @@ def test_every_bare_letter_the_app_binds_reaches_the_search_box_as_text() -> Non
     """The whole binding risk in one test: f folds, q quits, 0 and V sort."""
 
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
 
@@ -71,7 +78,7 @@ def test_every_bare_letter_the_app_binds_reaches_the_search_box_as_text() -> Non
 
 def test_a_file_query_opens_a_fully_folded_tree_onto_that_file_alone() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("f")
             assert labels(app) == ["linting", "typing"]
@@ -93,7 +100,7 @@ def test_a_file_query_opens_a_fully_folded_tree_onto_that_file_alone() -> None:
 
 def test_escape_leaves_search_mode_and_restores_the_outline_untouched() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("f")
             before = outline(app)
@@ -114,7 +121,7 @@ def test_escape_leaves_search_mode_and_restores_the_outline_untouched() -> None:
 
 def test_a_name_match_leaves_the_metric_as_the_reader_had_it() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
             await pilot.press(*"legacy")
@@ -127,7 +134,7 @@ def test_a_name_match_leaves_the_metric_as_the_reader_had_it() -> None:
 
 def test_a_description_match_opens_the_metric_on_the_words_that_matched() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
             await pilot.press(*"escapes")
@@ -147,7 +154,7 @@ def test_a_description_match_opens_the_metric_on_the_words_that_matched() -> Non
 
 def test_search_is_case_sensitive_and_empties_the_view_when_nothing_matches() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
             await pilot.press(*"Legacy")
@@ -160,7 +167,7 @@ def test_search_is_case_sensitive_and_empties_the_view_when_nothing_matches() ->
 
 def test_a_group_with_no_matching_metric_disappears() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
             await pilot.press(*"models.py")
@@ -172,7 +179,7 @@ def test_a_group_with_no_matching_metric_disappears() -> None:
 
 def test_a_fold_made_during_a_search_beats_the_reveal_and_dies_with_it() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
             await pilot.press(*"views.py")
@@ -193,7 +200,7 @@ def test_a_fold_made_during_a_search_beats_the_reveal_and_dies_with_it() -> None
 
 def test_enter_hands_the_rows_back_without_giving_up_the_query() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
             await pilot.press(*"legacy")
@@ -208,7 +215,7 @@ def test_enter_hands_the_rows_back_without_giving_up_the_query() -> None:
 
 def test_the_status_line_counts_what_the_query_found() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SEARCHABLE)
+        app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
             await pilot.press(*"views.py")

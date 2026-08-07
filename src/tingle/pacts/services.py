@@ -6,15 +6,16 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Collection
+    from collections.abc import Collection, Sequence
     from pathlib import Path
 
+    from tingle.pacts.browse import BrowseState, Row, SortKey
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.config import CheckPolicy, Config, MetricDraft
-    from tingle.pacts.diff import DiffReport
+    from tingle.pacts.config import CheckPolicy, Config, MetricDraft, MetricSpec
+    from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.metrics import MetricType
-    from tingle.pacts.report import RunReport
+    from tingle.pacts.report import MetricOutcome, RunReport
 
 
 class ConfigServiceProtocol(Protocol):
@@ -66,6 +67,71 @@ class MetricsServiceProtocol(Protocol):
         """Measure the branch, then judge it; `policy` overrides the config."""
 
 
+class BrowseServiceProtocol(Protocol):
+    """Driving a browsing session: what is visible, folded, sorted, searched.
+
+    Every call is pure -- a `BrowseState` goes in and a new one, or the
+    rows it should be drawn as, comes out. The gate holds the state and
+    the widgets; which rows that state means is decided here.
+    """
+
+    @abstractmethod
+    def start(self, specs: Sequence[MetricSpec]) -> BrowseState:
+        """Open a session over `specs`, before anything has been measured."""
+
+    @abstractmethod
+    def record(
+        self, state: BrowseState, outcome: MetricOutcome | DiffOutcome
+    ) -> BrowseState:
+        """Take one measured metric into the state."""
+
+    @abstractmethod
+    def rows(self, state: BrowseState) -> tuple[Row, ...]:
+        """Every row that should be drawn, in the order it should be drawn."""
+
+    @abstractmethod
+    def metric_key(self, name: str) -> str:
+        """Identify a metric row."""
+
+    @abstractmethod
+    def group_key(self, name: str | None) -> str:
+        """Identify a group row; `None` is the ungrouped section."""
+
+    @abstractmethod
+    def outlined(self, state: BrowseState) -> bool:
+        """Whether the rows still form an outline that can be folded."""
+
+    @abstractmethod
+    def push_sort(
+        self, state: BrowseState, key: SortKey, *, descending: bool = False
+    ) -> BrowseState:
+        """Sort by `key`, keeping the previous sorts as tie-breakers."""
+
+    @abstractmethod
+    def clear_sort(self, state: BrowseState) -> BrowseState:
+        """Drop every sort, returning the rows to config order."""
+
+    @abstractmethod
+    def set_query(self, state: BrowseState, query: str) -> BrowseState:
+        """Search for `query`, or leave search mode when it is empty."""
+
+    @abstractmethod
+    def set_fold(self, state: BrowseState, key: str, *, folded: bool) -> BrowseState:
+        """Fold or unfold one row."""
+
+    @abstractmethod
+    def toggle_fold(self, state: BrowseState, key: str) -> BrowseState:
+        """Fold an unfolded row, unfold a folded one."""
+
+    @abstractmethod
+    def toggle_fold_all(self, state: BrowseState) -> BrowseState:
+        """Fold every group at once, or unfold them all once none is folded."""
+
+    @abstractmethod
+    def fold_quiet_groups(self, state: BrowseState) -> BrowseState:
+        """Fold away the groups the report has nothing to say about."""
+
+
 class ServicesProtocol(Protocol):
     """The services a gate may reach; mirrors the inits registry."""
 
@@ -78,6 +144,11 @@ class ServicesProtocol(Protocol):
     @abstractmethod
     def metrics(self) -> MetricsServiceProtocol:
         """Metric execution."""
+
+    @property
+    @abstractmethod
+    def browse(self) -> BrowseServiceProtocol:
+        """What an interactive session shows, and in what order."""
 
     @property
     @abstractmethod

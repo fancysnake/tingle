@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from tingle.pacts.config import DEFAULT_GUIDE
 
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from tingle.pacts.config import MetricSpec
+    from tingle.pacts.diff import DiffOutcome
     from tingle.pacts.metrics import MetricResult
 
 
@@ -20,6 +21,11 @@ class MetricOutcome:
 
     `guide` is already resolved: the metric's own, or the one from
     `[display]`. Renderers read it as-is and never redo the fallback.
+
+    `emoji` is how bad the measured value is against that guide, decided
+    where the guide was, so that every view of a run shows one judgement
+    rather than each recomputing its own. It is empty on an errored
+    outcome, which has no value to rank.
     """
 
     spec: MetricSpec
@@ -27,6 +33,25 @@ class MetricOutcome:
     result: MetricResult | None = None
     error: str | None = None
     guide: int = DEFAULT_GUIDE
+    emoji: str = ""
+
+
+_Outcome = TypeVar("_Outcome", bound="MetricOutcome | DiffOutcome")
+
+
+@dataclass(frozen=True)
+class ReportSection(Generic[_Outcome]):
+    """One group of a report's outcomes, and what they add up to.
+
+    `name` is None for the metrics belonging to no group, whose section is
+    always last. Sections come pre-summed because grouping and summing are
+    the same judgement the emoji are: a renderer walks them, it does not
+    work them out.
+    """
+
+    name: str | None
+    outcomes: tuple[_Outcome, ...]
+    summary: GroupSummary
 
 
 @dataclass(frozen=True)
@@ -36,6 +61,7 @@ class RunReport:
     root: Path
     source: Path
     outcomes: tuple[MetricOutcome, ...]
+    sections: tuple[ReportSection[MetricOutcome], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -56,3 +82,4 @@ class GroupSummary:
     has_error: bool = False
     net: int | None = None
     changed: bool = False
+    emoji: str = ""

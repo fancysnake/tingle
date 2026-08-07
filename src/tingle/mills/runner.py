@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from tingle.mills.display import effective_guide
+from tingle.mills.display import effective_guide, sections, severity_emoji
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.mills.text import text_reader
@@ -37,7 +37,12 @@ def run(
         for spec in config.metrics
         if only is None or spec.name in only
     )
-    return RunReport(root=config.root, source=config.source, outcomes=outcomes)
+    return RunReport(
+        root=config.root,
+        source=config.source,
+        outcomes=outcomes,
+        sections=sections(outcomes),
+    )
 
 
 def _outcome(
@@ -71,7 +76,13 @@ def _outcome(
 
     if not files and spec.ranges:
         result = replace(result, warnings=(*result.warnings, "ranges matched no files"))
-    return MetricOutcome(spec=spec, range_names=range_names, result=result, guide=guide)
+    return MetricOutcome(
+        spec=spec,
+        range_names=range_names,
+        result=result,
+        guide=guide,
+        emoji=severity_emoji(result.value, guide),
+    )
 
 
 def ranges_for(

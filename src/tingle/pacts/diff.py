@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from tingle.pacts.config import MetricSpec
     from tingle.pacts.metrics import MetricResult, Occurrence
+    from tingle.pacts.report import ReportSection
 
 
 class DiffSourceError(Exception):
@@ -108,7 +109,9 @@ DiffMetricFunction: TypeAlias = Callable[[DiffMetricContext], DiffResult]
 class DiffOutcome:
     """Diff result of one metric plus the current full-repo total.
 
-    `guide` is already resolved, as on MetricOutcome.
+    `guide` and `emoji` are already resolved, as on MetricOutcome. The
+    emoji ranks the standing total, not the net: what the branch moved is
+    the net's own business, and a net of zero is not no debt.
     """
 
     spec: MetricSpec
@@ -117,6 +120,7 @@ class DiffOutcome:
     total: MetricResult | None = None
     error: str | None = None
     guide: int = DEFAULT_GUIDE
+    emoji: str = ""
 
 
 @dataclass(frozen=True)
@@ -132,3 +136,4 @@ class DiffReport:
     merge_base: str
     outcomes: tuple[DiffOutcome, ...]
     skipped: tuple[str, ...] = ()
+    sections: tuple[ReportSection[DiffOutcome], ...] = ()

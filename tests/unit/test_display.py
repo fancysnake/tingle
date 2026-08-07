@@ -9,6 +9,8 @@ from tingle.mills.display import (
     effective_guide,
     group_summary,
     loc_guide,
+    outcome_emoji,
+    sections,
     severity_emoji,
 )
 from tingle.pacts.config import DisplaySpec, MetricSpec
@@ -244,3 +246,64 @@ def test_a_real_project_keeps_the_worst_metric_alone_at_the_top() -> None:
     assert severity_emoji(483, guide) == "🚨"
     assert severity_emoji(2, guide) == "🦠"
     assert severity_emoji(0, guide) == "🎉"
+
+
+def _grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
+    return MetricOutcome(
+        spec=MetricSpec(name=name, type="file_count", group=group),
+        range_names=(),
+        result=MetricResult(value=value),
+    )
+
+
+def test_sections_keep_first_appearance_order_and_put_the_ungrouped_last() -> None:
+    grouped = sections(
+        (
+            _grouped("a", "typing"),
+            _grouped("b", "lint"),
+            _grouped("c", "typing"),  # scattered member of an earlier group
+            _grouped("d", None),
+        )
+    )
+
+    assert [
+        (section.name, [o.spec.name for o in section.outcomes]) for section in grouped
+    ] == [("typing", ["a", "c"]), ("lint", ["b"]), (None, ["d"])]
+
+
+def test_sections_of_an_ungrouped_run_are_one_section_in_config_order() -> None:
+    grouped = sections((_grouped("a", None), _grouped("b", None)))
+
+    assert len(grouped) == 1
+    assert grouped[0].name is None
+    assert [o.spec.name for o in grouped[0].outcomes] == ["a", "b"]
+
+
+def test_each_section_carries_its_own_sum() -> None:
+    grouped = sections(
+        (_grouped("a", "typing", value=3), _grouped("b", "typing", value=7))
+    )
+
+    assert grouped[0].summary.value == 10
+
+
+def test_a_summary_carries_the_emoji_its_total_earns() -> None:
+    assert group_summary([_outcome(0, guide=100)]).emoji == EMOJI_ZERO
+
+
+def test_an_outcomes_emoji_ranks_its_own_value_against_its_own_guide() -> None:
+    assert outcome_emoji(_outcome(0)) == EMOJI_ZERO
+    assert outcome_emoji(_outcome(400, guide=100)) == severity_emoji(400, 100)
+    assert outcome_emoji(_outcome(400, guide=10)) == severity_emoji(400, 10)
+
+
+def test_an_errored_outcome_earns_no_emoji() -> None:
+    assert outcome_emoji(_failed()) == ""
+
+
+def test_a_diffs_emoji_ranks_the_standing_total_not_the_net() -> None:
+    """A branch that paid one occurrence off a metric still deep in debt."""
+    outcome = _diff_outcome(-1, total=400, guide=100)
+
+    assert outcome_emoji(outcome) == severity_emoji(400, 100)
+    assert outcome_emoji(outcome) != severity_emoji(-1, 100)

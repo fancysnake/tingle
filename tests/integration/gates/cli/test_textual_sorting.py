@@ -10,12 +10,12 @@ from textual_support import (
     column,
     headers,
     labels,
+    metrics_app,
     outline,
     status,
     summed_report,
 )
 
-from tingle.gates.cli.textual import MetricsApp
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.metrics import MetricResult
 from tingle.pacts.report import MetricOutcome
@@ -44,7 +44,7 @@ SORTABLE = summed_report(
 
 def test_sorting_by_name_flattens_the_view_and_orders_every_metric() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             await pilot.press("n")
 
@@ -55,7 +55,7 @@ def test_sorting_by_name_flattens_the_view_and_orders_every_metric() -> None:
 
 def test_sorting_by_name_then_type_gives_type_major_order() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             await pilot.press("n", "t")
 
@@ -67,7 +67,7 @@ def test_sorting_by_name_then_type_gives_type_major_order() -> None:
 
 def test_a_lowercase_key_sorts_up_and_its_shifted_twin_sorts_down() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             await pilot.press("v")
             assert column(app, 2) == ["🚧 5", "🚨 20", "🚨 90"]
@@ -80,7 +80,7 @@ def test_a_lowercase_key_sorts_up_and_its_shifted_twin_sorts_down() -> None:
 
 def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             # mid is 20 against a guide of 20, so it is worse than alpha's
             # 90 against 100 even though it is the smaller number
@@ -93,7 +93,7 @@ def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
 
 def test_the_sorted_columns_header_says_which_way_it_is_running() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             assert headers(app) == ["Group / Metric", "Type", "Value"]
 
@@ -114,7 +114,7 @@ def test_the_sorted_columns_header_says_which_way_it_is_running() -> None:
 
 def test_sorting_by_group_keeps_the_outline_and_orders_groups_by_name() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             await pilot.press("g")
 
@@ -136,7 +136,7 @@ def test_sorting_by_group_keeps_the_outline_and_orders_groups_by_name() -> None:
 
 def test_zero_restores_config_order_the_outline_and_the_fold_state() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("left")  # fold the first group
             assert labels(app) == [
@@ -165,7 +165,7 @@ def test_zero_restores_config_order_the_outline_and_the_fold_state() -> None:
 
 def test_a_flat_sort_puts_occurrences_out_of_reach_until_the_sort_is_cleared() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("right")
             assert "src/a.py:1" in labels(app)
@@ -184,7 +184,7 @@ def test_a_flat_sort_puts_occurrences_out_of_reach_until_the_sort_is_cleared() -
 
 def test_the_sort_bar_says_what_is_deciding_the_order() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             assert status(app) == "sort: config order"
 
@@ -204,7 +204,7 @@ def test_the_sort_bar_says_what_is_deciding_the_order() -> None:
 
 def test_pushing_a_key_already_in_the_stack_moves_it_to_the_front() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             await pilot.press("n", "t", "n")
 
@@ -215,7 +215,7 @@ def test_pushing_a_key_already_in_the_stack_moves_it_to_the_front() -> None:
 
 def test_asking_for_a_stacked_key_the_other_way_turns_it_over_in_place() -> None:
     async def scenario() -> None:
-        app = MetricsApp(SORTABLE)
+        app = metrics_app(SORTABLE)
         async with app.run_test() as pilot:
             await pilot.press("t", "v")
             assert status(app).startswith("sort: value asc then type asc")

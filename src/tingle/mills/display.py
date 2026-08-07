@@ -7,17 +7,19 @@ the listings cannot drift apart -- they are three views of one judgement.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from tingle.pacts.diff import DiffOutcome
-from tingle.pacts.report import GroupSummary
+from tingle.pacts.report import GroupSummary, ReportSection
 from tingle.specs.display import EMOJI_BANDS, EMOJI_OVER, EMOJI_ZERO, LOC_PER_GUIDE
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
 
     from tingle.pacts.config import DisplaySpec, MetricSpec
     from tingle.pacts.report import MetricOutcome
+
+_Outcome = TypeVar("_Outcome", bound="MetricOutcome | DiffOutcome")
 
 
 def effective_guide(
@@ -120,4 +122,39 @@ def group_summary(outcomes: Iterable[MetricOutcome | DiffOutcome]) -> GroupSumma
         has_error=has_error,
         net=net if is_diff else None,
         changed=changed,
+        emoji=severity_emoji(value, guide),
+    )
+
+
+def outcome_emoji(outcome: MetricOutcome | DiffOutcome) -> str:
+    """Rank one outcome against its own guide, or nothing if it errored.
+
+    A diff is ranked by the standing total it carries rather than by its
+    net: the net says what the branch did, the emoji says where the debt
+    now stands.
+    """
+    if (
+        measured := (
+            outcome.total if isinstance(outcome, DiffOutcome) else outcome.result
+        )
+    ) is None:
+        return ""
+    return severity_emoji(measured.value, outcome.guide)
+
+
+def sections(outcomes: Sequence[_Outcome]) -> tuple[ReportSection[_Outcome], ...]:
+    """Group outcomes into pre-summed sections, ungrouped last.
+
+    Named groups come in the order they first appear in the config, which
+    is the order the reader wrote them in; the nameless section is always
+    last. Order within a section is preserved, so a config with no groups
+    anywhere yields one section holding everything as it was configured.
+    """
+    grouped: dict[str | None, list[_Outcome]] = {}
+    for outcome in outcomes:
+        grouped.setdefault(outcome.spec.group, []).append(outcome)
+    ordered = sorted(grouped.items(), key=lambda item: item[0] is None)
+    return tuple(
+        ReportSection(name=name, outcomes=tuple(group), summary=group_summary(group))
+        for name, group in ordered
     )

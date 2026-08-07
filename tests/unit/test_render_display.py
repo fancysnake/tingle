@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,7 @@ from tingle.gates.cli.render import (
     run_json,
     run_listing,
 )
+from tingle.mills.display import outcome_emoji, sections
 from tingle.pacts.check import CheckVerdict
 from tingle.pacts.config import CheckPolicy, MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
@@ -33,7 +35,7 @@ def _outcome(
     guide: int = 100,
     description: str | None = None,
 ) -> MetricOutcome:
-    return MetricOutcome(
+    outcome = MetricOutcome(
         spec=MetricSpec(
             name=name, type="file_count", group=group, description=description
         ),
@@ -41,6 +43,7 @@ def _outcome(
         result=MetricResult(value=value),
         guide=guide,
     )
+    return replace(outcome, emoji=outcome_emoji(outcome))
 
 
 def _failed(name: str, group: str | None = None) -> MetricOutcome:
@@ -53,7 +56,10 @@ def _failed(name: str, group: str | None = None) -> MetricOutcome:
 
 def _report(*outcomes: MetricOutcome) -> RunReport:
     return RunReport(
-        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=outcomes
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        outcomes=outcomes,
+        sections=sections(outcomes),
     )
 
 
@@ -65,13 +71,14 @@ def _diff_outcome(
     total: int = 0,
     guide: int = 100,
 ) -> DiffOutcome:
-    return DiffOutcome(
+    outcome = DiffOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
         result=DiffResult(net=net, added=max(net, 0), removed=max(-net, 0)),
         total=MetricResult(value=total),
         guide=guide,
     )
+    return replace(outcome, emoji=outcome_emoji(outcome))
 
 
 def _diff_report(*outcomes: DiffOutcome) -> DiffReport:
@@ -81,6 +88,7 @@ def _diff_report(*outcomes: DiffOutcome) -> DiffReport:
         base_ref="main",
         merge_base="abc123",
         outcomes=outcomes,
+        sections=sections(outcomes),
     )
 
 

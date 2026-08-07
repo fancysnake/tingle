@@ -17,6 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tingle.gates.cli.textual import BrowseTable, MetricsApp, SearchBar, SortBar
+from tingle.inits.services import Services
 from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
@@ -132,6 +133,13 @@ def valued(name: str, group: str, *, value: int, guide: int = 100) -> MetricOutc
         result=MetricResult(value=value),
         guide=guide,
     )
+
+
+def metrics_app(
+    report: RunReport | DiffReport, opener: VsCodeCli | None = None
+) -> MetricsApp:
+    """Build the app the way inits does, browse service and all."""
+    return MetricsApp(report, opener, browse=Services().browse)
 
 
 def column(app: MetricsApp, index: int) -> list[str]:

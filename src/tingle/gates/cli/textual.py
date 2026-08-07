@@ -1,7 +1,7 @@
 """Interactive terminal UI over run and diff reports (textual adapter).
 
-The table is drawn from `mills.browse`, which decides what is visible and
-in what order; nothing here reads an outcome or resolves a fold. This
+The table is drawn from the browse service, which decides what is visible
+and in what order; nothing here reads an outcome or resolves a fold. This
 module's whole job is turning `Row`s into cells and keys into gestures.
 """
 
@@ -14,21 +14,6 @@ from textual.app import App
 from textual.binding import Binding
 from textual.widgets import DataTable, Footer, Header, Input, Static
 
-from tingle.mills.browse import (
-    clear_sort,
-    fold_quiet_groups,
-    group_key,
-    metric_key,
-    outlined,
-    push_sort,
-    record,
-    rows,
-    set_fold,
-    set_query,
-    start,
-    toggle_fold,
-    toggle_fold_all,
-)
 from tingle.pacts.browse import RowKind, SortKey
 
 if TYPE_CHECKING:
@@ -38,6 +23,7 @@ if TYPE_CHECKING:
     from tingle.pacts.diff import DiffReport
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.report import RunReport
+    from tingle.pacts.services import BrowseServiceProtocol
 
 #: Marks a row that can be folded, open and shut.
 UNFOLDED, FOLDED = "▾ ", "▸ "
@@ -161,13 +147,18 @@ class MetricsApp(App[None]):
     ]
 
     def __init__(
-        self, report: RunReport | DiffReport, opener: EditorOpener | None = None
+        self,
+        report: RunReport | DiffReport,
+        opener: EditorOpener | None = None,
+        *,
+        browse: BrowseServiceProtocol,
     ) -> None:
         """Present an already-computed report; the TUI never runs metrics."""
         super().__init__()
         self._report = report
         self._opener = opener
-        self._state = fold_quiet_groups(_loaded(report))
+        self._browse = browse
+        self._state = browse.fold_quiet_groups(_loaded(report, browse))
         self._rows: tuple[Row, ...] = ()
 
     def compose(self) -> ComposeResult:
@@ -192,14 +183,14 @@ class MetricsApp(App[None]):
         """Fold the row the cursor is on, or the metric that holds it."""
         if (row := self._fold_target()) is None:
             return
-        self._state = set_fold(self._state, row.key, folded=True)
+        self._state = self._browse.set_fold(self._state, row.key, folded=True)
         self._draw(land_on=row.key)
 
     def action_unfold(self) -> None:
         """Unfold the folded row the cursor is on."""
         if (row := self._current()) is None or row.folded is not True:
             return
-        self._state = set_fold(self._state, row.key, folded=False)
+        self._state = self._browse.set_fold(self._state, row.key, folded=False)
         self._draw(land_on=row.key)
 
     def action_select_row(self) -> None:
@@ -209,7 +200,7 @@ class MetricsApp(App[None]):
         if row.kind is RowKind.OCCURRENCE:
             self._open(row)
         elif row.folded is not None:
-            self._state = toggle_fold(self._state, row.key)
+            self._state = self._browse.toggle_fold(self._state, row.key)
             self._draw(land_on=row.key)
 
     def action_sort(self, key: str) -> None:
@@ -222,12 +213,14 @@ class MetricsApp(App[None]):
 
     def _push_sort(self, key: str, *, descending: bool) -> None:
         if (sort := SORT_KEYS.get(key)) is not None:
-            self._state = push_sort(self._state, sort, descending=descending)
+            self._state = self._browse.push_sort(
+                self._state, sort, descending=descending
+            )
             self._draw()
 
     def action_clear_sort(self) -> None:
         """Drop every sort, bringing back config order and the outline."""
-        self._state = clear_sort(self._state)
+        self._state = self._browse.clear_sort(self._state)
         self._draw()
 
     def action_search(self) -> None:
@@ -246,13 +239,13 @@ class MetricsApp(App[None]):
         search = self.query_one(SearchBar)
         search.value = ""
         search.add_class("hidden")
-        self._state = set_query(self._state, "")
+        self._state = self._browse.set_query(self._state, "")
         self._draw()
         self.query_one(BrowseTable).focus()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Filter as the query is typed, so the reader sees it narrowing."""
-        self._state = set_query(self._state, event.value)
+        self._state = self._browse.set_query(self._state, event.value)
         self._draw()
 
     def on_input_submitted(self, _: Input.Submitted) -> None:
@@ -266,7 +259,7 @@ class MetricsApp(App[None]):
         fold happens, or it would be left pointing at a hidden row.
         """
         landing = self._enclosing_key()
-        self._state = toggle_fold_all(self._state)
+        self._state = self._browse.toggle_fold_all(self._state)
         self._draw(land_on=landing)
 
     def _draw(self, *, land_on: str | None = None) -> None:
@@ -277,13 +270,13 @@ class MetricsApp(App[None]):
         """
         table = self.query_one(BrowseTable)
         wanted = land_on if land_on is not None else self._cursor_key()
-        self._rows = rows(self._state)
+        self._rows = self._browse.rows(self._state)
         table.clear()
         for row in self._rows:
             table.add_row(*_cells(row), key=row.key)
         table.move_cursor(row=self._index_of(wanted))
         _mark_sorted_header(table, self._state)
-        self.query_one(SortBar).update(_sort_line(self._state))
+        self.query_one(SortBar).update(_sort_line(self._state, self._browse))
 
     def _current(self) -> Row | None:
         """Return the row the cursor is on, if the table has any."""
@@ -315,7 +308,7 @@ class MetricsApp(App[None]):
         if row.folded is not None:
             return row
         if row.entry is not None:
-            return self._row(metric_key(row.entry.spec.name))
+            return self._row(self._browse.metric_key(row.entry.spec.name))
         return None
 
     def _enclosing_key(self) -> str | None:
@@ -323,8 +316,8 @@ class MetricsApp(App[None]):
         if (row := self._current()) is None or row.entry is None:
             return self._cursor_key()
         if any(other.kind is RowKind.GROUP for other in self._rows):
-            return group_key(row.entry.spec.group)
-        return metric_key(row.entry.spec.name)
+            return self._browse.group_key(row.entry.spec.group)
+        return self._browse.metric_key(row.entry.spec.name)
 
     def _row(self, key: str) -> Row | None:
         return next((row for row in self._rows if row.key == key), None)
@@ -341,11 +334,13 @@ class MetricsApp(App[None]):
         )
 
 
-def _loaded(report: RunReport | DiffReport) -> BrowseState:
+def _loaded(
+    report: RunReport | DiffReport, browse: BrowseServiceProtocol
+) -> BrowseState:
     """Take a finished report into a browsing session, outcome by outcome."""
-    state = start(tuple(outcome.spec for outcome in report.outcomes))
+    state = browse.start(tuple(outcome.spec for outcome in report.outcomes))
     for outcome in report.outcomes:
-        state = record(state, outcome)
+        state = browse.record(state, outcome)
     return state
 
 
@@ -380,7 +375,7 @@ def _unmarked(label: str) -> str:
     return label
 
 
-def _sort_line(state: BrowseState) -> str:
+def _sort_line(state: BrowseState, browse: BrowseServiceProtocol) -> str:
     """Say what is deciding the order, and what folding costs.
 
     A flattened view is worth saying out loud: the reader has just lost
@@ -390,7 +385,7 @@ def _sort_line(state: BrowseState) -> str:
     and escape is the way out of it.
     """
     if state.query:
-        found = sum(1 for row in rows(state) if row.kind is RowKind.METRIC)
+        found = sum(1 for row in browse.rows(state) if row.kind is RowKind.METRIC)
         matched = f"{found} metric{'' if found == 1 else 's'}"
         return f"search: {state.query!r} — {matched} — esc to leave"
     if not state.sort:
@@ -399,7 +394,7 @@ def _sort_line(state: BrowseState) -> str:
         f"{step.key.value} {'desc' if step.descending else 'asc'}"
         for step in state.sort
     )
-    if outlined(state):
+    if browse.outlined(state):
         return f"sort: {stack}"
     return f"sort: {stack}  ·  flat, no folding — 0 to reset"
 

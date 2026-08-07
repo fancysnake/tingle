@@ -38,6 +38,7 @@ from textual_support import (
     column,
     cursor,
     labels,
+    metrics_app,
     outline,
     recording_opener,
     summed_report,
@@ -55,7 +56,7 @@ if TYPE_CHECKING:
 
 def test_the_table_has_a_row_per_metric_with_its_type_and_value() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test():
             assert labels(app) == ["noqa-comments", "python-files"]
             assert column(app, 1) == ["regex_count", "file_count"]
@@ -66,7 +67,7 @@ def test_the_table_has_a_row_per_metric_with_its_type_and_value() -> None:
 
 def test_metrics_start_folded_and_unfold_in_place() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             assert outline(app) == ["▸ noqa-comments", "▸ python-files"]
 
@@ -98,7 +99,7 @@ def test_a_metric_says_what_it_measures_above_what_it_found() -> None:
                 ),
             )
         )
-        app = MetricsApp(report)
+        app = metrics_app(report)
         async with app.run_test() as pilot:
             await pilot.press("right")
 
@@ -116,7 +117,7 @@ def test_a_folded_metric_hides_what_it_says_about_itself() -> None:
     """The agreed cost of making the description a row: folding hides it."""
 
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("right")
             assert "ranges: python" in labels(app)
@@ -137,7 +138,7 @@ def test_a_failed_metric_shows_the_error_where_it_can_be_read() -> None:
                 error="ValueError: boom",
             )
         )
-        app = MetricsApp(report)
+        app = metrics_app(report)
         async with app.run_test() as pilot:
             assert column(app, 2) == ["ERROR"]
 
@@ -150,7 +151,7 @@ def test_a_failed_metric_shows_the_error_where_it_can_be_read() -> None:
 
 def test_arrows_move_between_rows() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             assert cursor(app) == "noqa-comments"
 
@@ -165,7 +166,7 @@ def test_arrows_move_between_rows() -> None:
 
 def test_jk_still_work_as_hidden_aliases() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("j")
             assert cursor(app) == "python-files"
@@ -178,7 +179,7 @@ def test_jk_still_work_as_hidden_aliases() -> None:
 
 def test_right_unfolds_and_left_folds_the_row_under_the_cursor() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             assert cursor(app) == "typing"
 
@@ -195,7 +196,7 @@ def test_right_unfolds_and_left_folds_the_row_under_the_cursor() -> None:
 
 def test_hl_still_fold_and_unfold_as_hidden_aliases() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("h")
             assert outline(app)[0] == "▸ typing"
@@ -208,7 +209,7 @@ def test_hl_still_fold_and_unfold_as_hidden_aliases() -> None:
 
 def test_folding_from_a_hit_folds_the_metric_and_lands_the_cursor_on_it() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("right", "down", "down")
             assert cursor(app) == "src/a.py:1"
@@ -223,7 +224,7 @@ def test_folding_from_a_hit_folds_the_metric_and_lands_the_cursor_on_it() -> Non
 
 def test_space_toggles_the_row_under_the_cursor() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("space")
             assert "ranges: python" in labels(app)
@@ -236,7 +237,7 @@ def test_space_toggles_the_row_under_the_cursor() -> None:
 
 def test_groups_and_metrics_fold_independently() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("down", "space")  # unfold type-ignores
             assert labels(app)[:3] == ["typing", "type-ignores", "x.py:1"]
@@ -249,7 +250,7 @@ def test_groups_and_metrics_fold_independently() -> None:
 
 def test_a_grouped_report_nests_metrics_under_their_group() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test():
             assert outline(app) == [
                 "▾ typing",
@@ -267,7 +268,7 @@ def test_a_grouped_report_nests_metrics_under_their_group() -> None:
 def test_space_on_an_occurrence_opens_it_at_its_line() -> None:
     async def scenario() -> None:
         opener, calls = recording_opener()
-        app = MetricsApp(RUN_REPORT, opener)
+        app = metrics_app(RUN_REPORT, opener)
         async with app.run_test() as pilot:
             await pilot.press("right", "down", "down")
             assert cursor(app) == "src/a.py:1"
@@ -283,7 +284,7 @@ def test_space_on_an_occurrence_opens_it_at_its_line() -> None:
 def test_a_diff_occurrence_opens_too() -> None:
     async def scenario() -> None:
         opener, calls = recording_opener()
-        app = MetricsApp(DIFF_REPORT, opener)
+        app = metrics_app(DIFF_REPORT, opener)
         async with app.run_test() as pilot:
             await pilot.press("right", "down", "down")
 
@@ -297,7 +298,7 @@ def test_a_diff_occurrence_opens_too() -> None:
 def test_space_does_not_open_when_no_editor_is_reachable() -> None:
     async def scenario() -> None:
         opener, calls = recording_opener(available=False)
-        app = MetricsApp(RUN_REPORT, opener)
+        app = metrics_app(RUN_REPORT, opener)
         async with app.run_test() as pilot:
             await pilot.press("right", "down", "down")
 
@@ -311,7 +312,7 @@ def test_space_does_not_open_when_no_editor_is_reachable() -> None:
 def test_space_on_a_metric_toggles_rather_than_opening() -> None:
     async def scenario() -> None:
         opener, calls = recording_opener()
-        app = MetricsApp(RUN_REPORT, opener)
+        app = metrics_app(RUN_REPORT, opener)
         async with app.run_test() as pilot:
             await pilot.press("space")
 
@@ -323,7 +324,7 @@ def test_space_on_a_metric_toggles_rather_than_opening() -> None:
 
 def test_f_folds_and_unfolds_every_group() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("f")
             assert labels(app) == ["typing", "lint", "(ungrouped)"]
@@ -344,7 +345,7 @@ def test_f_folds_and_unfolds_every_group() -> None:
 
 def test_f_folds_all_when_only_some_groups_are_open() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("left")  # fold just the first group
             assert labels(app)[:2] == ["typing", "lint"]
@@ -358,7 +359,7 @@ def test_f_folds_all_when_only_some_groups_are_open() -> None:
 
 def test_f_leaves_a_metrics_own_fold_state_untouched() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("down", "space")  # unfold type-ignores
             assert "x.py:1" in labels(app)
@@ -373,7 +374,7 @@ def test_f_leaves_a_metrics_own_fold_state_untouched() -> None:
 
 def test_f_folds_metrics_when_the_report_has_no_groups() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("right")
             assert "ranges: python" in labels(app)
@@ -387,7 +388,7 @@ def test_f_folds_metrics_when_the_report_has_no_groups() -> None:
 
 def test_f_parks_the_cursor_on_the_group_that_survives_the_fold() -> None:
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("down", "down")  # onto mypy-overrides, inside typing
             assert cursor(app) == "mypy-overrides"
@@ -403,7 +404,7 @@ def test_the_arrows_still_work_after_folding_from_inside_a_group() -> None:
     """Regression: the cursor must never be left pointing at a hidden row."""
 
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("down", "down")
             await pilot.press("f")
@@ -417,7 +418,7 @@ def test_the_arrows_still_work_after_folding_from_inside_a_group() -> None:
 
 def test_diff_report_shows_the_branch_impact_and_signed_occurrences() -> None:
     async def scenario() -> None:
-        app = MetricsApp(DIFF_REPORT)
+        app = metrics_app(DIFF_REPORT)
         async with app.run_test() as pilot:
             assert column(app, 2) == ["+2 / -1 (net +1 of 🚧 7)"]
 
@@ -436,7 +437,7 @@ def test_diff_report_shows_the_branch_impact_and_signed_occurrences() -> None:
 
 def test_metric_rows_carry_their_severity_emoji() -> None:
     async def scenario() -> None:
-        app = MetricsApp(
+        app = metrics_app(
             summed_report(valued("a", "g", value=0), valued("b", "g", value=3))
         )
         async with app.run_test():
@@ -450,7 +451,7 @@ def test_metric_rows_carry_their_severity_emoji() -> None:
 
 def test_group_header_carries_the_sum_of_its_metrics() -> None:
     async def scenario() -> None:
-        app = MetricsApp(
+        app = metrics_app(
             summed_report(
                 valued("a", "g", value=2, guide=100),
                 valued("b", "g", value=3, guide=100),
@@ -465,7 +466,7 @@ def test_group_header_carries_the_sum_of_its_metrics() -> None:
 
 def test_a_group_summing_to_zero_starts_folded() -> None:
     async def scenario() -> None:
-        app = MetricsApp(
+        app = metrics_app(
             summed_report(
                 valued("a", "clean", value=0),
                 valued("b", "clean", value=0),
@@ -483,7 +484,7 @@ def test_a_zero_group_holding_an_error_stays_open() -> None:
     """An error is the one thing that must never be folded out of sight."""
 
     async def scenario() -> None:
-        app = MetricsApp(
+        app = metrics_app(
             summed_report(
                 valued("a", "clean", value=0),
                 MetricOutcome(
@@ -503,7 +504,7 @@ def test_an_unchanged_diff_group_starts_folded() -> None:
     """A branch that moved nothing here has nothing to say, whatever it stands on."""
 
     async def scenario() -> None:
-        app = MetricsApp(QUIET_DIFF_REPORT)
+        app = metrics_app(QUIET_DIFF_REPORT)
         async with app.run_test():
             assert labels(app) == ["quiet", "loud", "moved"]
 
@@ -535,7 +536,7 @@ def test_folding_is_bound_on_the_table_not_the_app() -> None:
 
 def test_pressing_p_opens_the_command_palette() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("p")
             assert isinstance(app.screen, CommandPalette)
@@ -563,7 +564,7 @@ def test_open_palette_keeps_the_arrow_keys() -> None:
     # `down` ran against the palette screen -- doing nothing, yet still
     # reporting the key as handled. Its result list never saw the arrows.
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             command_list = await _palette_options(pilot, "t")
             assert command_list.highlighted == 0
@@ -582,7 +583,7 @@ def test_letter_bindings_do_not_eat_the_palette_search_box() -> None:
     # "p" is a priority binding, "q" quits and "f" folds; inside the
     # palette all three must reach its Input as plain text
     async def scenario() -> None:
-        app = MetricsApp(GROUPED_REPORT)
+        app = metrics_app(GROUPED_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("p")
             assert isinstance(app.screen, CommandPalette)
@@ -599,7 +600,7 @@ def test_letter_bindings_do_not_eat_the_palette_search_box() -> None:
 
 def test_quit_binding() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
             await pilot.press("q")
             await pilot.pause()
@@ -610,7 +611,7 @@ def test_quit_binding() -> None:
 
 def test_the_table_holds_focus_so_the_keys_always_land() -> None:
     async def scenario() -> None:
-        app = MetricsApp(RUN_REPORT)
+        app = metrics_app(RUN_REPORT)
         async with app.run_test():
             assert isinstance(app.focused, BrowseTable)
 

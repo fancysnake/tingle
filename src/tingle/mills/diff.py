@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from tingle.mills.display import effective_guide
+from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.mills.runner import ranges_for
@@ -68,6 +68,7 @@ class DiffRunner:
             merge_base=branch_diff.merge_base,
             outcomes=tuple(outcomes),
             skipped=tuple(skipped),
+            sections=sections(tuple(outcomes)),
         )
 
     def _outcome(
@@ -106,9 +107,10 @@ class DiffRunner:
                 error=f"{type(exc).__name__}: {exc}",
                 guide=guide,
             )
-        return DiffOutcome(
+        outcome = DiffOutcome(
             spec=spec, range_names=range_names, result=result, total=total, guide=guide
         )
+        return replace(outcome, emoji=outcome_emoji(outcome))
 
 
 def _filter_files(
