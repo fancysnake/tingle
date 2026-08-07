@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from tui_support import (
+from textual_support import (
     GROUPED_REPORT,
     RUN_REPORT,
-    MetricsApp,
-    MetricSpec,
     column,
     headers,
     labels,
@@ -17,6 +15,8 @@ from tui_support import (
     summed_report,
 )
 
+from tingle.gates.cli.textual import MetricsApp
+from tingle.pacts.config import MetricSpec
 from tingle.pacts.metrics import MetricResult
 from tingle.pacts.report import MetricOutcome
 

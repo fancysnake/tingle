@@ -137,7 +137,10 @@ extra_checks = true
 warn_unreachable = true
 color_output = true
 explicit_package_bases = true
-mypy_path = "src"
+# the test suites' shared helper modules are imported bare (`from support
+# import ...`), the way pytest resolves them by putting a test file's own
+# directory on sys.path; mypy needs to be told the same directories
+mypy_path = ["src", "tests/unit", "tests/integration/gates/cli"]
 pretty = true
 
 [[tool.mypy.overrides]]

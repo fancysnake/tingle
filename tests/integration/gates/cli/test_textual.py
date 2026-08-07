@@ -30,15 +30,11 @@ from typing import TYPE_CHECKING
 from textual.binding import Binding
 from textual.command import CommandList, CommandPalette
 from textual.widgets import Input
-from tui_support import (
+from textual_support import (
     DIFF_REPORT,
     GROUPED_REPORT,
     QUIET_DIFF_REPORT,
     RUN_REPORT,
-    BrowseTable,
-    MetricsApp,
-    MetricSpec,
-    Occurrence,
     column,
     cursor,
     labels,
@@ -48,7 +44,9 @@ from tui_support import (
     valued,
 )
 
-from tingle.pacts.metrics import MetricResult
+from tingle.gates.cli.textual import BrowseTable, MetricsApp
+from tingle.pacts.config import MetricSpec
+from tingle.pacts.metrics import MetricResult, Occurrence
 from tingle.pacts.report import MetricOutcome
 
 if TYPE_CHECKING:

@@ -4,20 +4,11 @@ from __future__ import annotations
 
 import asyncio
 
-from tui_support import (
-    BrowseTable,
-    MetricsApp,
-    MetricSpec,
-    Occurrence,
-    SearchBar,
-    labels,
-    outline,
-    search_box,
-    status,
-    summed_report,
-)
+from textual_support import labels, outline, search_box, status, summed_report
 
-from tingle.pacts.metrics import MetricResult
+from tingle.gates.cli.textual import BrowseTable, MetricsApp, SearchBar
+from tingle.pacts.config import MetricSpec
+from tingle.pacts.metrics import MetricResult, Occurrence
 from tingle.pacts.report import MetricOutcome
 
 SEARCHABLE = summed_report(

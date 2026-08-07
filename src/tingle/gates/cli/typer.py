@@ -301,7 +301,7 @@ class CliGate:
     def _interactive(self, request: _MetricRequest) -> None:
         """Run the metrics, then hand the report to the interactive TUI."""
         # imported lazily: textual is heavy and only needed on this path
-        from tingle.gates.tui.app import (  # pylint: disable=import-outside-toplevel
+        from tingle.gates.cli.textual import (  # pylint: disable=import-outside-toplevel
             MetricsApp,
         )
 

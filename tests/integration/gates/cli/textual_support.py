@@ -6,16 +6,17 @@ arrangement lives here once. The readers pull what is actually drawn out
 of the table rather than reaching into the app's own state, so a test
 asserts what a reader would see.
 
-Named `tui_support` rather than `support` because the unit suite already
-has a module by that name, and pytest puts each test file's own directory
-on `sys.path` -- two modules called `support` would shadow each other.
+Named `textual_support` rather than `support` because the unit suite
+already has a module by that name, and pytest puts each test file's own
+directory on `sys.path` -- two modules called `support` would shadow each
+other.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from tingle.gates.tui.app import BrowseTable, MetricsApp, SearchBar, SortBar
+from tingle.gates.cli.textual import BrowseTable, MetricsApp, SearchBar, SortBar
 from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult

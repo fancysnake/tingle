@@ -72,7 +72,7 @@ ignored-modules=
 # `from support import ...` resolves the way it does under pytest, which puts
 # a test file's own directory there. source-roots cannot do this job: which of
 # several nested roots it picks depends on the order pylint walks them in.
-init-hook='import sys; sys.path[:0] = ["tests/unit", "tests/integration/gates/tui"]'
+init-hook='import sys; sys.path[:0] = ["tests/unit", "tests/integration/gates/cli"]'
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use, and will cap the count on Windows to
