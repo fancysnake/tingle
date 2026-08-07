@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 from importlib import metadata
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
 
+from tingle.gates.cli import typer as typer_gate
+from tingle.gates.cli.textual import MetricsApp
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 from tingle.mills.metrics.registry import METRIC_TYPES
@@ -193,3 +196,43 @@ def test_list_types_works_without_config(
     assert result.exit_code == 0
     for name in METRIC_TYPES:
         assert name in result.output
+
+
+@pytest.mark.usefixtures("project")
+def test_a_terminal_gets_the_interactive_table(interactive: list[MetricsApp]) -> None:
+    """The only path that builds the TUI, and so the only one that wires it.
+
+    The real app is built, not a stand-in: `browse` is keyword-only and has
+    no default, so reaching this assertion is itself the wiring check.
+    """
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    assert len(interactive) == 1
+    assert isinstance(interactive[0], MetricsApp)
+    assert "python-files" not in result.output  # the table was not printed instead
+
+
+@pytest.mark.usefixtures("repo")
+def test_a_terminal_asking_for_a_diff_gets_one(interactive: list[MetricsApp]) -> None:
+    result = runner.invoke(app, ["--diff"])
+
+    assert result.exit_code == 0
+    assert len(interactive) == 1
+    assert "lint-escapes" not in result.output
+
+
+@pytest.mark.usefixtures("project")
+def test_a_pipe_gets_the_summary_table_instead(
+    interactive: list[MetricsApp], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The tty check is the whole switch: without one, nothing interactive runs."""
+    monkeypatch.setattr(
+        typer_gate, "sys", SimpleNamespace(stdout=SimpleNamespace(isatty=lambda: False))
+    )
+
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    assert not interactive
+    assert "lint-escapes" in result.output

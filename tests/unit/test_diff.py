@@ -18,22 +18,7 @@ from tingle.pacts.diff import (
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
-
-
-class FakeProject:
-    def __init__(self, contents: Mapping[str, str]) -> None:
-        self._contents = dict(contents)
-
-    def walk(self) -> Iterable[PurePath]:
-        return sorted(PurePath(name) for name in self._contents)
-
-    def read(self, path: PurePath) -> bytes | None:
-        text = self._contents.get(str(path))
-        return None if text is None else text.encode()
-
-    def exists(self, path: PurePath) -> bool:
-        return str(path) in self._contents
+    from collections.abc import Mapping
 
 
 class FakeDiffSource:
@@ -53,6 +38,12 @@ class FakeDiffSource:
 
 def _touched_files(ctx: DiffMetricContext) -> DiffResult:
     return DiffResult(net=len(ctx.files), added=len(ctx.files), removed=0)
+
+
+def _base_lines(ctx: DiffMetricContext) -> DiffResult:
+    """Count the base side's lines, which means actually reading it."""
+    texts = [ctx.read_base(file.path) for file in ctx.files]
+    return DiffResult(net=sum(len(text.splitlines()) for text in texts if text))
 
 
 def _total_files(ctx: MetricContext) -> MetricResult:
@@ -76,6 +67,9 @@ METRIC_TYPES = {
         name="boom_total", func=_boom_total, diff_func=_touched_files
     ),
     "no_diff": MetricType(name="no_diff", func=_total_files),
+    "base_lines": MetricType(
+        name="base_lines", func=_total_files, diff_func=_base_lines
+    ),
 }
 
 BRANCH = BranchDiff(
@@ -106,6 +100,18 @@ def test_runs_diff_and_total() -> None:
     assert outcome.result.net == 1  # notes.md filtered out by the python range
     assert outcome.total is not None
     assert outcome.total.value == 2
+
+
+def test_the_base_side_reaches_a_metric_as_text_not_as_bytes() -> None:
+    """The adapter hands over bytes; the runner decodes on the way in."""
+    config = make_config(MetricSpec(name="base", type="base_lines"))
+    source = FakeDiffSource(BRANCH, {"a.py": "one\ntwo\nthree\n"})
+
+    report = DiffRunner(config, PROJECT, source, METRIC_TYPES).run("main")
+
+    outcome = report.outcomes[0]
+    assert outcome.result is not None
+    assert outcome.result.net == 3
 
 
 def test_range_filtering_applies_to_changed_files() -> None:

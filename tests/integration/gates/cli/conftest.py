@@ -8,9 +8,13 @@ of the same name — pytest requires the parameter to match the fixture.
 from __future__ import annotations
 
 import subprocess
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+
+from tingle.gates.cli import typer as typer_gate
+from tingle.gates.cli.textual import MetricsApp
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -96,3 +100,22 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (src / "new.py").write_text("w = 4  # noqa\n")  # untracked
     monkeypatch.chdir(root)
     return root
+
+
+@pytest.fixture
+def interactive(monkeypatch: pytest.MonkeyPatch) -> list[MetricsApp]:
+    """Make stdout look like a terminal, and catch the app the gate builds.
+
+    The app is real and so is the service graph behind it; only `run` is
+    replaced, since a launched TUI would sit waiting for a keystroke.
+    """
+    built: list[MetricsApp] = []
+
+    def record(self: MetricsApp) -> None:
+        built.append(self)
+
+    monkeypatch.setattr(
+        typer_gate, "sys", SimpleNamespace(stdout=SimpleNamespace(isatty=lambda: True))
+    )
+    monkeypatch.setattr(MetricsApp, "run", record)
+    return built

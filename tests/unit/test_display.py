@@ -12,6 +12,7 @@ from tingle.mills.display import (
     outcome_emoji,
     sections,
     severity_emoji,
+    severity_ratio,
 )
 from tingle.pacts.config import DisplaySpec, MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffResult
@@ -307,3 +308,22 @@ def test_a_diffs_emoji_ranks_the_standing_total_not_the_net() -> None:
 
     assert outcome_emoji(outcome) == severity_emoji(400, 100)
     assert outcome_emoji(outcome) != severity_emoji(-1, 100)
+
+
+def test_severity_ratio_of_nothing_is_zero_and_never_divides() -> None:
+    """Sorting by score reaches the ratio directly, below the emoji's guard.
+
+    A group whose metrics all errored sums no guides, so the zero case has
+    to be answered before anything is divided.
+    """
+    assert severity_ratio(0, guide=100) == 0.0
+    assert severity_ratio(0, guide=0) == 0.0
+
+
+def test_severity_ratio_climbs_with_the_value() -> None:
+    assert severity_ratio(1, 100) < severity_ratio(50, 100) < severity_ratio(500, 100)
+
+
+def test_severity_ratio_is_one_at_the_guide() -> None:
+    """The anchor the ladder is built on: full-size debt is exactly 1.0."""
+    assert severity_ratio(100, 100) == 1.0

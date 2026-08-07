@@ -17,10 +17,27 @@ def _boom(_: MetricContext) -> MetricResult:
     raise ValueError(msg)
 
 
+def _present(ctx: MetricContext) -> MetricResult:
+    """Count the metric's files that are actually there, by asking."""
+    return MetricResult(value=sum(1 for path in ctx.files if ctx.exists(path)))
+
+
 METRIC_TYPES = {
     "file_count": MetricType(name="file_count", func=_file_count),
     "boom": MetricType(name="boom", func=_boom),
+    "present": MetricType(name="present", func=_present),
 }
+
+
+def test_a_metric_can_ask_the_project_whether_a_file_is_there() -> None:
+    """`exists` is part of the context, so the runner has to wire it through."""
+    config = make_config(MetricSpec(name="here", type="present", ranges=("python",)))
+
+    report = run(config, PROJECT, metric_types=METRIC_TYPES)
+
+    outcome = report.outcomes[0]
+    assert outcome.result is not None
+    assert outcome.result.value == 2
 
 
 def test_runs_metrics_and_reports_values() -> None:

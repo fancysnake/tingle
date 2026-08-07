@@ -54,6 +54,22 @@ if TYPE_CHECKING:
     from textual.pilot import Pilot
 
 
+def test_a_report_measuring_nothing_draws_no_rows_and_survives_the_keys() -> None:
+    """Every gesture reaches for the row under a cursor that is not on one."""
+
+    async def scenario() -> None:
+        app = metrics_app(summed_report())
+        async with app.run_test() as pilot:
+            assert labels(app) == []
+
+            await pilot.press("left", "right", "space", "f")
+
+            assert labels(app) == []
+            assert app.is_running
+
+    asyncio.run(scenario())
+
+
 def test_the_table_has_a_row_per_metric_with_its_type_and_value() -> None:
     async def scenario() -> None:
         app = metrics_app(RUN_REPORT)
@@ -554,8 +570,10 @@ async def _palette_options(pilot: Pilot[None], query: str) -> CommandList:
         await pilot.pause()
         if command_list.option_count >= 2:
             return command_list
-    msg = f"palette found {command_list.option_count} options for {query!r}"
-    raise AssertionError(msg)
+    # the loop returns on any run where the suite passes, so neither line below
+    # is reachable without a failure already in flight
+    msg = f"palette found {command_list.option_count} for {query!r}"  # pragma: no cover
+    raise AssertionError(msg)  # pragma: no cover
 
 
 def test_open_palette_keeps_the_arrow_keys() -> None:

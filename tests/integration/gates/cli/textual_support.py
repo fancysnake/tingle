@@ -14,85 +14,45 @@ other.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from tingle.gates.cli.textual import BrowseTable, MetricsApp, SearchBar, SortBar
 from tingle.inits.services import Services
 from tingle.links.editor import VsCodeCli
+from tingle.mills.display import outcome_emoji, sections
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
 from tingle.pacts.report import MetricOutcome, RunReport
 
-RUN_REPORT = RunReport(
-    root=Path("/proj"),
-    source=Path("/proj/tingle.toml"),
-    outcomes=(
-        MetricOutcome(
-            spec=MetricSpec(name="noqa-comments", type="regex_count"),
-            range_names=("python",),
-            result=MetricResult(
-                value=2,
-                occurrences=(
-                    Occurrence(path="src/a.py", line=1),
-                    Occurrence(path="src/b.py", line=9),
-                ),
-            ),
-        ),
-        MetricOutcome(
-            spec=MetricSpec(name="python-files", type="file_count"),
-            range_names=("python",),
-            result=MetricResult(value=5),
-        ),
-    ),
-)
-
-DIFF_REPORT = DiffReport(
-    root=Path("/proj"),
-    source=Path("/proj/tingle.toml"),
-    base_ref="main",
-    merge_base="abc123",
-    outcomes=(
-        DiffOutcome(
-            spec=MetricSpec(name="noqa-comments", type="regex_count"),
-            range_names=("python",),
-            result=DiffResult(
-                net=1,
-                added=2,
-                removed=1,
-                added_occurrences=(
-                    Occurrence(path="src/a.py", line=3),
-                    Occurrence(path="src/new.py", line=1),
-                ),
-                removed_occurrences=(Occurrence(path="src/b.py", line=9),),
-            ),
-            total=MetricResult(value=7),
-        ),
-    ),
-)
+ROOT = Path("/proj")
+SOURCE = Path("/proj/tingle.toml")
 
 
-#: One group the branch moved and one it did not, for the folding rule.
-QUIET_DIFF_REPORT = DiffReport(
-    root=Path("/proj"),
-    source=Path("/proj/tingle.toml"),
-    base_ref="main",
-    merge_base="abc123",
-    outcomes=(
-        DiffOutcome(
-            spec=MetricSpec(name="still", type="file_count", group="quiet"),
-            range_names=(),
-            result=DiffResult(net=0, added=0, removed=0),
-            total=MetricResult(value=12),
-        ),
-        DiffOutcome(
-            spec=MetricSpec(name="moved", type="file_count", group="loud"),
-            range_names=(),
-            result=DiffResult(net=2, added=2, removed=0),
-            total=MetricResult(value=9),
-        ),
-    ),
-)
+def summed_report(*outcomes: MetricOutcome) -> RunReport:
+    """Wrap outcomes in a report shaped the way the mill hands one over.
+
+    The emoji and the sections are filled in here rather than left empty,
+    so a fixture cannot pass a test that a real report would fail.
+    """
+    ranked = tuple(replace(o, emoji=outcome_emoji(o)) for o in outcomes)
+    return RunReport(
+        root=ROOT, source=SOURCE, outcomes=ranked, sections=sections(ranked)
+    )
+
+
+def diffed_report(*outcomes: DiffOutcome) -> DiffReport:
+    """Do the same for a branch diff."""
+    ranked = tuple(replace(o, emoji=outcome_emoji(o)) for o in outcomes)
+    return DiffReport(
+        root=ROOT,
+        source=SOURCE,
+        base_ref="main",
+        merge_base="abc123",
+        outcomes=ranked,
+        sections=sections(ranked),
+    )
 
 
 def grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
@@ -106,25 +66,6 @@ def grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
     )
 
 
-GROUPED_REPORT = RunReport(
-    root=Path("/proj"),
-    source=Path("/proj/tingle.toml"),
-    outcomes=(
-        grouped("type-ignores", "typing"),
-        grouped("mypy-overrides", "typing"),
-        grouped("noqa-comments", "lint"),
-        grouped("python-files", None),
-    ),
-)
-
-
-def summed_report(*outcomes: MetricOutcome) -> RunReport:
-    """Wrap outcomes in a report, for the tests that build their own."""
-    return RunReport(
-        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=outcomes
-    )
-
-
 def valued(name: str, group: str, *, value: int, guide: int = 100) -> MetricOutcome:
     """Build a metric with a value and no hits: nothing to fold, only a number."""
     return MetricOutcome(
@@ -133,6 +74,67 @@ def valued(name: str, group: str, *, value: int, guide: int = 100) -> MetricOutc
         result=MetricResult(value=value),
         guide=guide,
     )
+
+
+RUN_REPORT = summed_report(
+    MetricOutcome(
+        spec=MetricSpec(name="noqa-comments", type="regex_count"),
+        range_names=("python",),
+        result=MetricResult(
+            value=2,
+            occurrences=(
+                Occurrence(path="src/a.py", line=1),
+                Occurrence(path="src/b.py", line=9),
+            ),
+        ),
+    ),
+    MetricOutcome(
+        spec=MetricSpec(name="python-files", type="file_count"),
+        range_names=("python",),
+        result=MetricResult(value=5),
+    ),
+)
+
+DIFF_REPORT = diffed_report(
+    DiffOutcome(
+        spec=MetricSpec(name="noqa-comments", type="regex_count"),
+        range_names=("python",),
+        result=DiffResult(
+            net=1,
+            added=2,
+            removed=1,
+            added_occurrences=(
+                Occurrence(path="src/a.py", line=3),
+                Occurrence(path="src/new.py", line=1),
+            ),
+            removed_occurrences=(Occurrence(path="src/b.py", line=9),),
+        ),
+        total=MetricResult(value=7),
+    )
+)
+
+#: One group the branch moved and one it did not, for the folding rule.
+QUIET_DIFF_REPORT = diffed_report(
+    DiffOutcome(
+        spec=MetricSpec(name="still", type="file_count", group="quiet"),
+        range_names=(),
+        result=DiffResult(net=0, added=0, removed=0),
+        total=MetricResult(value=12),
+    ),
+    DiffOutcome(
+        spec=MetricSpec(name="moved", type="file_count", group="loud"),
+        range_names=(),
+        result=DiffResult(net=2, added=2, removed=0),
+        total=MetricResult(value=9),
+    ),
+)
+
+GROUPED_REPORT = summed_report(
+    grouped("type-ignores", "typing"),
+    grouped("mypy-overrides", "typing"),
+    grouped("noqa-comments", "lint"),
+    grouped("python-files", None),
+)
 
 
 def metrics_app(

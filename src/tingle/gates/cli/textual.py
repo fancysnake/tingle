@@ -309,7 +309,7 @@ class MetricsApp(App[None]):
             return row
         if row.entry is not None:
             return self._row(self._browse.metric_key(row.entry.spec.name))
-        return None
+        return None  # pragma: no cover - every row carries a fold state or an entry
 
     def _enclosing_key(self) -> str | None:
         """Find the top-level row holding the cursor: where fold-all leaves it."""
@@ -324,7 +324,7 @@ class MetricsApp(App[None]):
 
     def _open(self, row: Row) -> None:
         """Open a hit where the reader writes code, if there is one to open."""
-        if row.occurrence is None:
+        if row.occurrence is None:  # pragma: no cover - guarded by caller
             return
         if self._opener is None or not self._opener.available:
             self.notify("No VS Code terminal to open in.", severity="warning")

@@ -150,6 +150,17 @@ def test_untracked_files_count_as_fully_added(tmp_path: Path) -> None:
     assert files["blob.bin"].added_lines == frozenset()
 
 
+def test_an_untracked_file_that_is_not_utf8_adds_no_lines(tmp_path: Path) -> None:
+    """No NUL, so the sniff passes it; it still is not text git would diff."""
+    repo = _branch_repo(tmp_path, "one\n")
+    (repo / "latin.txt").write_bytes(b"calf\xe9\n")
+
+    files = _by_path(GitCli(repo).branch_diff("main").files)
+
+    assert files["latin.txt"].status is FileStatus.ADDED
+    assert files["latin.txt"].added_lines == frozenset()
+
+
 def test_gitignored_untracked_files_are_excluded(tmp_path: Path) -> None:
     repo = _branch_repo(tmp_path, "one\n")
     (repo / ".gitignore").write_text("*.log\n")
