@@ -9,10 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A reusable GitHub Actions workflow,
-  `fancysnake/tingle/.github/workflows/metrics-history.yml`, that records
-  `stat --json` on every main build and publishes a chart of each metric's
-  history.
+- A GitHub Actions composite action,
+  `fancysnake/tingle/actions/metrics-history`, that records `stat --json` on
+  a branch and publishes a chart of each metric's history.
 
 ## [0.4.0] - 2026-07-16
 
