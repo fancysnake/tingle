@@ -9,6 +9,7 @@ carries just its own analysis.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 from tingle.pacts.diff import DiffResult, FileStatus
@@ -25,15 +26,11 @@ if TYPE_CHECKING:
 FileFindings: TypeAlias = "tuple[list[Occurrence], list[Occurrence], list[str]]"
 
 #: One file's located hits, plus anything the analysis wants to warn about.
+#: Warnings are bare messages: which file, and which side of a diff, they
+#: concern is not the analysis's to know, and is prefixed on for it.
 LocatedFinder: TypeAlias = (
     "Callable[[PurePath, str], tuple[list[Occurrence], list[str]]]"
 )
-
-#: Whether the thing is present in one side of a diff, plus anything the
-#: analysis wants to warn about. Warnings are bare messages: which file and
-#: which side they concern is not the analysis's to know, and is prefixed on
-#: for it.
-SidePresence: TypeAlias = "Callable[[PurePath, str], tuple[bool, list[str]]]"
 
 #: The param every line-located metric reads to discard uninteresting hits.
 IGNORE_LINES_PARAM = "ignore_lines"
@@ -56,7 +53,7 @@ def located_metric(
     occurrences: list[Occurrence] = []
     for path, text in readable_files(ctx, warnings, suffix=suffix):
         hits, found_warnings = find(path, text)
-        warnings.extend(found_warnings)
+        warnings.extend(f"{path}: {warning}" for warning in found_warnings)
         if found := drop_ignored(hits, text=text, patterns=ignores):
             details[str(path)] = len(found)
             occurrences.extend(found)
@@ -105,6 +102,23 @@ def drop_ignored(
         for occurrence in occurrences
         if not _is_ignored(occurrence, lines=lines, patterns=patterns)
     ]
+
+
+def excusing(
+    find: LocatedFinder, patterns: tuple[re.Pattern[str], ...]
+) -> LocatedFinder:
+    """Wrap a finder so the hits `ignore_lines` excuses never surface.
+
+    Every metric that excuses hits does it against the text the hits were
+    found in, so the finder and its excuses travel together rather than as
+    two things each caller has to remember to pair.
+    """
+
+    def find_kept(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
+        hits, warnings = find(path, text)
+        return drop_ignored(hits, text=text, patterns=patterns), warnings
+
+    return find_kept
 
 
 def _is_ignored(
@@ -173,7 +187,7 @@ def per_file_result(located: MetricResult) -> MetricResult:
 
 
 def presence_crossings(
-    ctx: DiffMetricContext, *, present: SidePresence, suffix: str | None = None
+    ctx: DiffMetricContext, *, find: LocatedFinder, suffix: str | None = None
 ) -> DiffResult:
     """Count the files a thing appeared in, and the files it vanished from.
 
@@ -183,32 +197,27 @@ def presence_crossings(
     still counts for nothing however much of it the branch rewrote -- which
     is the point, since reworking legacy code is not spreading it.
 
-    Both sides are read whole and re-analysed; the touched line sets are
-    never consulted. Only changed files are examined, which is sound:
-    presence cannot flip in a file the branch left alone.
+    Both sides are read whole and re-analysed, with `ignore_lines` excusing
+    hits on each side against its own text, exactly as a full run does; the
+    touched line sets are never consulted. Only changed files are examined,
+    which is sound: presence cannot flip in a file the branch left alone.
 
     A side that will not read counts as absent, and warns only when the
     file's status says it should have been there -- a deleted file has no
-    current side, and that is not a problem worth a warning.
+    current side, and that is not a problem worth a warning. A file neither
+    side will read is a binary or a mode-only change: it holds the thing on
+    neither side, which is unremarkable rather than worth warning twice.
     """
+    kept = excusing(find, compile_ignores(ctx.params))
 
     def per_file(file: FileDiff) -> FileFindings:
         if suffix is not None and file.path.suffix != suffix:
             return [], [], []
-        now, warnings = _side_presence(
-            ctx.read,
-            file,
-            present=present,
-            side="current",
-            expected=file.status is not FileStatus.DELETED,
-        )
-        before, base_warnings = _side_presence(
-            ctx.read_base,
-            file,
-            present=present,
-            side="base",
-            expected=file.status is not FileStatus.ADDED,
-        )
+        now_text, base_text = ctx.read(file.path), ctx.read_base(file.path)
+        if now_text is None and base_text is None:
+            return [], [], []
+        now, warnings = _side_presence(now_text, file, find=kept, side=_CURRENT)
+        before, base_warnings = _side_presence(base_text, file, find=kept, side=_BASE)
         warnings.extend(base_warnings)
         if now and not before:
             return [Occurrence(path=str(file.path))], [], warnings
@@ -219,19 +228,28 @@ def presence_crossings(
     return accumulate_diff(ctx.files, per_file)
 
 
+@dataclass(frozen=True)
+class _Side:
+    """One side of a diff: what to call it, and when it is meant to be empty."""
+
+    label: str
+    absent_status: FileStatus
+
+
+_CURRENT = _Side("current", FileStatus.DELETED)
+_BASE = _Side("base", FileStatus.ADDED)
+
+
 def _side_presence(
-    reader: Callable[[PurePath], str | None],
-    file: FileDiff,
-    *,
-    present: SidePresence,
-    side: str,
-    expected: bool,
+    text: str | None, file: FileDiff, *, find: LocatedFinder, side: _Side
 ) -> tuple[bool, list[str]]:
     """Ask one side whether the thing is there; absent when it will not read."""
-    if (text := reader(file.path)) is None:
-        return False, [f"{file.path}: {side} side unreadable"] if expected else []
-    found, warnings = present(file.path, text)
-    return found, [f"{file.path}: {side} side: {warning}" for warning in warnings]
+    if text is None:
+        expected = file.status is not side.absent_status
+        return False, [f"{file.path}: {side.label} side unreadable"] if expected else []
+    hits, warnings = find(file.path, text)
+    labelled = [f"{file.path}: {side.label} side: {warning}" for warning in warnings]
+    return bool(hits), labelled
 
 
 def accumulate_diff(

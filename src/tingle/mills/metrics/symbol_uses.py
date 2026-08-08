@@ -8,14 +8,13 @@ An occurrence is attributed to the line where the reference starts.
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from tingle.mills.metrics.assemble import (
     FileFindings,
     accumulate_diff,
     compile_ignores,
-    drop_ignored,
+    excusing,
     located_metric,
     per_file_result,
     presence_crossings,
@@ -24,7 +23,6 @@ from tingle.mills.metrics.assemble import (
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
 
 if TYPE_CHECKING:
-    import re
     from collections.abc import Callable, Mapping
     from collections.abc import Set as AbstractSet
     from pathlib import PurePath
@@ -47,9 +45,7 @@ def symbol_spread(ctx: MetricContext) -> MetricResult:
     got, where reworking the code already using it is not the thing being
     watched.
     """
-    return per_file_result(
-        located_metric(ctx, find=_finder(_parts(ctx.params)), suffix=".py")
-    )
+    return per_file_result(symbol_uses(ctx))
 
 
 def _finder(parts: tuple[str, ...]) -> LocatedFinder:
@@ -59,12 +55,10 @@ def _finder(parts: tuple[str, ...]) -> LocatedFinder:
         try:
             tree = ast.parse(text)
         except SyntaxError as exc:
-            return [], [f"{path}: skipped (syntax error: {exc.msg})"]
+            return [], [f"skipped (syntax error: {exc.msg})"]
         lines, star_fallback = _occurrence_lines(tree, parts)
         warnings = (
-            [f"{path}: star import: falling back to bare-name counting"]
-            if star_fallback
-            else []
+            ["star import: falling back to bare-name counting"] if star_fallback else []
         )
         found = [Occurrence(path=str(path), line=line) for line in sorted(lines)]
         return found, warnings
@@ -77,30 +71,18 @@ def _parts(params: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(params["symbol"].split("."))
 
 
-@dataclass(frozen=True)
-class _Query:
-    """What the metric is looking for: the symbol, and what to excuse."""
-
-    parts: tuple[str, ...]
-    ignores: tuple[re.Pattern[str], ...]
-
-
 def symbol_uses_diff(ctx: DiffMetricContext) -> DiffResult:
     """Count references on lines the branch added vs lines it removed."""
-    query = _Query(parts=_parts(ctx.params), ignores=compile_ignores(ctx.params))
+    find = excusing(_finder(_parts(ctx.params)), compile_ignores(ctx.params))
 
     def per_file(file: FileDiff) -> FileFindings:
         if file.path.suffix != ".py":
             return [], [], []
         added, added_warnings = _side_occurrences(
-            ctx.read, file.path, query=query, touched=file.added_lines, side="current"
+            ctx.read, file.path, find=find, touched=file.added_lines, side="current"
         )
         removed, removed_warnings = _side_occurrences(
-            ctx.read_base,
-            file.path,
-            query=query,
-            touched=file.removed_lines,
-            side="base",
+            ctx.read_base, file.path, find=find, touched=file.removed_lines, side="base"
         )
         return added, removed, [*added_warnings, *removed_warnings]
 
@@ -115,25 +97,7 @@ def symbol_spread_diff(ctx: DiffMetricContext) -> DiffResult:
     a referencing file the branch rewrote is beside the point, so reworking
     legacy code nets zero while one fresh file importing the class does not.
     """
-    query = _Query(parts=_parts(ctx.params), ignores=compile_ignores(ctx.params))
-
-    def present(path: PurePath, text: str) -> tuple[bool, list[str]]:
-        try:
-            tree = ast.parse(text)
-        except SyntaxError as exc:
-            return False, [f"skipped (syntax error: {exc.msg})"]
-        lines, star_fallback = _occurrence_lines(tree, query.parts)
-        warnings = (
-            ["star import: falling back to bare-name counting"] if star_fallback else []
-        )
-        found = drop_ignored(
-            [Occurrence(path=str(path), line=line) for line in sorted(lines)],
-            text=text,
-            patterns=query.ignores,
-        )
-        return bool(found), warnings
-
-    return presence_crossings(ctx, present=present, suffix=".py")
+    return presence_crossings(ctx, find=_finder(_parts(ctx.params)), suffix=".py")
 
 
 def validate_params(params: Mapping[str, Any]) -> list[str]:
@@ -155,39 +119,22 @@ def _side_occurrences(
     reader: Callable[[PurePath], str | None],
     path: PurePath,
     *,
-    query: _Query,
+    find: LocatedFinder,
     touched: AbstractSet[int],
     side: str,
 ) -> tuple[list[Occurrence], list[str]]:
     """Locate occurrences starting on the touched lines of one diff side.
 
-    Each side is filtered against its own text, so a line the metric
+    Each side is analysed against its own text, so a line the metric
     ignores on the branch is equally ignored in the base.
     """
     if not touched:
         return [], []
     if (text := reader(path)) is None:
         return [], [f"{path}: {side} side unreadable"]
-    try:
-        tree = ast.parse(text)
-    except SyntaxError as exc:
-        return [], [f"{path}: {side} side skipped (syntax error: {exc.msg})"]
-    lines, star_fallback = _occurrence_lines(tree, query.parts)
-    warnings = (
-        [f"{path}: {side} side: star import: falling back to bare-name counting"]
-        if star_fallback
-        else []
-    )
-    found = drop_ignored(
-        [
-            Occurrence(path=str(path), line=line)
-            for line in sorted(lines)
-            if line in touched
-        ],
-        text=text,
-        patterns=query.ignores,
-    )
-    return found, warnings
+    hits, warnings = find(path, text)
+    found = [hit for hit in hits if hit.line in touched]
+    return found, [f"{path}: {side} side: {warning}" for warning in warnings]
 
 
 def _occurrence_lines(tree: ast.AST, parts: tuple[str, ...]) -> tuple[list[int], bool]:

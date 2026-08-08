@@ -71,7 +71,13 @@ class Occurrence:
 
 @dataclass(frozen=True)
 class MetricResult:
-    """A measured value with optional per-item details and warnings."""
+    """A measured value with optional per-item details and warnings.
+
+    `details` is per-item weight, not a decomposition of `value`: it says
+    how heavily each item is involved, and only a metric whose value is the
+    total weight has them sum to it. A spread metric counts each file once
+    however many hits it holds, so its details sum to more than its value.
+    """
 
     value: int
     details: Mapping[str, int] = field(default_factory=dict)

@@ -46,7 +46,7 @@ def regex_spread(ctx: MetricContext) -> MetricResult:
     metric for keeping something from spreading, where rewriting the code
     that already has it is not the thing being watched.
     """
-    return per_file_result(located_metric(ctx, find=_finder(_compile(ctx.params))))
+    return per_file_result(regex_count(ctx))
 
 
 def _finder(pattern: re.Pattern[str]) -> LocatedFinder:
@@ -112,14 +112,7 @@ def regex_spread_diff(ctx: DiffMetricContext) -> DiffResult:
     Total column -- the caveat on `regex_count` in diff mode does not
     apply to this metric.
     """
-    find = _finder(_compile(ctx.params))
-    ignores = compile_ignores(ctx.params)
-
-    def present(path: PurePath, text: str) -> tuple[bool, list[str]]:
-        hits, warnings = find(path, text)
-        return bool(drop_ignored(hits, text=text, patterns=ignores)), warnings
-
-    return presence_crossings(ctx, present=present)
+    return presence_crossings(ctx, find=_finder(_compile(ctx.params)))
 
 
 def _matches_on_lines(

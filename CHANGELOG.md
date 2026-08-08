@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `regex_spread` matches both sides of a diff full-text, so unlike
   `regex_count` it carries no multi-line caveat in diff mode.
 
+### Changed
+
+- Side-scoped diff warnings read the same way whichever metric raises them:
+  `symbol_uses` now says `a.py: base side: skipped (syntax error: ...)`,
+  with the colon every other side warning already used.
+
 ## [0.4.0] - 2026-07-16
 
 ### Added

@@ -16,17 +16,22 @@ def _context(
     current: Mapping[str, str | None],
     *,
     base: Mapping[str, str | None],
+    params: Mapping[str, object] | None = None,
 ) -> DiffMetricContext:
     return DiffMetricContext(
         files=files,
         read=lambda path: current.get(str(path)),
         read_base=lambda path: base.get(str(path)),
-        params={},
+        params=params or {},
     )
 
 
-def _present(_path: PurePath, text: str) -> tuple[bool, list[str]]:
-    return "HIT" in text, []
+def _find(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
+    return [
+        Occurrence(path=str(path), line=lineno)
+        for lineno, line in enumerate(text.splitlines(), start=1)
+        if "HIT" in line
+    ], []
 
 
 # per_file_result
@@ -113,7 +118,7 @@ def test_appearing_in_a_file_counts_as_added() -> None:
     file = FileDiff(path=PurePath("a.py"), status=FileStatus.MODIFIED)
 
     result = presence_crossings(
-        _context((file,), {"a.py": "HIT\n"}, base={"a.py": "clean\n"}), present=_present
+        _context((file,), {"a.py": "HIT\n"}, base={"a.py": "clean\n"}), find=_find
     )
 
     assert result.added == 1
@@ -126,7 +131,7 @@ def test_vanishing_from_a_file_counts_as_removed() -> None:
     file = FileDiff(path=PurePath("a.py"), status=FileStatus.MODIFIED)
 
     result = presence_crossings(
-        _context((file,), {"a.py": "clean\n"}, base={"a.py": "HIT\n"}), present=_present
+        _context((file,), {"a.py": "clean\n"}, base={"a.py": "HIT\n"}), find=_find
     )
 
     assert result.removed == 1
@@ -144,7 +149,7 @@ def test_rewriting_a_file_that_already_had_it_moves_nothing() -> None:
 
     result = presence_crossings(
         _context((file,), {"a.py": "HIT\nHIT\nHIT\n"}, base={"a.py": "HIT\nother\n"}),
-        present=_present,
+        find=_find,
     )
 
     assert result.net == 0
@@ -157,7 +162,7 @@ def test_created_file_with_the_thing_counts_as_added() -> None:
     file = FileDiff(path=PurePath("new.py"), status=FileStatus.ADDED)
 
     result = presence_crossings(
-        _context((file,), {"new.py": "HIT\n"}, base={}), present=_present
+        _context((file,), {"new.py": "HIT\n"}, base={}), find=_find
     )
 
     assert result.net == 1
@@ -168,7 +173,7 @@ def test_deleted_file_with_the_thing_counts_as_removed() -> None:
     file = FileDiff(path=PurePath("gone.py"), status=FileStatus.DELETED)
 
     result = presence_crossings(
-        _context((file,), {}, base={"gone.py": "HIT\n"}), present=_present
+        _context((file,), {}, base={"gone.py": "HIT\n"}), find=_find
     )
 
     assert result.net == -1
@@ -185,7 +190,7 @@ def test_details_carry_the_per_file_net() -> None:
             {"a.py": "HIT\n", "b.py": "clean\n"},
             base={"a.py": "clean\n", "b.py": "HIT\n"},
         ),
-        present=_present,
+        find=_find,
     )
 
     assert result.net == 0
@@ -198,7 +203,7 @@ def test_unreadable_side_warns_when_the_file_should_be_there() -> None:
     file = FileDiff(path=PurePath("a.py"), status=FileStatus.MODIFIED)
 
     result = presence_crossings(
-        _context((file,), {"a.py": None}, base={"a.py": "HIT\n"}), present=_present
+        _context((file,), {"a.py": None}, base={"a.py": "HIT\n"}), find=_find
     )
 
     assert result.warnings == ("a.py: current side unreadable",)
@@ -209,23 +214,51 @@ def test_suffix_skips_files_of_other_kinds() -> None:
     file = FileDiff(path=PurePath("notes.md"), status=FileStatus.ADDED)
 
     result = presence_crossings(
-        _context((file,), {"notes.md": "HIT\n"}, base={}),
-        present=_present,
-        suffix=".py",
+        _context((file,), {"notes.md": "HIT\n"}, base={}), find=_find, suffix=".py"
     )
 
     assert result.net == 0
     assert not result.warnings
 
 
+def test_a_file_neither_side_reads_says_nothing() -> None:
+    # a changed binary: git reports it with no lines on either side, and a
+    # thing absent from both sides has not crossed anything
+    file = FileDiff(path=PurePath("logo.png"), status=FileStatus.MODIFIED)
+
+    result = presence_crossings(
+        _context((file,), {"logo.png": None}, base={"logo.png": None}), find=_find
+    )
+
+    assert result.net == 0
+    assert not result.warnings
+
+
+def test_ignored_lines_do_not_make_a_side_present() -> None:
+    file = FileDiff(path=PurePath("a.py"), status=FileStatus.MODIFIED)
+
+    result = presence_crossings(
+        _context(
+            (file,),
+            {"a.py": "HIT  # excused\n"},
+            base={"a.py": "clean\n"},
+            params={"ignore_lines": ["# excused"]},
+        ),
+        find=_find,
+    )
+
+    assert result.net == 0
+
+
 def test_side_warnings_are_labelled_with_file_and_side() -> None:
-    def warns(_path: PurePath, text: str) -> tuple[bool, list[str]]:
-        return "HIT" in text, ["something is odd"]
+    def warns(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
+        hits, _ = _find(path, text)
+        return hits, ["something is odd"]
 
     file = FileDiff(path=PurePath("a.py"), status=FileStatus.MODIFIED)
 
     result = presence_crossings(
-        _context((file,), {"a.py": "HIT\n"}, base={"a.py": "HIT\n"}), present=warns
+        _context((file,), {"a.py": "HIT\n"}, base={"a.py": "HIT\n"}), find=warns
     )
 
     # the analysis reports a bare message; which file and which side it

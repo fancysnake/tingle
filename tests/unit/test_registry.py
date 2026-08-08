@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from tingle.mills.metrics.regex_count import regex_spread, regex_spread_diff
 from tingle.mills.metrics.registry import METRIC_TYPES
+from tingle.mills.metrics.symbol_uses import symbol_spread, symbol_spread_diff
 
 EXPECTED_TYPES = {
     "regex_count",
@@ -71,3 +73,14 @@ def test_spread_types_accept_what_their_counting_siblings_do() -> None:
         assert METRIC_TYPES[spread].params.validate is (
             METRIC_TYPES[counting].params.validate
         )
+
+
+def test_spread_types_are_wired_to_their_own_handlers() -> None:
+    # the table is data, so a copy-paste slip would silently point a spread
+    # type at its sibling's function and nothing else would notice
+    for name, func, diff_func in (
+        ("regex_spread", regex_spread, regex_spread_diff),
+        ("symbol_spread", symbol_spread, symbol_spread_diff),
+    ):
+        assert METRIC_TYPES[name].func is func
+        assert METRIC_TYPES[name].diff_func is diff_func
