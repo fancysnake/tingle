@@ -134,6 +134,9 @@ separate command and does not affect the exit code:
           path: metrics.json
 ```
 
+An artifact is a file, not a history — it expires and nothing plots it. To
+keep the values and chart them over time, see [History](history.md).
+
 ## GitLab
 
 Set `GIT_DEPTH: 0` so the merge-base is reachable. `tingle report

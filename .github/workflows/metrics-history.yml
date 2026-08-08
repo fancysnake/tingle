@@ -1,0 +1,85 @@
+name: Metrics history
+
+# Reusable: record `tingle stat` on every main build and plot the history.
+# The values are committed to a branch, so the caller must hold
+# `permissions: contents: write` — a called workflow can only narrow what
+# the caller grants, never widen it.
+#
+#   jobs:
+#     metrics:
+#       if: github.ref == 'refs/heads/main'
+#       permissions:
+#         contents: write
+#       uses: fancysnake/tingle/.github/workflows/metrics-history.yml@main
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: Chart title. Keep it stable — it keys the stored series.
+        type: string
+        default: tingle
+      python-version:
+        description: Python that runs tingle.
+        type: string
+        default: "3.x"
+      tingle-version:
+        description: Version to install. Empty installs the latest release.
+        type: string
+        default: ""
+      config:
+        description: Path to the config file, when it is not auto-discovered.
+        type: string
+        default: ""
+      data-branch:
+        description: Branch the history is committed to.
+        type: string
+        default: gh-pages
+      data-dir:
+        description: Directory in that branch holding the chart and its data.
+        type: string
+        default: metrics
+      max-points:
+        description: Points kept per metric. Empty keeps every build.
+        type: string
+        default: ""
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      # `stat` measures the working tree, so the shallow default is enough;
+      # the benchmark action pushes over a remote it builds from the token,
+      # and needs no stored credentials
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ inputs.python-version }}
+      - env:
+          VERSION: ${{ inputs.tingle-version }}
+        run: pip install "tingle${VERSION:+==$VERSION}"
+      - name: Measure
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: tingle stat --json ${CONFIG:+--config "$CONFIG"} > stat.json
+      - name: Convert to chart points
+        # a metric that errored has no value to plot; name it, then drop it
+        run: |
+          jq -r '.metrics[] | select(.error) | "skipping \(.name): \(.error)"' stat.json
+          jq '[.metrics[] | select(.error == null) | {name, unit: "count", value}]' stat.json > points.json
+      - uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        with:
+          name: ${{ inputs.name }}
+          # every tingle metric is a count you want to shrink or hold
+          tool: customSmallerIsBetter
+          output-file-path: points.json
+          github-token: ${{ github.token }}
+          auto-push: true
+          gh-pages-branch: ${{ inputs.data-branch }}
+          benchmark-data-dir-path: ${{ inputs.data-dir }}
+          max-items-in-chart: ${{ inputs.max-points }}
+          # `tingle check` is the gate; this job only records
+          comment-on-alert: false
+          fail-on-alert: false
