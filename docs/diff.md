@@ -51,6 +51,7 @@ Each metric type means something specific in diff mode:
 |---|---|
 | `regex_count` | matches on lines you added (+) vs lines you removed (−) |
 | `symbol_uses` | references starting on added vs removed lines |
+| `regex_spread` / `symbol_spread` | files that started matching (+) vs stopped (−) |
 | `line_count` | added vs removed lines |
 | `file_count` | created vs deleted files |
 | `toml_list_length` / `toml_table_array` / `ini_list_length` | value at the merge-base vs now (net only) |
@@ -58,6 +59,12 @@ Each metric type means something specific in diff mode:
 The config-list types compare two values rather than counting lines, which
 is why they show only a net figure — the Added and Removed columns stay
 blank for them.
+
+The [spread types](metrics.md#spread-regex_spread-and-symbol_spread) do not
+count lines either. They read both sides of every changed file whole and
+compare presence, so a branch that rewrites a file which already matched nets
+zero however many matching lines it churned, while one new file that matches
+is +1. That is the point of them: reworking legacy code is not spreading it.
 
 ## Approximations to know about
 
@@ -67,7 +74,8 @@ where it is inexact:
 - **Diff counting is per line.** Regex patterns containing newlines never
   match in diff mode (`MULTILINE` / `DOTALL` have no cross-line effect), so
   the Total column — which uses full-text matching — can disagree for such
-  patterns.
+  patterns. This does not apply to `regex_spread`, which matches both sides
+  full-text.
 - **A `symbol_uses` reference is attributed to the line where it *starts*.**
   Edits to a later line of a multi-line call don't count it.
 - **Renames are treated as delete + add.** Net zero for line metrics; a
