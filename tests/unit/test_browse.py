@@ -31,8 +31,7 @@ def _outcome(
     spec: MetricSpec, value: int, *, guide: int = 100, paths: tuple[str, ...] = ()
 ) -> MetricOutcome:
     result = MetricResult(
-        value=value,
-        occurrences=tuple(Occurrence(path=path, line=1) for path in paths),
+        value=value, occurrences=tuple(Occurrence(path=path, line=1) for path in paths)
     )
     return MetricOutcome(
         spec=spec,
@@ -51,7 +50,7 @@ def _failed(spec: MetricSpec, *, ranges: tuple[str, ...] = ()) -> MetricOutcome:
 
 
 def _measured() -> BrowseState:
-    """A finished run over four metrics: the fixture most tests start from."""
+    """Finish a run over four metrics: the fixture most tests start from."""
     return start(
         (
             _outcome(NOQA, 0),
@@ -402,7 +401,7 @@ def test_sorting_a_diff_run_by_value_ranks_the_standing_total_not_the_net() -> N
         )
     )
 
-    # noqa's branch impact is the bigger number; the debt it sits on is not
+    # the branch moved noqa-comment more; the debt it sits on is still smaller
     assert _metric_names(push_sort(state, SortKey.VALUE, descending=True)) == [
         "loc",
         "noqa-comment",

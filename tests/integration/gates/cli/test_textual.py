@@ -24,12 +24,14 @@ call-out the plan asked for:
 from __future__ import annotations
 
 import asyncio
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from textual.binding import Binding
 from textual.command import CommandList, CommandPalette
 from textual.widgets import Input
+from textual.widgets._toast import Toast
 from textual_support import (
     DIFF_REPORT,
     GROUPED_REPORT,
@@ -46,11 +48,14 @@ from textual_support import (
 )
 
 from tingle.gates.cli.textual import BrowseTable, MetricsApp
+from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.metrics import MetricResult, Occurrence
 from tingle.pacts.report import MetricOutcome
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from textual.pilot import Pilot
 
 
@@ -293,6 +298,8 @@ def test_space_on_an_occurrence_opens_it_at_its_line() -> None:
 
             await pilot.press("space")
 
+            await app.workers.wait_for_complete()  # the hand-over is threaded
+
             # the path is resolved under the report root, at the hit's line
             assert calls == [["/usr/bin/code", "--goto", f"{Path('/proj/src/a.py')}:1"]]
 
@@ -307,6 +314,8 @@ def test_a_diff_occurrence_opens_too() -> None:
             await pilot.press("right", "down", "down")
 
             await pilot.press("space")
+
+            await app.workers.wait_for_complete()
 
             assert calls == [["/usr/bin/code", "--goto", f"{Path('/proj/src/a.py')}:3"]]
 
@@ -323,6 +332,38 @@ def test_space_does_not_open_when_no_editor_is_reachable() -> None:
             await pilot.press("space")
 
             assert not calls
+
+    asyncio.run(scenario())
+
+
+def test_an_editor_that_will_not_open_is_reported_not_fatal() -> None:
+    """The hand-over runs in a worker; its failure has to come back as words."""
+
+    def _refuse(_args: Sequence[str]) -> None:
+        raise subprocess.TimeoutExpired(cmd="code", timeout=5)
+
+    async def scenario() -> None:
+        opener = VsCodeCli(
+            environ={"TERM_PROGRAM": "vscode"},
+            which=lambda _: "/usr/bin/code",
+            spawn=_refuse,
+        )
+        app = metrics_app(RUN_REPORT, opener)
+        # the toasts are what a reader would see, so let the app raise them
+        async with app.run_test(notifications=True) as pilot:
+            await pilot.press("right", "down", "down")
+
+            await pilot.press("space")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+
+            assert app.is_running
+            said = (
+                f"could not open {Path('/proj/src/a.py')}:1: Command 'code' timed out"
+            )
+            toasts = [str(toast.render()) for toast in app.screen.query(Toast)]
+            assert len(toasts) == 1
+            assert toasts[0].startswith(said)
 
     asyncio.run(scenario())
 

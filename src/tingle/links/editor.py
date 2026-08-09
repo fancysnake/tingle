@@ -13,6 +13,8 @@ import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
+from tingle.pacts.editor import EditorError
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
@@ -41,11 +43,20 @@ class VsCodeCli:
         )
 
     def open(self, path: str, line: int | None) -> None:
-        """Hand VS Code a `file:line` target (or a bare file) to jump to."""
+        """Hand VS Code a `file:line` target (or a bare file) to jump to.
+
+        A shim that is gone by the time it is called, or one that hangs
+        long enough to be given up on, becomes an EditorError: the caller
+        has a reader to tell, and this has nothing else to do with it.
+        """
         if (code := self._which("code")) is None:
             return
         target = f"{path}:{line}" if line is not None else path
-        self._spawn([code, "--goto", target])
+        try:
+            self._spawn([code, "--goto", target])
+        except (OSError, subprocess.SubprocessError) as exc:
+            msg = f"could not open {target}: {exc}"
+            raise EditorError(msg) from exc
 
     @staticmethod
     def _popen(args: Sequence[str]) -> None:

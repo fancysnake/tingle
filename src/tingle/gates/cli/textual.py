@@ -7,6 +7,7 @@ module's whole job is turning `Row`s into cells and keys into gestures.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.cells import cell_len
@@ -16,6 +17,7 @@ from textual.binding import Binding
 from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from tingle.pacts.browse import RowKind, SortKey
+from tingle.pacts.editor import EditorError
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -150,7 +152,7 @@ class MetricsApp(App[None]):
     def __init__(
         self,
         report: RunReport | DiffReport,
-        opener: EditorOpener | None = None,
+        opener: EditorOpener,
         *,
         browse: BrowseServiceProtocol,
     ) -> None:
@@ -326,12 +328,23 @@ class MetricsApp(App[None]):
         """Open a hit where the reader writes code, if there is one to open."""
         if row.occurrence is None:  # pragma: no cover - guarded by caller
             return
-        if self._opener is None or not self._opener.available:
+        if not self._opener.available:
             self.notify("No VS Code terminal to open in.", severity="warning")
             return
-        self._opener.open(
-            str(self._report.root / row.occurrence.path), row.occurrence.line
+        target = str(self._report.root / row.occurrence.path)
+        line = row.occurrence.line
+        # off the event loop: handing the file over means waiting on
+        # another process, and the table must stay answerable meanwhile
+        self.run_worker(
+            partial(self._hand_over, target, line), thread=True, exit_on_error=False
         )
+
+    def _hand_over(self, target: str, line: int | None) -> None:
+        """Ask the editor for the file, and say so if it will not take it."""
+        try:
+            self._opener.open(target, line)
+        except EditorError as exc:
+            self.call_from_thread(self.notify, str(exc), severity="error")
 
 
 def _mark_sorted_header(table: BrowseTable, state: BrowseState) -> None:

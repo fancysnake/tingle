@@ -144,7 +144,14 @@ GROUPED_REPORT = summed_report(
 def metrics_app(
     report: RunReport | DiffReport, opener: VsCodeCli | None = None
 ) -> MetricsApp:
-    """Build the app the way inits does, browse service and all."""
+    """Build the app the way inits does, browse service and all.
+
+    A test that is not about opening a hit gets an opener with nothing to
+    open, which is a state the app already has to handle -- rather than
+    the absence of one, which production never passes.
+    """
+    if opener is None:
+        opener, _calls = recording_opener(available=False)
     return MetricsApp(report, opener, browse=Services().browse)
 
 

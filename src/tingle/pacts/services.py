@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
     from tingle.pacts.browse import BrowseState, Row, SortKey
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.config import CheckPolicy, Config, MetricDraft, MetricSpec
+    from tingle.pacts.config import CheckPolicy, Config, MetricDraft
     from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.metrics import MetricType
@@ -76,9 +76,7 @@ class BrowseServiceProtocol(Protocol):
     """
 
     @abstractmethod
-    def start(
-        self, outcomes: Sequence[MetricOutcome | DiffOutcome]
-    ) -> BrowseState:
+    def start(self, outcomes: Sequence[MetricOutcome | DiffOutcome]) -> BrowseState:
         """Open a session over the outcomes of a finished report."""
 
     @abstractmethod
