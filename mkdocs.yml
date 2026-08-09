@@ -42,6 +42,7 @@ nav:
       - Metric types: metrics.md
       - Branch impact: diff.md
       - CI gate: check.md
+      - History: history.md
   - Reference:
       - CLI: cli.md
       - Changelog: changelog.md

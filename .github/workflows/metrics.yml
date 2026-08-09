@@ -1,0 +1,28 @@
+name: Metrics history
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the values are committed to the metrics-data branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4
+      - run: mise exec -- poetry install
+      # measure with the build the gate ran against, not the released wheel;
+      # mise puts the project venv in .venv
+      - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      # Pages here is deployed from an artifact, so the history gets a branch
+      # of its own — the fallback path docs/history.md documents
+      - uses: ./actions/metrics-history
+        with:
+          data-branch: metrics-data

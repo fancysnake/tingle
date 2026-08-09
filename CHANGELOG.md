@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A GitHub Actions composite action,
+  `fancysnake/tingle/actions/metrics-history`, that records `stat --json` on
+  a branch and publishes a chart of each metric's history.
+
 ## [0.4.1] - 2026-08-09
 
 ### Added

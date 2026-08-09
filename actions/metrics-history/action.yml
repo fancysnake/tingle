@@ -1,0 +1,100 @@
+name: tingle metrics history
+description: >-
+  Record `tingle stat` on a branch and publish a chart of each metric's
+  history. Expects `tingle` on PATH — run it from the job that already
+  installed it.
+
+inputs:
+  name:
+    description: Chart title. Keep it stable — it keys the stored series.
+    default: tingle
+  config:
+    description: Path to the config file, when it is not auto-discovered.
+    default: ""
+  data-branch:
+    description: Branch the history is committed to. Created when missing.
+    default: gh-pages
+  data-dir:
+    description: Directory in that branch holding the chart and its data.
+    default: metrics
+  max-points:
+    description: Points kept per metric. Empty keeps every build.
+    default: ""
+  github-token:
+    description: Token used to create and push to the data branch.
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Require a clean checkout
+      shell: bash
+      run: |
+        # recording switches this checkout to the data branch and back, and
+        # git refuses to switch away from a modified tracked file — say so
+        # here rather than letting it surface as a raw git error later
+        if ! git diff --quiet HEAD; then
+          echo "::error::the checkout has modified tracked files; commit or discard them before recording"
+          git diff --name-only HEAD >&2
+          exit 1
+        fi
+
+    - name: Measure
+      shell: bash
+      env:
+        CONFIG: ${{ inputs.config }}
+      run: |
+        # `stat` exits 1 when a metric raises, having named it on stderr and
+        # written the rest of the payload: one broken metric must not cost
+        # the whole data point. Anything above that is the tool failing.
+        status=0
+        tingle stat --json ${CONFIG:+--config "$CONFIG"} > stat.json || status=$?
+        [ "$status" -le 1 ] || exit "$status"
+        jq '[.metrics[] | select(.error == null) | {name, unit: "count", value}]' \
+          stat.json > points.json
+        if [ "$(jq length points.json)" -eq 0 ]; then
+          echo "::error::every metric errored; there is nothing to record"
+          exit 1
+        fi
+
+    - name: Create the data branch when missing
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.data-branch }}
+        TOKEN: ${{ inputs.github-token }}
+      run: |
+        # the benchmark action fetches this branch and dies on a raw git
+        # error if it is absent — which is every repository's first run
+        remote="https://x-access-token:$TOKEN@${GITHUB_SERVER_URL#https://}/$GITHUB_REPOSITORY.git"
+        if git ls-remote --exit-code --heads "$remote" "$BRANCH" > /dev/null; then
+          exit 0
+        fi
+        echo "creating $BRANCH: history has to live somewhere"
+        # orphan, in a scratch repository: the data branch shares no history
+        # with the source, and the caller's checkout is left untouched
+        empty=$(mktemp -d)
+        git init --quiet --initial-branch "$BRANCH" "$empty"
+        git -C "$empty" \
+          -c user.name=github-actions[bot] \
+          -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+          commit --quiet --allow-empty -m "Start $BRANCH"
+        git -C "$empty" push --quiet "$remote" "$BRANCH" && exit 0
+        # a concurrent first run got there between the check and the push:
+        # the branch existing is all this step wanted, so confirm and go on
+        echo "$BRANCH was created by another run"
+        git ls-remote --exit-code --heads "$remote" "$BRANCH" > /dev/null
+
+    - uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+      with:
+        name: ${{ inputs.name }}
+        # every tingle metric is a count you want to shrink or hold
+        tool: customSmallerIsBetter
+        output-file-path: points.json
+        github-token: ${{ inputs.github-token }}
+        auto-push: true
+        gh-pages-branch: ${{ inputs.data-branch }}
+        benchmark-data-dir-path: ${{ inputs.data-dir }}
+        max-items-in-chart: ${{ inputs.max-points }}
+        # `tingle check` is the gate; this action only records
+        comment-on-alert: false
+        fail-on-alert: false
