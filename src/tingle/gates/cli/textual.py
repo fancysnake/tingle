@@ -281,7 +281,9 @@ class MetricsApp(App[None]):
             table.add_row(*_cells(row), key=row.key)
         table.move_cursor(row=self._index_of(wanted))
         _mark_sorted_header(table, self._state)
-        self.query_one(SortBar).update(_sort_line(self._state, self._browse))
+        self.query_one(SortBar).update(
+            _sort_line(self._state, self._browse, rows=self._rows)
+        )
 
     def _current(self) -> Row | None:
         """Return the row the cursor is on, if the table has any."""
@@ -382,7 +384,9 @@ def _unmarked(label: str) -> str:
     return label
 
 
-def _sort_line(state: BrowseState, browse: BrowseServiceProtocol) -> str:
+def _sort_line(
+    state: BrowseState, browse: BrowseServiceProtocol, *, rows: tuple[Row, ...]
+) -> str:
     """Say what is deciding the order, and what folding costs.
 
     A flattened view is worth saying out loud: the reader has just lost
@@ -390,9 +394,12 @@ def _sort_line(state: BrowseState, browse: BrowseServiceProtocol) -> str:
     is one key they cannot see from the rows alone. A live query says so
     instead: while one is up it is the thing deciding what is on screen,
     and escape is the way out of it.
+
+    The rows counted are the ones just drawn: projecting them again would
+    rescan every occurrence of every metric, once per keystroke typed.
     """
     if state.query:
-        found = sum(1 for row in browse.rows(state) if row.kind is RowKind.METRIC)
+        found = sum(1 for row in rows if row.kind is RowKind.METRIC)
         matched = f"{found} metric{'' if found == 1 else 's'}"
         return f"search: {state.query!r} — {matched} — esc to leave"
     if not state.sort:

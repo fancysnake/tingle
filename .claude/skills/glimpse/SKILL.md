@@ -280,8 +280,9 @@ demand it.
 Concrete thresholds — none is a hard line, all are "watch for this":
 
 - **A layer becomes a package when it earns it.** Promote `mills.py` → `mills/`
-  on any one of: it crosses ~1000 lines, two unrelated concerns in it cause
-  merge friction, or a second noun genuinely exists. Not before. `inits` is a
+  when a second noun genuinely exists, or when two unrelated concerns in it
+  cause merge friction. Not on size alone: crossing ~1000 lines is worth a
+  look, but one long tightly coupled module is still one noun. `inits` is a
   convenience call either way — it stays thin whatever it holds.
 - **~1000 lines per file** — split a file when it crosses this and the two
   halves are unrelated enough that they cause merge friction. A 1500-line file
@@ -329,7 +330,9 @@ hatches, not invitations.
    injecting it is idiomatic. ISP at the service boundary: declare the
    two-or-three protocols actually used.
 4. **Mills have no side-effect imports.** Only protocols and DTOs from pacts,
-   constants from specs, pure helpers from anywhere (see **Layers**).
+   constants from specs, and pure helpers from the layers below — never from
+   `links`, `gates` or `inits`, which would reverse the dependency whether the
+   helper is pure or not (see **Layers**, and let `importlinter` enforce it).
 5. **Writes use TypedDicts.** DTOs for reads, TypedDicts for writes — gates →
    mills as input, mills → links as what repo write methods accept
    (`create(data: CreateProposalDict) -> ProposalDTO`; a `CreateXDict` has no

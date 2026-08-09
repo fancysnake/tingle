@@ -62,18 +62,24 @@ def test_slash_opens_the_search_box_and_puts_the_cursor_in_it() -> None:
 
 
 def test_every_bare_letter_the_app_binds_reaches_the_search_box_as_text() -> None:
-    """The whole binding risk in one test: f folds, q quits, 0 and V sort."""
+    """The whole binding risk in one test: every key the app claims, typed.
+
+    The five sorts, their shifted twins, fold-all, reset, quit and the two
+    table aliases -- if any of them reached its binding instead of the box,
+    the query would come out short.
+    """
+    bound = "fq0gntvcGNTVCjk"
 
     async def scenario() -> None:
         app = metrics_app(SEARCHABLE)
         async with app.run_test() as pilot:
             await pilot.press("/")
 
-            await pilot.press("f", "q", "0", "V", "g", "n", "t", "c", "j", "k")
+            await pilot.press(*bound)
 
-            assert search_box(app).value == "fq0Vgntcjk"
+            assert search_box(app).value == bound
             assert app.is_running  # q did not quit
-            assert status(app).startswith("search:")  # 0 and V did not sort
+            assert status(app).startswith("search:")  # 0 and the sorts did not sort
 
     asyncio.run(scenario())
 

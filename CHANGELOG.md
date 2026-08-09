@@ -40,6 +40,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TUI: folding a metric now hides its description, which the accordion kept
   visible at rest. Descriptions became rows so they could live somewhere the
   table has room for.
+- A file is called binary on a NUL in its first 8,000 bytes, which is the
+  window git's own differ uses; it was 8,192.
+- An untracked file that is not UTF-8 now counts as fully added, the way git
+  would diff it. Whether a metric may read it is unchanged and still decided
+  when the metric runs.
+
+### Fixed
+
+- TUI: the ▲/▼ on the sorted column was cut off whenever that column's
+  values were narrower than its heading, which was every report with short
+  numbers in the value column.
+- TUI: opening a hit no longer blocks the table while the editor is being
+  handed the file, and an editor that will not open it says so in a
+  notification instead of ending the session.
 
 ### Removed
 

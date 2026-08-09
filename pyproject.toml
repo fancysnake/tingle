@@ -151,9 +151,8 @@ warn_unreachable = false
 
 [tool.vulture]
 # textual calls these by name, so no call site is visible: compose and on_*
-# are lifecycle hooks and action_* are keybinding targets. sort_key is
-# exercised by the tests, which vulture is not pointed at.
-ignore_names = ["compose", "on_*", "action_*", "sub_title", "sort_key"]
+# are lifecycle hooks and action_* are keybinding targets.
+ignore_names = ["compose", "on_*", "action_*", "sub_title"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

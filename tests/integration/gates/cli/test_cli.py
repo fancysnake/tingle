@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from importlib import metadata
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+from textual_support import column
 from typer.testing import CliRunner
 
 from tingle.gates.cli import typer as typer_gate
@@ -215,11 +217,30 @@ def test_a_terminal_gets_the_interactive_table(interactive: list[MetricsApp]) ->
 
 @pytest.mark.usefixtures("repo")
 def test_a_terminal_asking_for_a_diff_gets_one(interactive: list[MetricsApp]) -> None:
+    """What the app was handed, not merely that it was handed something.
+
+    A regression collecting a whole-tree run here would build a
+    `MetricsApp` all the same, so the table is read for the one thing
+    only a branch report can say: what the branch moved.
+    """
     result = runner.invoke(app, ["--diff"])
 
     assert result.exit_code == 0
     assert len(interactive) == 1
     assert "lint-escapes" not in result.output
+    assert all("net " in cell for cell in _drawn_values(interactive[0]))
+
+
+def _drawn_values(built: MetricsApp) -> list[str]:
+    """Run the app the gate built, and read its value column."""
+
+    async def scenario() -> list[str]:
+        async with built.run_test():
+            return column(built, 2)
+
+    values = asyncio.run(scenario())
+    assert values, "the app drew no rows to read"
+    return values
 
 
 @pytest.mark.usefixtures("project")
