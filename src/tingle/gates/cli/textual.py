@@ -159,7 +159,7 @@ class MetricsApp(App[None]):
         self._report = report
         self._opener = opener
         self._browse = browse
-        self._state = browse.fold_quiet_groups(_loaded(report, browse))
+        self._state = browse.fold_quiet_groups(browse.start(report.outcomes))
         self._rows: tuple[Row, ...] = ()
 
     def compose(self) -> ComposeResult:
@@ -201,7 +201,9 @@ class MetricsApp(App[None]):
         if row.kind is RowKind.OCCURRENCE:
             self._open(row)
         elif row.folded is not None:
-            self._state = self._browse.toggle_fold(self._state, row.key)
+            self._state = self._browse.set_fold(
+                self._state, row.key, folded=not row.folded
+            )
             self._draw(land_on=row.key)
 
     def action_sort(self, key: str) -> None:
@@ -308,17 +310,14 @@ class MetricsApp(App[None]):
             return None
         if row.folded is not None:
             return row
-        if row.entry is not None:
-            return self._row(self._browse.metric_key(row.entry.spec.name))
-        return None  # pragma: no cover - every row carries a fold state or an entry
+        return self._row(row.parent) if row.parent is not None else None
 
     def _enclosing_key(self) -> str | None:
         """Find the top-level row holding the cursor: where fold-all leaves it."""
-        if (row := self._current()) is None or row.entry is None:
-            return self._cursor_key()
-        if any(other.kind is RowKind.GROUP for other in self._rows):
-            return self._browse.group_key(row.entry.spec.group)
-        return self._browse.metric_key(row.entry.spec.name)
+        row = self._current()
+        while row is not None and row.parent is not None:
+            row = self._row(row.parent)
+        return row.key if row is not None else None
 
     def _row(self, key: str) -> Row | None:
         return next((row for row in self._rows if row.key == key), None)
@@ -333,16 +332,6 @@ class MetricsApp(App[None]):
         self._opener.open(
             str(self._report.root / row.occurrence.path), row.occurrence.line
         )
-
-
-def _loaded(
-    report: RunReport | DiffReport, browse: BrowseServiceProtocol
-) -> BrowseState:
-    """Take a finished report into a browsing session, outcome by outcome."""
-    state = browse.start(tuple(outcome.spec for outcome in report.outcomes))
-    for outcome in report.outcomes:
-        state = browse.record(state, outcome)
-    return state
 
 
 def _mark_sorted_header(table: BrowseTable, state: BrowseState) -> None:

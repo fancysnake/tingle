@@ -1,6 +1,6 @@
-"""Browsing a run: what is visible, in what order, as results arrive.
+"""Browsing a finished run: what is visible, and in what order.
 
-One question is answered here -- given the outcomes so far, the sort
+One question is answered here -- given a report's outcomes, the sort
 stack, the search query and the fold set, which rows should be drawn --
 so that the interactive gate holds no view logic of its own and can be
 tested without a terminal.
@@ -15,30 +15,16 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
-from tingle.mills.display import group_summary, severity_emoji, severity_ratio
-from tingle.pacts.browse import (
-    BrowseState,
-    MetricEntry,
-    MetricStatus,
-    Row,
-    RowKind,
-    Sort,
-    SortKey,
-)
+from tingle.mills.display import group_summary, severity_ratio
+from tingle.pacts.browse import BrowseState, Row, RowKind, Sort, SortKey
 from tingle.pacts.diff import DiffOutcome
+from tingle.pacts.report import ERROR_STAT, UNGROUPED
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
-    from tingle.pacts.config import MetricSpec
     from tingle.pacts.metrics import Occurrence
     from tingle.pacts.report import GroupSummary, MetricOutcome
-
-#: What the section holding metrics with no group of their own is called.
-UNGROUPED = "(ungrouped)"
-
-#: Shown in the value column of a metric that could not be measured.
-ERROR_STAT = "ERROR"
 
 
 def metric_key(name: str) -> str:
@@ -51,29 +37,15 @@ def group_key(name: str | None) -> str:
     return f"group:{name or ''}"
 
 
-def start(specs: Sequence[MetricSpec]) -> BrowseState:
-    """Open a session over `specs`: every metric folded, none measured yet.
+def start(outcomes: Sequence[MetricOutcome | DiffOutcome]) -> BrowseState:
+    """Open a session over a finished report: every metric folded.
 
     Metrics start folded and groups start open, so the listing opens as an
     outline of what was measured rather than as every located hit at once.
     """
     return BrowseState(
-        entries=tuple(MetricEntry(spec=spec) for spec in specs),
-        folded=frozenset(metric_key(spec.name) for spec in specs),
-    )
-
-
-def record(state: BrowseState, outcome: MetricOutcome | DiffOutcome) -> BrowseState:
-    """Take one measured metric into the state.
-
-    An outcome carrying no result is an error, and says so on its row;
-    the run itself carries on, as it does everywhere else.
-    """
-    status = MetricStatus.DONE if outcome.result is not None else MetricStatus.ERROR
-    return _replace_entry(
-        state,
-        outcome.spec.name,
-        change=lambda entry: replace(entry, status=status, outcome=outcome),
+        outcomes=tuple(outcomes),
+        folded=frozenset(metric_key(outcome.spec.name) for outcome in outcomes),
     )
 
 
@@ -112,11 +84,11 @@ def outlined(state: BrowseState) -> bool:
 def grouped(state: BrowseState) -> bool:
     """Whether the run has groups at all, whatever the view is doing to them.
 
-    Read off the config rather than the visible rows, so a search that
-    spared only ungrouped metrics -- or a sort that flattened the
-    outline -- does not make a grouped run look like a flat one.
+    Read off every outcome the session holds rather than the visible
+    rows, so a search that spared only ungrouped metrics -- or a sort
+    that flattened the outline -- does not make a grouped run look flat.
     """
-    return any(entry.spec.group is not None for entry in state.entries)
+    return any(outcome.spec.group is not None for outcome in state.outcomes)
 
 
 def set_query(state: BrowseState, query: str) -> BrowseState:
@@ -131,23 +103,12 @@ def set_query(state: BrowseState, query: str) -> BrowseState:
     return replace(state, query=query)
 
 
-def is_folded(state: BrowseState, key: str) -> bool:
-    """Whether the row `key` is folded as things currently stand.
-
-    Outside a search this is just the fold set. Inside one, a search may
-    reveal a row to show what it found, and an explicit fold beats that
-    reveal -- an outright gesture outranks something the query did on the
-    reader's behalf.
-
-    This answers one key at a time and derives the search matches to do
-    it, so a renderer drawing a listing should read `Row.folded`, which
-    `rows` has already resolved for every row in a single pass.
-    """
-    return _folded(state, key, revealed=_revealed(state, key))
-
-
 def set_fold(state: BrowseState, key: str, *, folded: bool) -> BrowseState:
     """Fold or unfold one row.
+
+    Whether a row is folded is answered by `rows`, which resolves it for
+    every row in one pass; a caller acting on a row already holds that
+    answer as `Row.folded` and passes back the other one.
 
     During a search the gesture is recorded apart from the fold set, so
     that leaving the search leaves the outline untouched.
@@ -159,21 +120,12 @@ def set_fold(state: BrowseState, key: str, *, folded: bool) -> BrowseState:
     return replace(state, folded=state.folded - {key})
 
 
-def toggle_fold(state: BrowseState, key: str) -> BrowseState:
-    """Fold an unfolded row, unfold a folded one."""
-    return set_fold(state, key, folded=not is_folded(state, key))
-
-
 def toggle_fold_all(state: BrowseState) -> BrowseState:
     """Fold every group at once, or unfold them all once none is unfolded.
 
     A run with no groups anywhere has metric rows at the top level, so
     there the metrics fold instead -- whatever the outline's top row is,
     that is what this collapses the listing to.
-
-    The rows are read for their fold state rather than asked for it again:
-    `is_folded` re-derives the search matches on every call, so resolving
-    one key at a time would rescan every occurrence once per top row.
     """
     if not (top := _fold_all_rows(state)):
         return state
@@ -191,9 +143,9 @@ def fold_quiet_groups(state: BrowseState) -> BrowseState:
     did have something to report. A group holding an error is never
     quiet -- that is the one thing the reader most needs to see.
 
-    This reads the outcomes rather than the config, so it belongs to
-    presenting a report and not to opening a session: `start` knows the
-    metrics but not yet what any of them found.
+    A gesture rather than part of opening a session: a reader who folds
+    everything away and then unfolds it should get their outline back,
+    not this one.
     """
     quiet = frozenset(
         group_key(name)
@@ -229,7 +181,7 @@ class _Match:
     gives no reason for being there.
     """
 
-    entry: MetricEntry
+    outcome: MetricOutcome | DiffOutcome
     occurrences: tuple[Occurrence, ...]
     revealed: bool
 
@@ -245,32 +197,32 @@ def _matches(state: BrowseState) -> tuple[_Match, ...]:
     """
     if not state.query:
         return tuple(
-            _Match(entry, _occurrences(entry), revealed=False)
-            for entry in state.entries
+            _Match(outcome, _occurrences(outcome), revealed=False)
+            for outcome in state.outcomes
         )
     matches: list[_Match] = []
-    for entry in state.entries:
-        occurrences = _occurrences(entry)
-        if _titled(entry, state.query):
-            matches.append(_Match(entry, occurrences, revealed=False))
-        elif _described(entry, state.query):
-            matches.append(_Match(entry, occurrences, revealed=True))
+    for outcome in state.outcomes:
+        occurrences = _occurrences(outcome)
+        if _titled(outcome, state.query):
+            matches.append(_Match(outcome, occurrences, revealed=False))
+        elif _described(outcome, state.query):
+            matches.append(_Match(outcome, occurrences, revealed=True))
         elif hits := tuple(o for o in occurrences if state.query in o.path):
-            matches.append(_Match(entry, hits, revealed=True))
+            matches.append(_Match(outcome, hits, revealed=True))
     return tuple(matches)
 
 
-def _titled(entry: MetricEntry, query: str) -> bool:
+def _titled(outcome: MetricOutcome | DiffOutcome, query: str) -> bool:
     """Whether the query matched text the metric's own row already shows.
 
     Its name and its group's are on screen the moment the metric is, so
     the row carries its own reason for being there and is left exactly as
     the reader had it.
     """
-    return query in entry.spec.name or query in (entry.spec.group or "")
+    return query in outcome.spec.name or query in (outcome.spec.group or "")
 
 
-def _described(entry: MetricEntry, query: str) -> bool:
+def _described(outcome: MetricOutcome | DiffOutcome, query: str) -> bool:
     """Whether the query matched what the metric says in its detail rows.
 
     A description or a range name is as much the metric's own word as its
@@ -279,26 +231,13 @@ def _described(entry: MetricEntry, query: str) -> bool:
     give the reader a row with no visible reason for being there -- the
     very thing revealing a matched file avoids.
     """
-    described = (entry.spec.description or "", *_range_names(entry))
+    described = (outcome.spec.description or "", *outcome.range_names)
     return any(query in text for text in described)
 
 
-def _range_names(entry: MetricEntry) -> tuple[str, ...]:
-    """Name the ranges a metric covers, as resolved once it has been measured.
-
-    Before that only what the config named is known, which is nothing at
-    all for a metric that leaves the default range implied -- so the
-    default range becomes searchable when the metric's outcome lands.
-    """
-    if entry.outcome is not None:
-        return entry.outcome.range_names
-    return entry.spec.ranges
-
-
-def _occurrences(entry: MetricEntry) -> tuple[Occurrence, ...]:
+def _occurrences(outcome: MetricOutcome | DiffOutcome) -> tuple[Occurrence, ...]:
     """Every hit a measured metric located; a diff's additions, then removals."""
-    outcome = entry.outcome
-    if outcome is None or outcome.result is None:
+    if outcome.result is None:
         return ()
     if isinstance(outcome, DiffOutcome):
         return (*outcome.result.added_occurrences, *outcome.result.removed_occurrences)
@@ -309,7 +248,7 @@ def _outline_rows(state: BrowseState, matches: tuple[_Match, ...]) -> Iterable[R
     """Group headers with their metrics, and their metrics' hits, nested."""
     has_groups = grouped(state)
     for name, section in _sections(matches, state.sort):
-        depth = 0
+        depth, parent = 0, None
         if has_groups:
             key = group_key(name)
             # a search reveals every group holding something it found, or
@@ -318,9 +257,9 @@ def _outline_rows(state: BrowseState, matches: tuple[_Match, ...]) -> Iterable[R
             yield _group_row(name, section, key=key, folded=folded)
             if folded:
                 continue
-            depth = 1
+            depth, parent = 1, key
         for match in section:
-            yield from _metric_rows(state, match, depth=depth)
+            yield from _metric_rows(state, match, depth=depth, parent=parent)
 
 
 def _sections(
@@ -336,7 +275,7 @@ def _sections(
     """
     sections: dict[str | None, list[_Match]] = {}
     for match in matches:
-        sections.setdefault(match.entry.spec.group, []).append(match)
+        sections.setdefault(match.outcome.spec.group, []).append(match)
     ungrouped = sections.pop(None, None)
     ordered: list[tuple[str | None, list[_Match]]] = list(sections.items())
     if sort and sort[0].key is SortKey.GROUP:
@@ -356,7 +295,7 @@ def _sorted(matches: Iterable[_Match], sort: tuple[Sort, ...]) -> list[_Match]:
     """
     if not sort:
         return list(matches)
-    ordered = sorted(matches, key=lambda match: match.entry.spec.name)
+    ordered = sorted(matches, key=lambda match: match.outcome.spec.name)
     for step in reversed(sort):
         ordered = _sorted_by(ordered, step)
     return ordered
@@ -365,75 +304,45 @@ def _sorted(matches: Iterable[_Match], sort: tuple[Sort, ...]) -> list[_Match]:
 def _sorted_by(matches: list[_Match], step: Sort) -> list[_Match]:
     """Sort by one key, leaving what that key cannot place at the end.
 
-    Nothing measured yet, a metric that failed, a metric in no group at
-    all: these have no position under the key being applied. They go last
-    whichever way the sort runs, rather than counting as zero -- which
-    under `value` would rank them debt-free, and under a reversed `value`
-    would put them first.
+    A metric that failed, or one in no group at all, has no position
+    under the key being applied -- which is what its sorter returning
+    None means. Those go last whichever way the sort runs, rather than
+    counting as zero, which under `value` would rank them debt-free and
+    under a reversed `value` would put them first.
     """
-    placeable = _PLACEABLE[step.key]
-    placed = [match for match in matches if placeable(match)]
-    unplaced = [match for match in matches if not placeable(match)]
-    placed.sort(key=_SORTERS[step.key], reverse=step.descending)
+    sorter = _SORTERS[step.key]
+    placed = [match for match in matches if sorter(match) is not None]
+    unplaced = [match for match in matches if sorter(match) is None]
+    placed.sort(key=sorter, reverse=step.descending)
     return [*placed, *unplaced]
 
 
-def _group_sort(match: _Match) -> str:
-    return match.entry.spec.group or ""
-
-
-def _name_sort(match: _Match) -> str:
-    return match.entry.spec.name
-
-
-def _type_sort(match: _Match) -> str:
-    return match.entry.spec.type
-
-
-def _value_sort(match: _Match) -> float:
-    return float(_value(match.entry) or 0)
-
-
-def _score_sort(match: _Match) -> float:
-    return _score(match.entry) or 0.0
-
-
+#: What each key sorts a metric by, or None where it cannot place it.
 _SORTERS: dict[SortKey, Callable[[_Match], Any]] = {
-    SortKey.GROUP: _group_sort,
-    SortKey.NAME: _name_sort,
-    SortKey.TYPE: _type_sort,
-    SortKey.VALUE: _value_sort,
-    SortKey.SCORE: _score_sort,
-}
-
-#: Whether a key has anywhere to put a metric at all -- see `_sorted_by`.
-_PLACEABLE: dict[SortKey, Callable[[_Match], bool]] = {
-    SortKey.GROUP: lambda match: match.entry.spec.group is not None,
-    SortKey.NAME: lambda _: True,
-    SortKey.TYPE: lambda _: True,
-    SortKey.VALUE: lambda match: _value(match.entry) is not None,
-    SortKey.SCORE: lambda match: _score(match.entry) is not None,
+    SortKey.GROUP: lambda match: match.outcome.spec.group,
+    SortKey.NAME: lambda match: match.outcome.spec.name,
+    SortKey.TYPE: lambda match: match.outcome.spec.type,
+    SortKey.VALUE: lambda match: _value(match.outcome),
+    SortKey.SCORE: lambda match: _score(match.outcome),
 }
 
 
-def _value(entry: MetricEntry) -> int | None:
-    """Return the number a metric measured, or None while it has none.
+def _value(outcome: MetricOutcome | DiffOutcome) -> int | None:
+    """Return the number a metric measured, or None if it measured none.
 
     A diff's number is its standing total, not its net: a branch that
     moved nothing still sits on whatever debt was already there.
     """
-    if (outcome := entry.outcome) is None:
-        return None
     if isinstance(outcome, DiffOutcome):
         return outcome.total.value if outcome.total is not None else None
     return outcome.result.value if outcome.result is not None else None
 
 
-def _score(entry: MetricEntry) -> float | None:
+def _score(outcome: MetricOutcome | DiffOutcome) -> float | None:
     """How bad a metric's value is against its own guide, or None."""
-    if (value := _value(entry)) is None or entry.outcome is None:
+    if (value := _value(outcome)) is None:
         return None
-    return severity_ratio(value, entry.outcome.guide)
+    return severity_ratio(value, outcome.guide)
 
 
 def _group_row(
@@ -445,24 +354,23 @@ def _group_row(
     a partial sum says more than a blank, and blanking it until the last
     metric lands would leave the header saying nothing for the whole run.
     """
-    summary = _section_summary(section)
     return Row(
         kind=RowKind.GROUP,
         key=key,
         depth=0,
-        cells=_group_cells(name, summary),
+        cells=_group_cells(name, _section_summary(section)),
         folded=folded,
-        summary=summary,
     )
 
 
 def _section_summary(section: Sequence[_Match]) -> GroupSummary:
-    """Add up what a group's measured metrics say; the unmeasured add nothing."""
-    return group_summary(
-        tuple(
-            match.entry.outcome for match in section if match.entry.outcome is not None
-        )
-    )
+    """Add up what a group's metrics say -- the ones a query left, at that.
+
+    Under a live query a group header totals only the metrics the query
+    matched, which is the one place a section's sum is deliberately not
+    the report's: it says what is on screen.
+    """
+    return group_summary(tuple(match.outcome for match in section))
 
 
 def _quiet(summary: GroupSummary) -> bool:
@@ -474,23 +382,26 @@ def _quiet(summary: GroupSummary) -> bool:
     return summary.value == 0
 
 
-def _metric_rows(state: BrowseState, match: _Match, *, depth: int) -> Iterable[Row]:
+def _metric_rows(
+    state: BrowseState, match: _Match, *, depth: int, parent: str | None
+) -> Iterable[Row]:
     """Draw a metric, then what it says about itself and what it found.
 
     The detail lines come before the hits: what a metric measures reads
     as an introduction to the list, not a footnote after it.
     """
-    row = _metric_row(state, match, depth=depth, foldable=True)
+    row = _metric_row(state, match, depth=depth, foldable=True, parent=parent)
     yield row
     if row.folded is not False:
         return
-    for index, text in enumerate(_details(match.entry)):
+    for index, text in enumerate(_details(match.outcome)):
         yield Row(
             kind=RowKind.DETAIL,
             key=f"{row.key}/detail/{index}",
             depth=depth + 1,
             cells=(text, "", ""),
-            entry=match.entry,
+            parent=row.key,
+            outcome=match.outcome,
         )
     for index, occurrence in enumerate(match.occurrences):
         yield Row(
@@ -498,33 +409,39 @@ def _metric_rows(state: BrowseState, match: _Match, *, depth: int) -> Iterable[R
             key=f"{row.key}/{index}",
             depth=depth + 1,
             cells=(str(occurrence), "", ""),
-            entry=match.entry,
+            parent=row.key,
+            outcome=match.outcome,
             occurrence=occurrence,
         )
 
 
-def _details(entry: MetricEntry) -> tuple[str, ...]:
+def _details(outcome: MetricOutcome | DiffOutcome) -> tuple[str, ...]:
     """Gather what a metric says about itself: what, where, and why not.
 
     A metric that failed says so here rather than leaving the reader with
     an ERROR in the value column and nowhere to find out what happened.
     """
     lines = []
-    if (description := entry.spec.description) is not None:
+    if (description := outcome.spec.description) is not None:
         lines.append(description)
-    if names := _range_names(entry):
+    if names := outcome.range_names:
         lines.append(f"ranges: {', '.join(names)}")
-    if (outcome := entry.outcome) is not None and outcome.error is not None:
+    if outcome.error is not None:
         lines.append(outcome.error)
     return tuple(lines)
 
 
 def _metric_row(
-    state: BrowseState, match: _Match, *, depth: int, foldable: bool
+    state: BrowseState,
+    match: _Match,
+    *,
+    depth: int,
+    foldable: bool,
+    parent: str | None = None,
 ) -> Row:
     """One metric's own row. Nothing to fold means no fold state at all."""
-    key = metric_key(match.entry.spec.name)
-    has_body = bool(match.occurrences) or bool(_details(match.entry))
+    key = metric_key(match.outcome.spec.name)
+    has_body = bool(match.occurrences) or bool(_details(match.outcome))
     folded = (
         _folded(state, key, revealed=match.revealed) if foldable and has_body else None
     )
@@ -532,34 +449,37 @@ def _metric_row(
         kind=RowKind.METRIC,
         key=key,
         depth=depth,
-        cells=_metric_cells(match.entry),
+        cells=_metric_cells(match.outcome),
         folded=folded,
-        entry=match.entry,
+        parent=parent,
+        outcome=match.outcome,
     )
 
 
 def _group_cells(name: str | None, summary: GroupSummary) -> tuple[str, str, str]:
     label = name if name is not None else UNGROUPED
-    stat = _valued(summary.value, summary.guide)
+    stat = f"{summary.emoji} {summary.value}"
     if summary.net is not None:
         stat = f"net {summary.net:+d} of {stat}"
     return (label, "", stat)
 
 
-def _metric_cells(entry: MetricEntry) -> tuple[str, str, str]:
-    return (entry.spec.name, entry.spec.type, _stat(entry))
+def _metric_cells(outcome: MetricOutcome | DiffOutcome) -> tuple[str, str, str]:
+    return (outcome.spec.name, outcome.spec.type, _stat(outcome))
 
 
-def _stat(entry: MetricEntry) -> str:
-    """Fill the value column: blank until an outcome lands, then its number."""
-    if entry.status is MetricStatus.PENDING:
-        return ""
-    outcome = entry.outcome
-    if outcome is None or outcome.result is None:
+def _stat(outcome: MetricOutcome | DiffOutcome) -> str:
+    """Fill the value column with the number, led by the rank it earned.
+
+    The rank is the one the mill decided when it resolved the guide, not
+    a second opinion worked out here: two ladders that must agree are a
+    drift waiting to happen, and this is the view that would win it.
+    """
+    if outcome.result is None:
         return ERROR_STAT
     if isinstance(outcome, DiffOutcome):
         return _diff_stat(outcome)
-    return _valued(outcome.result.value, outcome.guide)
+    return f"{outcome.emoji} {outcome.result.value}"
 
 
 def _diff_stat(outcome: DiffOutcome) -> str:
@@ -569,14 +489,10 @@ def _diff_stat(outcome: DiffOutcome) -> str:
     net = f"net {result.net:+d}"
     if outcome.total is None:
         return f"{net} of ?"
-    standing = f"{net} of {_valued(outcome.total.value, outcome.guide)}"
+    standing = f"{net} of {outcome.emoji} {outcome.total.value}"
     if result.added is None or result.removed is None:
         return standing
     return f"+{result.added} / -{result.removed} ({standing})"
-
-
-def _valued(value: int, guide: int) -> str:
-    return f"{severity_emoji(value, guide)} {value}"
 
 
 def _folded(state: BrowseState, key: str, *, revealed: bool) -> bool:
@@ -588,18 +504,6 @@ def _folded(state: BrowseState, key: str, *, revealed: bool) -> bool:
     return not revealed and key in state.folded
 
 
-def _revealed(state: BrowseState, key: str) -> bool:
-    """Whether the current query is holding this row open."""
-    if not state.query:
-        return False
-    matches = _matches(state)
-    if any(group_key(match.entry.spec.group) == key for match in matches):
-        return True
-    return any(
-        metric_key(match.entry.spec.name) == key and match.revealed for match in matches
-    )
-
-
 def _fold_all_rows(state: BrowseState) -> list[Row]:
     """Find the rows `fold all` acts on: the groups, or the metrics if none."""
     rendered = rows(state)
@@ -608,16 +512,3 @@ def _fold_all_rows(state: BrowseState) -> list[Row]:
     return [
         row for row in rendered if row.kind is RowKind.METRIC and row.folded is not None
     ]
-
-
-def _replace_entry(
-    state: BrowseState, name: str, *, change: Callable[[MetricEntry], MetricEntry]
-) -> BrowseState:
-    """Apply `change` to the entry called `name`, leaving the rest alone."""
-    return replace(
-        state,
-        entries=tuple(
-            change(entry) if entry.spec.name == name else entry
-            for entry in state.entries
-        ),
-    )

@@ -1,7 +1,7 @@
 """Contracts for browsing a run interactively: rows, sorting, state.
 
 The interactive gate draws whatever `mills.browse` says is visible, so
-the state of a browsing session -- what has been measured, what is
+the state of a browsing session -- which outcomes it is over, what is
 folded, what is sorted, what is being searched for -- is a contract, not
 a widget tree. Nothing here knows a terminal exists.
 """
@@ -15,23 +15,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from tingle.pacts.config import MetricSpec
     from tingle.pacts.diff import DiffOutcome
     from tingle.pacts.metrics import Occurrence
-    from tingle.pacts.report import GroupSummary, MetricOutcome
-
-
-class MetricStatus(StrEnum):
-    """Whether a configured metric has a result, and why not if it has none.
-
-    PENDING is the state a metric is in between being read out of the
-    config and having its outcome taken in; a session built from a report
-    passes through it rather than resting there.
-    """
-
-    PENDING = "pending"
-    DONE = "done"
-    ERROR = "error"
+    from tingle.pacts.report import MetricOutcome
 
 
 class SortKey(StrEnum):
@@ -82,19 +68,6 @@ class Sort:
 
 
 @dataclass(frozen=True)
-class MetricEntry:
-    """One configured metric and everything known about it so far.
-
-    `outcome` is None until the metric has been measured; `status` says
-    whether that is because it has not started, is running, or failed.
-    """
-
-    spec: MetricSpec
-    status: MetricStatus = MetricStatus.PENDING
-    outcome: MetricOutcome | DiffOutcome | None = None
-
-
-@dataclass(frozen=True)
 class Row:
     """One line of the browser, ready to be drawn.
 
@@ -108,7 +81,11 @@ class Row:
     detail, or a metric with nothing under it -- which is not the same as
     False.
 
-    `entry` and `occurrence` carry what the row was made from, so a
+    `parent` is the key of the row this one folds into, None at the top
+    level, so a renderer acting on a row can find what encloses it
+    without knowing how a key is spelled.
+
+    `outcome` and `occurrence` carry what the row was made from, so a
     renderer can act on a row (open a hit in the editor, colour a diff)
     without parsing its text back apart.
     """
@@ -118,9 +95,9 @@ class Row:
     depth: int
     cells: tuple[str, str, str]
     folded: bool | None = None
-    entry: MetricEntry | None = None
+    parent: str | None = None
+    outcome: MetricOutcome | DiffOutcome | None = None
     occurrence: Occurrence | None = None
-    summary: GroupSummary | None = None
 
 
 @dataclass(frozen=True)
@@ -138,7 +115,7 @@ class BrowseState:
     are kept apart from `folded` and dropped when the query is cleared.
     """
 
-    entries: tuple[MetricEntry, ...] = ()
+    outcomes: tuple[MetricOutcome | DiffOutcome, ...] = ()
     sort: tuple[Sort, ...] = ()
     folded: frozenset[str] = frozenset()
     query: str = ""

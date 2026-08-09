@@ -14,6 +14,14 @@ if TYPE_CHECKING:
     from tingle.pacts.diff import DiffOutcome
     from tingle.pacts.metrics import MetricResult
 
+#: What the section holding the metrics with no group of their own is
+#: called. The static table and the interactive one both name it, and a
+#: word two views must agree on is a contract rather than either's own.
+UNGROUPED = "(ungrouped)"
+
+#: Shown in place of the value of a metric that could not be measured.
+ERROR_STAT = "ERROR"
+
 
 @dataclass(frozen=True)
 class MetricOutcome:

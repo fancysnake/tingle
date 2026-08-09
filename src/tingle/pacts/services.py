@@ -76,26 +76,14 @@ class BrowseServiceProtocol(Protocol):
     """
 
     @abstractmethod
-    def start(self, specs: Sequence[MetricSpec]) -> BrowseState:
-        """Open a session over `specs`, before anything has been measured."""
-
-    @abstractmethod
-    def record(
-        self, state: BrowseState, outcome: MetricOutcome | DiffOutcome
+    def start(
+        self, outcomes: Sequence[MetricOutcome | DiffOutcome]
     ) -> BrowseState:
-        """Take one measured metric into the state."""
+        """Open a session over the outcomes of a finished report."""
 
     @abstractmethod
     def rows(self, state: BrowseState) -> tuple[Row, ...]:
         """Every row that should be drawn, in the order it should be drawn."""
-
-    @abstractmethod
-    def metric_key(self, name: str) -> str:
-        """Identify a metric row."""
-
-    @abstractmethod
-    def group_key(self, name: str | None) -> str:
-        """Identify a group row; `None` is the ungrouped section."""
 
     @abstractmethod
     def outlined(self, state: BrowseState) -> bool:
@@ -118,10 +106,6 @@ class BrowseServiceProtocol(Protocol):
     @abstractmethod
     def set_fold(self, state: BrowseState, key: str, *, folded: bool) -> BrowseState:
         """Fold or unfold one row."""
-
-    @abstractmethod
-    def toggle_fold(self, state: BrowseState, key: str) -> BrowseState:
-        """Fold an unfolded row, unfold a folded one."""
 
     @abstractmethod
     def toggle_fold_all(self, state: BrowseState) -> BrowseState:

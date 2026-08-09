@@ -1,61 +1,65 @@
 from __future__ import annotations
 
 from tingle.mills.browse import (
-    UNGROUPED,
     clear_sort,
     fold_quiet_groups,
     group_key,
     grouped,
-    is_folded,
     metric_key,
     outlined,
     push_sort,
-    record,
     rows,
     set_fold,
     set_query,
     start,
-    toggle_fold,
     toggle_fold_all,
 )
-from tingle.pacts.browse import BrowseState, MetricStatus, RowKind, Sort, SortKey
+from tingle.mills.display import outcome_emoji
+from tingle.pacts.browse import BrowseState, RowKind, Sort, SortKey
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
-from tingle.pacts.report import MetricOutcome
+from tingle.pacts.report import UNGROUPED, MetricOutcome
 
 NOQA = MetricSpec(name="noqa-comment", type="regex_count", group="linting")
 PYLINT = MetricSpec(name="pylint-comment", type="regex_count", group="linting")
 LOC = MetricSpec(name="loc", type="file_lines", group="size")
 LEGACY = MetricSpec(name="legacy-arch", type="symbol_uses")
 
-SPECS = (NOQA, PYLINT, LOC, LEGACY)
-
 
 def _outcome(
     spec: MetricSpec, value: int, *, guide: int = 100, paths: tuple[str, ...] = ()
 ) -> MetricOutcome:
+    result = MetricResult(
+        value=value,
+        occurrences=tuple(Occurrence(path=path, line=1) for path in paths),
+    )
     return MetricOutcome(
         spec=spec,
         range_names=("src",),
-        emoji="",
-        result=MetricResult(
-            value=value,
-            occurrences=tuple(Occurrence(path=path, line=1) for path in paths),
-        ),
+        emoji=outcome_emoji(result, guide),
+        result=result,
         guide=guide,
     )
 
 
-def _measured() -> BrowseState:
-    """Finish a run over SPECS: the fixture most tests start from."""
-    state = start(SPECS)
-    state = record(state, _outcome(NOQA, 0))
-    state = record(
-        state, _outcome(PYLINT, 4, paths=("src/mills/runner.py", "src/mills/diff.py"))
+def _failed(spec: MetricSpec, *, ranges: tuple[str, ...] = ()) -> MetricOutcome:
+    """One metric that raised: no result, and so nothing ranked."""
+    return MetricOutcome(
+        spec=spec, range_names=ranges, emoji="", error="ValueError: boom"
     )
-    state = record(state, _outcome(LOC, 900, guide=2000))
-    return record(state, _outcome(LEGACY, 7, paths=("src/views.py",)))
+
+
+def _measured() -> BrowseState:
+    """A finished run over four metrics: the fixture most tests start from."""
+    return start(
+        (
+            _outcome(NOQA, 0),
+            _outcome(PYLINT, 4, paths=("src/mills/runner.py", "src/mills/diff.py")),
+            _outcome(LOC, 900, guide=2000),
+            _outcome(LEGACY, 7, paths=("src/views.py",)),
+        )
+    )
 
 
 def _labels(state: BrowseState) -> list[str]:
@@ -66,16 +70,24 @@ def _metric_names(state: BrowseState) -> list[str]:
     return [row.cells[0] for row in rows(state) if row.kind is RowKind.METRIC]
 
 
-def test_a_fresh_session_lists_every_configured_metric_as_pending() -> None:
-    state = start(SPECS)
+def _unfolded(state: BrowseState, key: str) -> BrowseState:
+    """Unfold one row the way the gate does: off the fold state it drew."""
+    row = next(row for row in rows(state) if row.key == key)
+    assert row.folded is not None
+    return set_fold(state, key, folded=not row.folded)
 
-    assert [entry.status for entry in state.entries] == [MetricStatus.PENDING] * 4
+
+def test_a_fresh_session_opens_folded_over_every_metric_it_was_given() -> None:
+    state = _measured()
+
     assert _metric_names(state) == [
         "noqa-comment",
         "pylint-comment",
         "loc",
         "legacy-arch",
     ]
+    # an outline of what was measured, not every hit it located
+    assert not [row for row in rows(state) if row.kind is RowKind.OCCURRENCE]
 
 
 def test_rows_nest_metrics_under_their_group_in_config_order() -> None:
@@ -93,38 +105,31 @@ def test_rows_nest_metrics_under_their_group_in_config_order() -> None:
     assert [row.depth for row in rows(state)] == [0, 1, 1, 0, 1, 0, 1]
 
 
-def test_a_metric_with_no_outcome_shows_a_blank_and_adds_nothing_to_its_group() -> None:
-    state = record(start(SPECS), _outcome(NOQA, 3))
+def test_a_metric_row_shows_the_rank_the_mill_gave_it_rather_than_its_own() -> None:
+    """The value column reads the emoji off the outcome, undisputed."""
+    outcome = _outcome(NOQA, 3)
+    state = start((outcome, _outcome(PYLINT, 0)))
 
-    header, noqa, pylint, *_ = rows(state)
-    assert header.cells[2] == "🚧 3"  # only what has an outcome counts
-    assert noqa.cells[2] == "🚧 3"
-    assert pylint.cells[2] == ""
-    assert pylint.entry is not None
-    assert pylint.entry.status is MetricStatus.PENDING
+    header, noqa, *_ = rows(state)
+    assert noqa.cells[2] == f"{outcome.emoji} 3"
+    assert header.cells[2] == "🚧 3"  # the group's own rank, over its own sum
 
 
 def test_an_errored_metric_says_so_and_raises_its_groups_error_flag() -> None:
-    state = record(
-        start(SPECS),
-        MetricOutcome(spec=NOQA, range_names=(), emoji="", error="ValueError: boom"),
-    )
+    state = start((_failed(NOQA), _outcome(PYLINT, 1)))
 
     header, noqa, *_ = rows(state)
     assert noqa.cells[2] == "ERROR"
-    assert noqa.entry is not None
-    assert noqa.entry.status is MetricStatus.ERROR
-    assert header.summary is not None
-    assert header.summary.has_error
+    assert header.cells[0] == "linting"
+    assert not fold_quiet_groups(state).folded & {group_key("linting")}
 
 
 def test_occurrences_are_child_rows_of_an_unfolded_metric() -> None:
     state = _measured()
 
-    assert is_folded(state, metric_key("pylint-comment"))
     assert "src/mills/runner.py:1" not in _labels(state)
 
-    state = toggle_fold(state, metric_key("pylint-comment"))
+    state = _unfolded(state, metric_key("pylint-comment"))
     hits = [row for row in rows(state) if row.kind is RowKind.OCCURRENCE]
     assert [row.cells for row in hits] == [
         ("src/mills/runner.py:1", "", ""),
@@ -140,9 +145,10 @@ def test_a_metric_with_nothing_under_it_is_not_foldable() -> None:
         spec=spec, range_names=(), emoji="🎉", result=MetricResult(value=0), guide=100
     )
 
-    (bare,) = rows(record(start((spec,)), outcome))
+    (bare,) = rows(start((outcome,)))
 
     assert bare.folded is None
+    assert bare.parent is None
 
 
 def test_an_unfolded_metric_says_what_it_measures_before_what_it_found() -> None:
@@ -151,9 +157,9 @@ def test_an_unfolded_metric_says_what_it_measures_before_what_it_found() -> None
         type="regex_count",
         description="how many lint escapes we carry",
     )
-    state = record(start((spec,)), _outcome(spec, 1, paths=("src/a.py",)))
+    state = start((_outcome(spec, 1, paths=("src/a.py",)),))
 
-    state = toggle_fold(state, metric_key("pylint-comment"))
+    state = _unfolded(state, metric_key("pylint-comment"))
 
     assert [(row.kind, row.cells[0]) for row in rows(state)] == [
         (RowKind.METRIC, "pylint-comment"),
@@ -161,13 +167,16 @@ def test_an_unfolded_metric_says_what_it_measures_before_what_it_found() -> None
         (RowKind.DETAIL, "ranges: src"),
         (RowKind.OCCURRENCE, "src/a.py:1"),
     ]
+    # everything under a metric folds back into it
+    assert {row.parent for row in rows(state) if row.kind is not RowKind.METRIC} == {
+        metric_key("pylint-comment")
+    }
 
 
 def test_a_failed_metric_carries_its_error_where_the_reader_can_read_it() -> None:
-    outcome = MetricOutcome(
-        spec=LEGACY, range_names=("src",), emoji="", error="ValueError: boom"
+    state = _unfolded(
+        start((_failed(LEGACY, ranges=("src",)),)), metric_key("legacy-arch")
     )
-    state = toggle_fold(record(start((LEGACY,)), outcome), metric_key("legacy-arch"))
 
     details = [row.cells[0] for row in rows(state) if row.kind is RowKind.DETAIL]
 
@@ -196,9 +205,8 @@ def test_fold_all_folds_every_group_then_unfolds_them_together() -> None:
 
 def test_fold_all_collapses_the_metrics_when_the_run_has_no_groups() -> None:
     spec = MetricSpec(name="todo", type="regex_count")
-    state = toggle_fold(
-        record(start((spec,)), _outcome(spec, 2, paths=("src/a.py",))),
-        metric_key("todo"),
+    state = _unfolded(
+        start((_outcome(spec, 2, paths=("src/a.py",)),)), metric_key("todo")
     )
     assert _labels(state) == ["todo", "ranges: src", "src/a.py:1"]
 
@@ -208,17 +216,29 @@ def test_fold_all_collapses_the_metrics_when_the_run_has_no_groups() -> None:
 
 
 def test_fold_all_leaves_a_listing_with_nothing_foldable_alone() -> None:
-    # ungrouped, and unmeasured, so no group header and no hits underneath
-    state = start((LEGACY,))
+    # ungrouped, and with nothing to say about itself: no group header to
+    # fold and no rows underneath the one metric
+    bare = MetricOutcome(
+        spec=MetricSpec(name="bare", type="regex_count"),
+        range_names=(),
+        emoji="🎉",
+        result=MetricResult(value=0),
+    )
+
+    state = start((bare,))
 
     assert toggle_fold_all(state) is state
 
 
 def test_a_finished_report_folds_away_the_groups_with_nothing_to_report() -> None:
-    state = record(start(SPECS), _outcome(NOQA, 0))
-    state = record(state, _outcome(PYLINT, 0))
-    state = record(state, _outcome(LOC, 900, guide=2000))
-    state = record(state, _outcome(LEGACY, 7))
+    state = start(
+        (
+            _outcome(NOQA, 0),
+            _outcome(PYLINT, 0),
+            _outcome(LOC, 900, guide=2000),
+            _outcome(LEGACY, 7),
+        )
+    )
 
     state = fold_quiet_groups(state)
 
@@ -227,15 +247,11 @@ def test_a_finished_report_folds_away_the_groups_with_nothing_to_report() -> Non
 
 
 def test_a_group_holding_an_error_is_never_folded_away() -> None:
-    state = record(
-        start((NOQA, PYLINT)),
-        MetricOutcome(spec=NOQA, range_names=(), emoji="", error="ValueError: boom"),
-    )
-    state = record(state, _outcome(PYLINT, 0))
+    state = start((_failed(NOQA), _outcome(PYLINT, 0)))
 
     state = fold_quiet_groups(state)
 
-    assert not is_folded(state, group_key("linting"))
+    assert group_key("linting") not in state.folded
 
 
 def test_a_diff_group_the_branch_did_not_move_folds_away() -> None:
@@ -243,18 +259,18 @@ def test_a_diff_group_the_branch_did_not_move_folds_away() -> None:
     outcome = DiffOutcome(
         spec=quiet,
         range_names=("src",),
-        emoji="",
+        emoji="🦠",
         result=DiffResult(net=0, added=0, removed=0),
         total=MetricResult(value=12),
         guide=100,
     )
 
-    state = fold_quiet_groups(record(start((quiet,)), outcome))
+    state = fold_quiet_groups(start((outcome,)))
 
     assert _labels(state) == ["quiet"]
 
 
-def test_grouped_reads_the_config_not_whatever_the_view_left_visible() -> None:
+def test_grouped_reads_every_outcome_not_whatever_the_view_left_visible() -> None:
     state = _measured()
 
     assert grouped(state)
@@ -262,19 +278,19 @@ def test_grouped_reads_the_config_not_whatever_the_view_left_visible() -> None:
     # flattened the outline, both leave it a grouped run
     assert grouped(set_query(state, "legacy"))
     assert grouped(push_sort(state, SortKey.NAME))
-    assert not grouped(start((LEGACY,)))
+    assert not grouped(start((_outcome(LEGACY, 1),)))
 
 
 def test_push_sort_stacks_and_moves_a_repeated_key_to_the_front() -> None:
     state = push_sort(
-        push_sort(push_sort(start(SPECS), SortKey.NAME), SortKey.TYPE), SortKey.NAME
+        push_sort(push_sort(_measured(), SortKey.NAME), SortKey.TYPE), SortKey.NAME
     )
 
     assert state.sort == (Sort(SortKey.NAME), Sort(SortKey.TYPE))
 
 
 def test_pushing_a_key_the_other_way_up_turns_it_over_rather_than_stacking() -> None:
-    state = push_sort(push_sort(start(SPECS), SortKey.VALUE), SortKey.NAME)
+    state = push_sort(push_sort(_measured(), SortKey.VALUE), SortKey.NAME)
 
     state = push_sort(state, SortKey.VALUE, descending=True)
 
@@ -282,9 +298,7 @@ def test_pushing_a_key_the_other_way_up_turns_it_over_rather_than_stacking() -> 
 
 
 def test_a_descending_sort_is_the_ascending_one_turned_over() -> None:
-    state = record(start((NOQA, PYLINT, LOC)), _outcome(NOQA, 5))
-    state = record(state, _outcome(PYLINT, 40))
-    state = record(state, _outcome(LOC, 900))
+    state = start((_outcome(NOQA, 5), _outcome(PYLINT, 40), _outcome(LOC, 900)))
 
     assert _metric_names(push_sort(state, SortKey.VALUE)) == [
         "noqa-comment",
@@ -298,9 +312,10 @@ def test_a_descending_sort_is_the_ascending_one_turned_over() -> None:
     ]
 
 
-def test_the_unmeasured_stay_last_whichever_way_the_sort_runs() -> None:
-    state = record(start(SPECS), _outcome(NOQA, 5))
-    state = record(state, _outcome(LOC, 900))
+def test_what_a_key_cannot_place_stays_last_whichever_way_the_sort_runs() -> None:
+    state = start(
+        (_outcome(NOQA, 5), _failed(PYLINT), _outcome(LOC, 900), _failed(LEGACY))
+    )
 
     for descending in (False, True):
         names = _metric_names(push_sort(state, SortKey.VALUE, descending=descending))
@@ -357,33 +372,35 @@ def test_a_group_primary_key_keeps_the_outline_and_orders_groups_by_name() -> No
     ]
 
 
-def test_sorting_by_value_puts_the_biggest_first_and_the_unmeasured_last() -> None:
-    state = record(start(SPECS), _outcome(NOQA, 5))
-    state = record(state, _outcome(LOC, 900))
+def test_sorting_by_value_puts_the_biggest_first_and_the_errored_last() -> None:
+    state = start(
+        (_outcome(NOQA, 5), _failed(PYLINT), _outcome(LOC, 900), _failed(LEGACY))
+    )
 
     state = push_sort(state, SortKey.VALUE, descending=True)
 
     assert _metric_names(state) == [
         "loc",
         "noqa-comment",
-        "legacy-arch",  # never measured, so nothing to rank
+        "legacy-arch",  # measured nothing, so nothing to rank
         "pylint-comment",
     ]
 
 
 def test_sorting_a_diff_run_by_value_ranks_the_standing_total_not_the_net() -> None:
-    state = record(
-        start((NOQA, LOC)),
-        DiffOutcome(
-            spec=NOQA,
-            range_names=("src",),
-            emoji="",
-            result=DiffResult(net=9),
-            total=MetricResult(value=2),
-            guide=100,
-        ),
+    state = start(
+        (
+            DiffOutcome(
+                spec=NOQA,
+                range_names=("src",),
+                emoji="🦠",
+                result=DiffResult(net=9),
+                total=MetricResult(value=2),
+                guide=100,
+            ),
+            _outcome(LOC, 30),
+        )
     )
-    state = record(state, _outcome(LOC, 30))
 
     # noqa's branch impact is the bigger number; the debt it sits on is not
     assert _metric_names(push_sort(state, SortKey.VALUE, descending=True)) == [
@@ -393,17 +410,16 @@ def test_sorting_a_diff_run_by_value_ranks_the_standing_total_not_the_net() -> N
 
 
 def test_sorting_by_score_puts_a_metric_with_no_score_last() -> None:
-    state = record(start((NOQA, PYLINT)), _outcome(NOQA, 5))
+    state = start((_outcome(NOQA, 5), _failed(PYLINT)))
 
     assert _metric_names(push_sort(state, SortKey.SCORE, descending=True)) == [
         "noqa-comment",
-        "pylint-comment",  # never measured, so it has no score to rank
+        "pylint-comment",  # measured nothing, so it has no score to rank
     ]
 
 
 def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
-    state = record(start((NOQA, LOC)), _outcome(NOQA, 5, guide=5))
-    state = record(state, _outcome(LOC, 900, guide=100_000))
+    state = start((_outcome(NOQA, 5, guide=5), _outcome(LOC, 900, guide=100_000)))
 
     by_value = push_sort(state, SortKey.VALUE, descending=True)
     by_score = push_sort(state, SortKey.SCORE, descending=True)
@@ -431,13 +447,13 @@ def test_a_diff_row_shows_the_branch_impact_beside_the_standing_total() -> None:
     outcome = DiffOutcome(
         spec=NOQA,
         range_names=("src",),
-        emoji="",
+        emoji="🚨",
         result=DiffResult(net=2, added=3, removed=1),
         total=MetricResult(value=24),
         guide=100,
     )
 
-    header, noqa, *_ = rows(record(start((NOQA,)), outcome))
+    header, noqa, *_ = rows(start((outcome,)))
     assert noqa.cells[2] == "+3 / -1 (net +2 of 🚨 24)"
     assert header.cells[2] == "net +2 of 🚨 24"
 
@@ -451,7 +467,7 @@ def test_a_diff_with_no_standing_total_says_the_total_is_unknown() -> None:
         guide=100,
     )
 
-    _, noqa, *_ = rows(record(start((NOQA,)), outcome))
+    _, noqa, *_ = rows(start((outcome,)))
     assert noqa.cells[2] == "net +2 of ?"
 
 
@@ -459,13 +475,13 @@ def test_a_diff_reporting_only_a_net_shows_the_standing_total_alone() -> None:
     outcome = DiffOutcome(
         spec=NOQA,
         range_names=("src",),
-        emoji="",
+        emoji="🚨",
         result=DiffResult(net=-3),
         total=MetricResult(value=24),
         guide=100,
     )
 
-    _, noqa, *_ = rows(record(start((NOQA,)), outcome))
+    _, noqa, *_ = rows(start((outcome,)))
     assert noqa.cells[2] == "net -3 of 🚨 24"
 
 
@@ -492,7 +508,7 @@ def test_a_description_match_opens_the_metric_on_the_words_that_matched() -> Non
         description="how much code there is to maintain",
         group="size",
     )
-    state = record(start((spec,)), _outcome(spec, 900, paths=("src/mills/browse.py",)))
+    state = start((_outcome(spec, 900, paths=("src/mills/browse.py",)),))
 
     state = set_query(state, "maintain")
 
@@ -516,19 +532,13 @@ def test_a_range_name_match_finds_the_range_the_run_resolved() -> None:
         guide=100,
     )
 
-    assert _labels(set_query(record(start((LEGACY,)), outcome), "python-source")) == [
+    assert _labels(set_query(start((outcome,)), "python-source")) == [
         "legacy-arch",
         "ranges: python-source",
     ]
-    # the config left the range implied, so until the run resolves it there
-    # is no name to match -- the metric's own name is all it has
-    assert _labels(set_query(start((LEGACY,)), "python-source")) == []
-
-
-def test_a_range_named_in_the_config_matches_before_the_run_starts() -> None:
-    spec = MetricSpec(name="todo", type="regex_count", ranges=("docs",))
-
-    assert _labels(set_query(start((spec,)), "docs")) == ["todo", "ranges: docs"]
+    # the name the run resolved is the only one there is: a metric that
+    # left the default range implied is searchable by what it ended up on
+    assert _labels(set_query(start((outcome,)), "docs")) == []
 
 
 def test_a_name_match_leaves_the_metric_folded_as_the_reader_left_it() -> None:
@@ -562,11 +572,14 @@ def test_a_search_finds_a_file_inside_a_folded_metric_inside_a_folded_group() ->
 
 def test_an_explicit_fold_during_a_search_beats_the_reveal() -> None:
     state = set_query(_measured(), "runner.py")
+    revealed = next(
+        row for row in rows(state) if row.key == metric_key("pylint-comment")
+    )
+    assert revealed.folded is False  # the query opened it
 
-    state = toggle_fold(state, metric_key("pylint-comment"))
+    state = set_fold(state, revealed.key, folded=True)
 
     assert _labels(state) == ["linting", "pylint-comment"]
-    assert is_folded(state, metric_key("pylint-comment"))
 
 
 def test_leaving_the_search_restores_the_fold_state_untouched() -> None:
@@ -574,7 +587,7 @@ def test_leaving_the_search_restores_the_fold_state_untouched() -> None:
     before = _labels(state)
 
     state = set_query(state, "runner.py")
-    state = toggle_fold(state, group_key("linting"))
+    state = set_fold(state, group_key("linting"), folded=True)
     state = set_query(state, "")
 
     assert state.overlay == {}
