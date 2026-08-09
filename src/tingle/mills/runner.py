@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
-from tingle.mills.display import effective_guide, sections, severity_emoji
+from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.mills.text import text_reader
@@ -15,6 +15,10 @@ from tingle.pacts.report import MetricOutcome, RunReport
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping
+
+    from tingle.pacts.diff import DiffOutcome
+
+_Outcome = TypeVar("_Outcome", bound="MetricOutcome | DiffOutcome")
 
 
 def run(
@@ -38,10 +42,7 @@ def run(
         if only is None or spec.name in only
     )
     return RunReport(
-        root=config.root,
-        source=config.source,
-        outcomes=outcomes,
-        sections=sections(outcomes),
+        root=config.root, source=config.source, sections=sections(outcomes)
     )
 
 
@@ -67,11 +68,8 @@ def _outcome(
         result = metric_types[spec.type].func(context)
     # metric isolation: one failure must not stop the run
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        return MetricOutcome(
-            spec=spec,
-            range_names=range_names,
-            error=f"{type(exc).__name__}: {exc}",
-            guide=guide,
+        return errored(
+            MetricOutcome, spec, range_names=range_names, guide=guide, exc=exc
         )
 
     if not files and spec.ranges:
@@ -79,9 +77,32 @@ def _outcome(
     return MetricOutcome(
         spec=spec,
         range_names=range_names,
+        emoji=outcome_emoji(result, guide),
         result=result,
         guide=guide,
-        emoji=severity_emoji(result.value, guide),
+    )
+
+
+def errored(
+    kind: type[_Outcome],
+    spec: MetricSpec,
+    *,
+    range_names: tuple[str, ...],
+    guide: int,
+    exc: Exception,
+) -> _Outcome:
+    """Report a metric that raised: the reason kept, and nothing ranked.
+
+    A run and a diff isolate their metrics the same way and say the same
+    thing about one that failed, so they say it in one place; only the
+    kind of outcome they hand back differs.
+    """
+    return kind(
+        spec=spec,
+        range_names=range_names,
+        emoji="",
+        error=f"{type(exc).__name__}: {exc}",
+        guide=guide,
     )
 
 

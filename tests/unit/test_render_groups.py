@@ -1,30 +1,29 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from pathlib import Path
 
 from tingle.gates.cli.render import report_table, run_json, run_listing
 from tingle.mills.display import outcome_emoji, sections
-from tingle.pacts.config import MetricSpec
+from tingle.pacts.config import DEFAULT_GUIDE, MetricSpec
 from tingle.pacts.metrics import MetricResult
 from tingle.pacts.report import MetricOutcome, RunReport
 
 
 def _outcome(name: str, group: str | None = None, *, value: int = 1) -> MetricOutcome:
-    outcome = MetricOutcome(
+    result = MetricResult(value=value)
+    return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
-        result=MetricResult(value=value),
+        emoji=outcome_emoji(result, DEFAULT_GUIDE),
+        result=result,
     )
-    return replace(outcome, emoji=outcome_emoji(outcome))
 
 
 def _report(*outcomes: MetricOutcome) -> RunReport:
     return RunReport(
         root=Path("/proj"),
         source=Path("/proj/tingle.toml"),
-        outcomes=outcomes,
         sections=sections(outcomes),
     )
 

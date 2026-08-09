@@ -16,6 +16,7 @@ from tingle.pacts.diff import (
     FileStatus,
 )
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
+from tingle.pacts.report import GroupSummary, ReportSection
 
 
 def test_file_diff_defaults_to_empty_line_sets() -> None:
@@ -73,6 +74,7 @@ def test_diff_report_construction() -> None:
     outcome = DiffOutcome(
         spec=spec,
         range_names=("python",),
+        emoji="🦠",
         result=DiffResult(net=1, added=2, removed=1),
         total=MetricResult(value=10),
     )
@@ -81,7 +83,13 @@ def test_diff_report_construction() -> None:
         source=Path("/proj/tingle.toml"),
         base_ref="main",
         merge_base="abc123",
-        outcomes=(outcome,),
+        sections=(
+            ReportSection(
+                name=None,
+                outcomes=(outcome,),
+                summary=GroupSummary(value=10, guide=100, emoji="🦠"),
+            ),
+        ),
     )
 
     branch_diff = BranchDiff(base_ref="main", merge_base="abc123", files=())

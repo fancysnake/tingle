@@ -28,6 +28,7 @@ def _sortable(
     return MetricOutcome(
         spec=MetricSpec(name=name, type=kind, group=group),
         range_names=(),
+        emoji="",
         result=MetricResult(value=value),
         guide=guide,
     )

@@ -27,6 +27,7 @@ SEARCHABLE = summed_report(
             description="lint escapes we carry",
         ),
         range_names=("python",),
+        emoji="",
         result=MetricResult(
             value=2,
             occurrences=(
@@ -38,6 +39,7 @@ SEARCHABLE = summed_report(
     MetricOutcome(
         spec=MetricSpec(name="legacy-arch", type="symbol_uses", group="typing"),
         range_names=("python",),
+        emoji="",
         result=MetricResult(
             value=1, occurrences=(Occurrence(path="src/views.py", line=4),)
         ),

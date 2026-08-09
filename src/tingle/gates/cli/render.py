@@ -24,11 +24,6 @@ if TYPE_CHECKING:
 _Outcome = TypeVar("_Outcome", bound="MetricOutcome | DiffOutcome")
 
 
-def _in_section_order(sections: Sequence[ReportSection[_Outcome]]) -> list[_Outcome]:
-    """Flatten sections back into a single list, ungrouped last."""
-    return [outcome for section in sections for outcome in section.outcomes]
-
-
 def _section_heading(
     section: ReportSection[_Outcome], *, has_named: bool
 ) -> Text | None:
@@ -383,7 +378,7 @@ def _run_json(report: RunReport, *, detailed: bool) -> str:
                     "warnings": list(outcome.result.warnings) if outcome.result else [],
                     "error": outcome.error,
                 }
-                for outcome in _in_section_order(report.sections)
+                for outcome in report.outcomes
             ],
         },
         indent=2,
@@ -411,7 +406,7 @@ def _diff_json(report: DiffReport, *, detailed: bool) -> str:
                     "warnings": list(outcome.result.warnings) if outcome.result else [],
                     "error": outcome.error,
                 }
-                for outcome in _in_section_order(report.sections)
+                for outcome in report.outcomes
             ],
             "skipped": list(report.skipped),
         },

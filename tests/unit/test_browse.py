@@ -38,6 +38,7 @@ def _outcome(
     return MetricOutcome(
         spec=spec,
         range_names=("src",),
+        emoji="",
         result=MetricResult(
             value=value,
             occurrences=tuple(Occurrence(path=path, line=1) for path in paths),
@@ -105,7 +106,8 @@ def test_a_metric_with_no_outcome_shows_a_blank_and_adds_nothing_to_its_group() 
 
 def test_an_errored_metric_says_so_and_raises_its_groups_error_flag() -> None:
     state = record(
-        start(SPECS), MetricOutcome(spec=NOQA, range_names=(), error="ValueError: boom")
+        start(SPECS),
+        MetricOutcome(spec=NOQA, range_names=(), emoji="", error="ValueError: boom"),
     )
 
     header, noqa, *_ = rows(state)
@@ -135,7 +137,7 @@ def test_a_metric_with_nothing_under_it_is_not_foldable() -> None:
     # no hits, no description, and no range it can name: nothing to reveal
     spec = MetricSpec(name="bare", type="regex_count")
     outcome = MetricOutcome(
-        spec=spec, range_names=(), result=MetricResult(value=0), guide=100
+        spec=spec, range_names=(), emoji="🎉", result=MetricResult(value=0), guide=100
     )
 
     (bare,) = rows(record(start((spec,)), outcome))
@@ -162,7 +164,9 @@ def test_an_unfolded_metric_says_what_it_measures_before_what_it_found() -> None
 
 
 def test_a_failed_metric_carries_its_error_where_the_reader_can_read_it() -> None:
-    outcome = MetricOutcome(spec=LEGACY, range_names=("src",), error="ValueError: boom")
+    outcome = MetricOutcome(
+        spec=LEGACY, range_names=("src",), emoji="", error="ValueError: boom"
+    )
     state = toggle_fold(record(start((LEGACY,)), outcome), metric_key("legacy-arch"))
 
     details = [row.cells[0] for row in rows(state) if row.kind is RowKind.DETAIL]
@@ -225,7 +229,7 @@ def test_a_finished_report_folds_away_the_groups_with_nothing_to_report() -> Non
 def test_a_group_holding_an_error_is_never_folded_away() -> None:
     state = record(
         start((NOQA, PYLINT)),
-        MetricOutcome(spec=NOQA, range_names=(), error="ValueError: boom"),
+        MetricOutcome(spec=NOQA, range_names=(), emoji="", error="ValueError: boom"),
     )
     state = record(state, _outcome(PYLINT, 0))
 
@@ -239,6 +243,7 @@ def test_a_diff_group_the_branch_did_not_move_folds_away() -> None:
     outcome = DiffOutcome(
         spec=quiet,
         range_names=("src",),
+        emoji="",
         result=DiffResult(net=0, added=0, removed=0),
         total=MetricResult(value=12),
         guide=100,
@@ -372,6 +377,7 @@ def test_sorting_a_diff_run_by_value_ranks_the_standing_total_not_the_net() -> N
         DiffOutcome(
             spec=NOQA,
             range_names=("src",),
+            emoji="",
             result=DiffResult(net=9),
             total=MetricResult(value=2),
             guide=100,
@@ -425,6 +431,7 @@ def test_a_diff_row_shows_the_branch_impact_beside_the_standing_total() -> None:
     outcome = DiffOutcome(
         spec=NOQA,
         range_names=("src",),
+        emoji="",
         result=DiffResult(net=2, added=3, removed=1),
         total=MetricResult(value=24),
         guide=100,
@@ -439,6 +446,7 @@ def test_a_diff_with_no_standing_total_says_the_total_is_unknown() -> None:
     outcome = DiffOutcome(
         spec=NOQA,
         range_names=("src",),
+        emoji="",
         result=DiffResult(net=2, added=3, removed=1),
         guide=100,
     )
@@ -451,6 +459,7 @@ def test_a_diff_reporting_only_a_net_shows_the_standing_total_alone() -> None:
     outcome = DiffOutcome(
         spec=NOQA,
         range_names=("src",),
+        emoji="",
         result=DiffResult(net=-3),
         total=MetricResult(value=24),
         guide=100,
@@ -502,6 +511,7 @@ def test_a_range_name_match_finds_the_range_the_run_resolved() -> None:
     outcome = MetricOutcome(
         spec=LEGACY,
         range_names=("python-source",),
+        emoji="",
         result=MetricResult(value=7),
         guide=100,
     )

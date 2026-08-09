@@ -110,6 +110,7 @@ def test_a_metric_says_what_it_measures_above_what_it_found() -> None:
                     description="how many lint escapes we carry",
                 ),
                 range_names=("python",),
+                emoji="",
                 result=MetricResult(
                     value=1, occurrences=(Occurrence(path="src/a.py", line=1),)
                 ),
@@ -151,6 +152,7 @@ def test_a_failed_metric_shows_the_error_where_it_can_be_read() -> None:
             MetricOutcome(
                 spec=MetricSpec(name="broken", type="file_count"),
                 range_names=("python",),
+                emoji="",
                 error="ValueError: boom",
             )
         )
@@ -506,6 +508,7 @@ def test_a_zero_group_holding_an_error_stays_open() -> None:
                 MetricOutcome(
                     spec=MetricSpec(name="b", type="file_count", group="clean"),
                     range_names=(),
+                    emoji="",
                     error="ValueError: boom",
                 ),
             )

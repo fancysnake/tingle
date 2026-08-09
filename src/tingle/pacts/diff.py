@@ -109,31 +109,39 @@ DiffMetricFunction: TypeAlias = Callable[[DiffMetricContext], DiffResult]
 class DiffOutcome:
     """Diff result of one metric plus the current full-repo total.
 
-    `guide` and `emoji` are already resolved, as on MetricOutcome. The
-    emoji ranks the standing total, not the net: what the branch moved is
-    the net's own business, and a net of zero is not no debt.
+    `guide` and `emoji` are already resolved, as on MetricOutcome, and
+    `emoji` is as undefaulted for the same reason. It ranks the standing
+    total, not the net: what the branch moved is the net's own business,
+    and a net of zero is not no debt.
     """
 
     spec: MetricSpec
     range_names: tuple[str, ...]
+    emoji: str
     result: DiffResult | None = None
     total: MetricResult | None = None
     error: str | None = None
     guide: int = DEFAULT_GUIDE
-    emoji: str = ""
 
 
 @dataclass(frozen=True)
 class DiffReport:
     """The outcome of one `tingle diff` run.
 
-    `skipped` names metrics whose type has no diff variant.
+    Sections are the only storage, as on RunReport; `skipped` names
+    metrics whose type has no diff variant.
     """
 
     root: Path
     source: Path
     base_ref: str
     merge_base: str
-    outcomes: tuple[DiffOutcome, ...]
+    sections: tuple[ReportSection[DiffOutcome], ...]
     skipped: tuple[str, ...] = ()
-    sections: tuple[ReportSection[DiffOutcome], ...] = ()
+
+    @property
+    def outcomes(self) -> tuple[DiffOutcome, ...]:
+        """Every outcome the run produced, in the order sections draw them."""
+        return tuple(
+            outcome for section in self.sections for outcome in section.outcomes
+        )

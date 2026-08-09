@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
-from tingle.mills.runner import ranges_for
+from tingle.mills.runner import errored, ranges_for
 from tingle.mills.text import text_reader
 from tingle.pacts.config import Config, ConfigError, MetricSpec
 from tingle.pacts.diff import (
@@ -66,9 +66,8 @@ class DiffRunner:
             source=self.config.source,
             base_ref=branch_diff.base_ref,
             merge_base=branch_diff.merge_base,
-            outcomes=tuple(outcomes),
-            skipped=tuple(skipped),
             sections=sections(tuple(outcomes)),
+            skipped=tuple(skipped),
         )
 
     def _outcome(
@@ -101,16 +100,17 @@ class DiffRunner:
                 self.metric_types[spec.type].func(total_context),
             )
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            return DiffOutcome(
-                spec=spec,
-                range_names=range_names,
-                error=f"{type(exc).__name__}: {exc}",
-                guide=guide,
+            return errored(
+                DiffOutcome, spec, range_names=range_names, guide=guide, exc=exc
             )
-        outcome = DiffOutcome(
-            spec=spec, range_names=range_names, result=result, total=total, guide=guide
+        return DiffOutcome(
+            spec=spec,
+            range_names=range_names,
+            emoji=outcome_emoji(total, guide),
+            result=result,
+            total=total,
+            guide=guide,
         )
-        return replace(outcome, emoji=outcome_emoji(outcome))
 
 
 def _filter_files(

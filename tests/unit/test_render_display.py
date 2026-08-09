@@ -35,21 +35,23 @@ def _outcome(
     guide: int = 100,
     description: str | None = None,
 ) -> MetricOutcome:
-    outcome = MetricOutcome(
+    result = MetricResult(value=value)
+    return MetricOutcome(
         spec=MetricSpec(
             name=name, type="file_count", group=group, description=description
         ),
         range_names=(),
-        result=MetricResult(value=value),
+        emoji=outcome_emoji(result, guide),
+        result=result,
         guide=guide,
     )
-    return replace(outcome, emoji=outcome_emoji(outcome))
 
 
 def _failed(name: str, group: str | None = None) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
+        emoji="",
         error="ValueError: boom",
     )
 
@@ -58,7 +60,6 @@ def _report(*outcomes: MetricOutcome) -> RunReport:
     return RunReport(
         root=Path("/proj"),
         source=Path("/proj/tingle.toml"),
-        outcomes=outcomes,
         sections=sections(outcomes),
     )
 
@@ -71,14 +72,15 @@ def _diff_outcome(
     total: int = 0,
     guide: int = 100,
 ) -> DiffOutcome:
-    outcome = DiffOutcome(
+    standing = MetricResult(value=total)
+    return DiffOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
+        emoji=outcome_emoji(standing, guide),
         result=DiffResult(net=net, added=max(net, 0), removed=max(-net, 0)),
-        total=MetricResult(value=total),
+        total=standing,
         guide=guide,
     )
-    return replace(outcome, emoji=outcome_emoji(outcome))
 
 
 def _diff_report(*outcomes: DiffOutcome) -> DiffReport:
@@ -87,7 +89,6 @@ def _diff_report(*outcomes: DiffOutcome) -> DiffReport:
         source=Path("/proj/tingle.toml"),
         base_ref="main",
         merge_base="abc123",
-        outcomes=outcomes,
         sections=sections(outcomes),
     )
 
@@ -215,6 +216,7 @@ def test_diff_listing_prints_a_description() -> None:
                 name="a", type="file_count", description="Files over 1k lines."
             ),
             range_names=(),
+            emoji="🚧",
             result=DiffResult(net=1, added=1, removed=0),
             total=MetricResult(value=5),
         )
@@ -234,6 +236,7 @@ def test_diff_listing_renders_an_errored_metric_as_a_red_heading() -> None:
     errored = DiffOutcome(
         spec=MetricSpec(name="boom", type="file_count"),
         range_names=(),
+        emoji="",
         error="ValueError: boom",
     )
     text = _plain(diff_listing(_diff_report(errored, _diff_outcome("a"))))

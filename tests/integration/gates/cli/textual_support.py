@@ -33,24 +33,21 @@ SOURCE = Path("/proj/tingle.toml")
 def summed_report(*outcomes: MetricOutcome) -> RunReport:
     """Wrap outcomes in a report shaped the way the mill hands one over.
 
-    The emoji and the sections are filled in here rather than left empty,
-    so a fixture cannot pass a test that a real report would fail.
+    The emoji and the sections are ranked here rather than by hand, so a
+    fixture cannot pass a test that a real report would fail.
     """
-    ranked = tuple(replace(o, emoji=outcome_emoji(o)) for o in outcomes)
-    return RunReport(
-        root=ROOT, source=SOURCE, outcomes=ranked, sections=sections(ranked)
-    )
+    ranked = tuple(replace(o, emoji=outcome_emoji(o.result, o.guide)) for o in outcomes)
+    return RunReport(root=ROOT, source=SOURCE, sections=sections(ranked))
 
 
 def diffed_report(*outcomes: DiffOutcome) -> DiffReport:
-    """Do the same for a branch diff."""
-    ranked = tuple(replace(o, emoji=outcome_emoji(o)) for o in outcomes)
+    """Do the same for a branch diff, which is ranked by its standing total."""
+    ranked = tuple(replace(o, emoji=outcome_emoji(o.total, o.guide)) for o in outcomes)
     return DiffReport(
         root=ROOT,
         source=SOURCE,
         base_ref="main",
         merge_base="abc123",
-        outcomes=ranked,
         sections=sections(ranked),
     )
 
@@ -60,6 +57,7 @@ def grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
+        emoji="",
         result=MetricResult(
             value=value, occurrences=(Occurrence(path="x.py", line=1),)
         ),
@@ -71,6 +69,7 @@ def valued(name: str, group: str, *, value: int, guide: int = 100) -> MetricOutc
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
+        emoji="",
         result=MetricResult(value=value),
         guide=guide,
     )
@@ -80,6 +79,7 @@ RUN_REPORT = summed_report(
     MetricOutcome(
         spec=MetricSpec(name="noqa-comments", type="regex_count"),
         range_names=("python",),
+        emoji="",
         result=MetricResult(
             value=2,
             occurrences=(
@@ -91,6 +91,7 @@ RUN_REPORT = summed_report(
     MetricOutcome(
         spec=MetricSpec(name="python-files", type="file_count"),
         range_names=("python",),
+        emoji="",
         result=MetricResult(value=5),
     ),
 )
@@ -99,6 +100,7 @@ DIFF_REPORT = diffed_report(
     DiffOutcome(
         spec=MetricSpec(name="noqa-comments", type="regex_count"),
         range_names=("python",),
+        emoji="",
         result=DiffResult(
             net=1,
             added=2,
@@ -118,12 +120,14 @@ QUIET_DIFF_REPORT = diffed_report(
     DiffOutcome(
         spec=MetricSpec(name="still", type="file_count", group="quiet"),
         range_names=(),
+        emoji="",
         result=DiffResult(net=0, added=0, removed=0),
         total=MetricResult(value=12),
     ),
     DiffOutcome(
         spec=MetricSpec(name="moved", type="file_count", group="loud"),
         range_names=(),
+        emoji="",
         result=DiffResult(net=2, added=2, removed=0),
         total=MetricResult(value=9),
     ),

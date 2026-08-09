@@ -7,7 +7,7 @@ import pytest
 
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, Occurrence
-from tingle.pacts.report import MetricOutcome, RunReport
+from tingle.pacts.report import GroupSummary, MetricOutcome, ReportSection, RunReport
 
 
 def test_config_error_aggregates_messages() -> None:
@@ -67,11 +67,21 @@ def test_metric_type_holds_function() -> None:
 def test_run_report_construction() -> None:
     spec = MetricSpec(name="noqa", type="regex_count")
     outcome = MetricOutcome(
-        spec=spec, range_names=("python",), result=MetricResult(value=0)
+        spec=spec, range_names=("python",), emoji="🎉", result=MetricResult(value=0)
     )
     report = RunReport(
-        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=(outcome,)
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        sections=(
+            ReportSection(
+                name=None,
+                outcomes=(outcome,),
+                summary=GroupSummary(value=0, guide=100, emoji="🎉"),
+            ),
+        ),
     )
+    # the outcomes a report answers with are the ones its sections hold
+    assert report.outcomes == (outcome,)
     assert report.outcomes[0].error is None
 
 

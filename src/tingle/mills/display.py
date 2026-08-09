@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
     from tingle.pacts.config import DisplaySpec, MetricSpec
+    from tingle.pacts.metrics import MetricResult
     from tingle.pacts.report import MetricOutcome
 
 _Outcome = TypeVar("_Outcome", bound="MetricOutcome | DiffOutcome")
@@ -119,27 +120,23 @@ def group_summary(outcomes: Iterable[MetricOutcome | DiffOutcome]) -> GroupSumma
     return GroupSummary(
         value=value,
         guide=guide,
+        emoji=severity_emoji(value, guide),
         has_error=has_error,
         net=net if is_diff else None,
         changed=changed,
-        emoji=severity_emoji(value, guide),
     )
 
 
-def outcome_emoji(outcome: MetricOutcome | DiffOutcome) -> str:
-    """Rank one outcome against its own guide, or nothing if it errored.
+def outcome_emoji(measured: MetricResult | None, guide: int) -> str:
+    """Rank what a metric measured, or nothing when it measured nothing.
 
-    A diff is ranked by the standing total it carries rather than by its
-    net: the net says what the branch did, the emoji says where the debt
-    now stands.
+    Takes the number rather than the outcome holding it, so a diff can
+    hand over its standing total and a run its result, and neither call
+    site has to build the outcome twice to fill its own emoji in.
     """
-    if (
-        measured := (
-            outcome.total if isinstance(outcome, DiffOutcome) else outcome.result
-        )
-    ) is None:
+    if measured is None:
         return ""
-    return severity_emoji(measured.value, outcome.guide)
+    return severity_emoji(measured.value, guide)
 
 
 def sections(outcomes: Sequence[_Outcome]) -> tuple[ReportSection[_Outcome], ...]:

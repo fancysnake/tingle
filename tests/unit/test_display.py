@@ -25,6 +25,7 @@ def _outcome(value: int, *, guide: int = 100) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name="m", type="file_count"),
         range_names=(),
+        emoji="",
         result=MetricResult(value=value),
         guide=guide,
     )
@@ -34,6 +35,7 @@ def _failed(*, guide: int = 100) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name="boom", type="file_count"),
         range_names=(),
+        emoji="",
         error="ValueError: boom",
         guide=guide,
     )
@@ -45,6 +47,7 @@ def _diff_outcome(
     return DiffOutcome(
         spec=MetricSpec(name="m", type="file_count"),
         range_names=(),
+        emoji="",
         result=DiffResult(net=net, added=added, removed=removed),
         total=MetricResult(value=total),
         guide=guide,
@@ -253,6 +256,7 @@ def _grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
+        emoji="",
         result=MetricResult(value=value),
     )
 
@@ -292,22 +296,14 @@ def test_a_summary_carries_the_emoji_its_total_earns() -> None:
     assert group_summary([_outcome(0, guide=100)]).emoji == EMOJI_ZERO
 
 
-def test_an_outcomes_emoji_ranks_its_own_value_against_its_own_guide() -> None:
-    assert outcome_emoji(_outcome(0)) == EMOJI_ZERO
-    assert outcome_emoji(_outcome(400, guide=100)) == severity_emoji(400, 100)
-    assert outcome_emoji(_outcome(400, guide=10)) == severity_emoji(400, 10)
+def test_a_measured_number_is_ranked_against_the_guide_it_is_given() -> None:
+    assert outcome_emoji(MetricResult(value=0), 100) == EMOJI_ZERO
+    assert outcome_emoji(MetricResult(value=400), 100) == severity_emoji(400, 100)
+    assert outcome_emoji(MetricResult(value=400), 10) == severity_emoji(400, 10)
 
 
-def test_an_errored_outcome_earns_no_emoji() -> None:
-    assert outcome_emoji(_failed()) == ""
-
-
-def test_a_diffs_emoji_ranks_the_standing_total_not_the_net() -> None:
-    """A branch that paid one occurrence off a metric still deep in debt."""
-    outcome = _diff_outcome(-1, total=400, guide=100)
-
-    assert outcome_emoji(outcome) == severity_emoji(400, 100)
-    assert outcome_emoji(outcome) != severity_emoji(-1, 100)
+def test_measuring_nothing_earns_no_emoji() -> None:
+    assert outcome_emoji(None, 100) == ""
 
 
 def test_severity_ratio_of_nothing_is_zero_and_never_divides() -> None:
