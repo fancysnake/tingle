@@ -1,0 +1,202 @@
+/* tingle palette: red chrome, blue interaction, yellow highlight.
+   Red carries structure (header, nav, rules), blue carries anything the
+   reader can act on (links, hover, focus), yellow only ever appears as a
+   surface behind dark text — it fails contrast as a foreground. */
+
+[data-md-color-scheme="default"] {
+  --tingle-red: #c62828;
+  --tingle-red-light: #ef5350;
+  --tingle-red-dark: #8c1d1d;
+  --tingle-blue: #1565c0;
+  --tingle-blue-light: #42a5f5;
+  --tingle-yellow: #f9a825;
+  --tingle-yellow-surface: #fff8e1;
+
+  --md-primary-fg-color: var(--tingle-red);
+  --md-primary-fg-color--light: var(--tingle-red-light);
+  --md-primary-fg-color--dark: var(--tingle-red-dark);
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+
+  --md-accent-fg-color: var(--tingle-blue);
+  --md-accent-fg-color--transparent: rgba(21, 101, 192, 0.1);
+  --md-accent-bg-color: #ffffff;
+  --md-accent-bg-color--light: rgba(255, 255, 255, 0.7);
+
+  --md-typeset-a-color: var(--tingle-blue);
+  --md-typeset-mark-color: rgba(249, 168, 37, 0.4);
+  --md-footer-bg-color: var(--tingle-red-dark);
+  --md-footer-bg-color--dark: #6d1616;
+}
+
+[data-md-color-scheme="slate"] {
+  --tingle-red: #ef5350;
+  --tingle-red-light: #ff8a80;
+  --tingle-red-dark: #b71c1c;
+  --tingle-blue: #64b5f6;
+  --tingle-blue-light: #90caf9;
+  --tingle-yellow: #ffca28;
+  --tingle-yellow-surface: rgba(255, 202, 40, 0.14);
+
+  --md-primary-fg-color: #a51f1f;
+  --md-primary-fg-color--light: var(--tingle-red);
+  --md-primary-fg-color--dark: #7f1616;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+
+  --md-accent-fg-color: var(--tingle-blue);
+  --md-accent-fg-color--transparent: rgba(100, 181, 246, 0.14);
+
+  --md-typeset-a-color: var(--tingle-blue);
+  --md-typeset-mark-color: rgba(255, 202, 40, 0.35);
+  --md-footer-bg-color: #16181d;
+  --md-footer-bg-color--dark: #101216;
+}
+
+/* Structure — red */
+
+.md-typeset h1 {
+  color: var(--tingle-red);
+  font-weight: 700;
+}
+
+.md-typeset h2 {
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  padding-bottom: 0.2em;
+}
+
+.md-nav__link--active,
+.md-nav__item .md-nav__link--active {
+  color: var(--tingle-red);
+}
+
+.md-typeset .md-button--primary {
+  background-color: var(--tingle-red);
+  border-color: var(--tingle-red);
+  color: var(--md-primary-bg-color);
+}
+
+.md-typeset .md-button--primary:hover,
+.md-typeset .md-button--primary:focus {
+  background-color: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+}
+
+/* Interaction — blue */
+
+.md-typeset a:hover,
+.md-typeset a:focus {
+  color: var(--tingle-blue-light);
+}
+
+.md-typeset .headerlink:hover,
+.md-typeset :target > .headerlink {
+  color: var(--md-accent-fg-color);
+}
+
+.md-search-result__link:focus,
+.md-search-result__link:hover {
+  background-color: var(--md-accent-fg-color--transparent);
+}
+
+/* Highlight — yellow, always as a surface under dark text */
+
+.md-typeset mark,
+.md-search-result__link mark {
+  background-color: var(--md-typeset-mark-color);
+  color: inherit;
+  box-shadow: none;
+}
+
+.md-typeset .highlight .hll,
+.md-typeset .highlighttable .hll {
+  background-color: var(--tingle-yellow-surface);
+}
+
+.md-typeset blockquote {
+  border-left: 0.2rem solid var(--tingle-yellow);
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset kbd {
+  box-shadow:
+    0 0.1rem 0 0.05rem var(--tingle-yellow),
+    0 0.1rem 0 var(--md-default-fg-color--lighter),
+    0 -0.1rem 0.2rem var(--md-default-fg-color--lightest) inset;
+}
+
+/* Admonitions — the three colors split by intent, everything else default */
+
+.md-typeset .admonition.danger,
+.md-typeset details.danger,
+.md-typeset .admonition.failure,
+.md-typeset details.failure {
+  border-color: var(--tingle-red);
+}
+
+.md-typeset .danger > .admonition-title,
+.md-typeset .danger > summary,
+.md-typeset .failure > .admonition-title,
+.md-typeset .failure > summary {
+  background-color: rgba(198, 40, 40, 0.1);
+}
+
+.md-typeset .danger > .admonition-title::before,
+.md-typeset .danger > summary::before,
+.md-typeset .failure > .admonition-title::before,
+.md-typeset .failure > summary::before {
+  background-color: var(--tingle-red);
+}
+
+.md-typeset .admonition.note,
+.md-typeset details.note,
+.md-typeset .admonition.info,
+.md-typeset details.info {
+  border-color: var(--tingle-blue);
+}
+
+.md-typeset .note > .admonition-title,
+.md-typeset .note > summary,
+.md-typeset .info > .admonition-title,
+.md-typeset .info > summary {
+  background-color: var(--md-accent-fg-color--transparent);
+}
+
+.md-typeset .note > .admonition-title::before,
+.md-typeset .note > summary::before,
+.md-typeset .info > .admonition-title::before,
+.md-typeset .info > summary::before {
+  background-color: var(--tingle-blue);
+}
+
+.md-typeset .admonition.warning,
+.md-typeset details.warning,
+.md-typeset .admonition.tip,
+.md-typeset details.tip {
+  border-color: var(--tingle-yellow);
+}
+
+.md-typeset .warning > .admonition-title,
+.md-typeset .warning > summary,
+.md-typeset .tip > .admonition-title,
+.md-typeset .tip > summary {
+  background-color: var(--tingle-yellow-surface);
+}
+
+.md-typeset .warning > .admonition-title::before,
+.md-typeset .warning > summary::before,
+.md-typeset .tip > .admonition-title::before,
+.md-typeset .tip > summary::before {
+  background-color: var(--tingle-yellow);
+}
+
+/* Tables — red rule under the head, blue on row hover */
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-default-fg-color--lightest);
+  border-bottom: 2px solid var(--tingle-red);
+}
+
+.md-typeset table:not([class]) tr:hover {
+  background-color: var(--md-accent-fg-color--transparent);
+}
