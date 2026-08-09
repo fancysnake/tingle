@@ -20,36 +20,72 @@ from tingle.mills.metrics.counts import (
     line_count_diff,
     validate_count_params,
 )
-from tingle.mills.metrics.regex_count import regex_count, regex_count_diff
+from tingle.mills.metrics.regex_count import (
+    regex_count,
+    regex_count_diff,
+    regex_spread,
+    regex_spread_diff,
+)
 from tingle.mills.metrics.regex_count import validate_params as validate_regex_params
-from tingle.mills.metrics.symbol_uses import symbol_uses, symbol_uses_diff
+from tingle.mills.metrics.symbol_uses import (
+    symbol_spread,
+    symbol_spread_diff,
+    symbol_uses,
+    symbol_uses_diff,
+)
 from tingle.mills.metrics.symbol_uses import validate_params as validate_symbol_params
 from tingle.pacts.metrics import MetricType, ParamSchema
+
+# A spread type is its counting sibling read per-file, so the two are
+# configured identically: one schema each, shared by the pair, and a param
+# added to the count cannot forget the spread.
+_REGEX_PARAMS = ParamSchema(
+    required=("pattern",),
+    optional=("flags", "ignore_lines"),
+    primary="pattern",
+    validate=validate_regex_params,
+)
+
+_SYMBOL_PARAMS = ParamSchema(
+    required=("symbol",),
+    optional=("ignore_lines",),
+    primary="symbol",
+    validate=validate_symbol_params,
+)
 
 METRIC_TYPES: dict[str, MetricType] = {
     "regex_count": MetricType(
         name="regex_count",
         func=regex_count,
-        params=ParamSchema(
-            required=("pattern",),
-            optional=("flags", "ignore_lines"),
-            primary="pattern",
-            validate=validate_regex_params,
-        ),
+        params=_REGEX_PARAMS,
         description="Count regex matches in the files of the metric's ranges.",
         diff_func=regex_count_diff,
+    ),
+    "regex_spread": MetricType(
+        name="regex_spread",
+        func=regex_spread,
+        params=_REGEX_PARAMS,
+        description=(
+            "Number of files a regex matches in: how far the pattern has spread."
+        ),
+        diff_func=regex_spread_diff,
     ),
     "symbol_uses": MetricType(
         name="symbol_uses",
         func=symbol_uses,
-        params=ParamSchema(
-            required=("symbol",),
-            optional=("ignore_lines",),
-            primary="symbol",
-            validate=validate_symbol_params,
-        ),
+        params=_SYMBOL_PARAMS,
         description="Count references to a function or class in Python files.",
         diff_func=symbol_uses_diff,
+    ),
+    "symbol_spread": MetricType(
+        name="symbol_spread",
+        func=symbol_spread,
+        params=_SYMBOL_PARAMS,
+        description=(
+            "Number of Python files referencing a function or class: how far "
+            "it has spread."
+        ),
+        diff_func=symbol_spread_diff,
     ),
     "toml_list_length": MetricType(
         name="toml_list_length",
