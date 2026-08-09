@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from tingle.specs.text import BINARY_SNIFF_BYTES
+from tingle.pacts.metrics import BINARY_SNIFF_BYTES
 
 if TYPE_CHECKING:
     from collections.abc import Callable

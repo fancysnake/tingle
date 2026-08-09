@@ -12,6 +12,13 @@ if TYPE_CHECKING:
 
     from tingle.pacts.diff import DiffMetricFunction
 
+#: Bytes sniffed for a NUL before a file is called binary, which is the
+#: window git's own differ uses. Two layers apply it -- mills to decide
+#: what a metric may read, the git adapter to decide what git would have
+#: diffed -- so it is a fact about the bytes crossing `read()` rather than
+#: either layer's own rule.
+BINARY_SNIFF_BYTES = 8000
+
 
 class ProjectFiles(Protocol):
     """Read-only view of the project tree."""

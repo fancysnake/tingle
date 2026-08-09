@@ -15,6 +15,7 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
 from tingle.pacts.diff import BranchDiff, DiffSourceError, FileDiff, FileStatus
+from tingle.pacts.metrics import BINARY_SNIFF_BYTES
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -34,11 +35,6 @@ _DIFF_ARGS = (
 )
 
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
-
-#: Window git sniffs for a NUL before calling a file binary and diffing no
-#: lines of it. Untracked files never reach git's differ, so they are judged
-#: here by the same window.
-_BINARY_SNIFF_BYTES = 8192
 
 
 class GitCli:
@@ -124,21 +120,22 @@ class GitCli:
         """Every line of an untracked file, which the branch wholly added.
 
         Git reports no line numbers for a binary file it diffs, so the same
-        judgement is made here for the files it never diffed. This mirrors
-        git, not tingle's own rule about what a metric may read -- that one
-        lives in mills and applies after the diff is built.
+        judgement is made here for the files it never diffed -- the NUL
+        sniff and nothing else, because that is all git asks. Whether a
+        metric may read what is left is tingle's own rule, and it lives in
+        mills, after the diff is built.
+
+        The lines are counted off the bytes for the same reason: git's
+        idea of a line break is the ASCII one, not everything Python will
+        split a string on.
         """
         try:
             data = (self._root / path).read_bytes()
         except OSError:
             return ()
-        if b"\0" in data[:_BINARY_SNIFF_BYTES]:
+        if b"\0" in data[:BINARY_SNIFF_BYTES]:
             return ()
-        try:
-            text = data.decode("utf-8")
-        except UnicodeDecodeError:
-            return ()
-        return range(1, len(text.splitlines()) + 1)
+        return range(1, len(data.splitlines()) + 1)
 
     def _run(self, *args: str) -> str:
         result = self._git(*args)

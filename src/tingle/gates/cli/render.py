@@ -12,6 +12,7 @@ from rich.table import Table
 from rich.text import Text
 
 from tingle.pacts.config import CheckPolicy
+from tingle.pacts.report import ERROR_STAT, UNGROUPED
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -82,7 +83,7 @@ def report_table(report: RunReport) -> Table:
             )
         for outcome in section.outcomes:
             value = (
-                "[red]ERROR[/]"
+                f"[red]{ERROR_STAT}[/]"
                 if outcome.result is None
                 else _valued(outcome.emoji, outcome.result.value, width=width)
             )
@@ -124,7 +125,7 @@ def _value_width(numbers: Sequence[int]) -> int:
 
 
 def _group_label(name: str | None) -> str:
-    return name if name is not None else "(ungrouped)"
+    return name if name is not None else UNGROUPED
 
 
 def diff_table(report: DiffReport) -> Table:
@@ -178,7 +179,7 @@ def diff_table(report: DiffReport) -> Table:
 def _diff_cells(outcome: DiffOutcome, width: int) -> tuple[str, str, str, str]:
     """Render the added/removed/net/total cells of one diff row."""
     if outcome.result is None:
-        return ("", "", "[red]ERROR[/]", "")
+        return ("", "", f"[red]{ERROR_STAT}[/]", "")
     return (
         _added_cell(outcome.result.added),
         _removed_cell(outcome.result.removed),
@@ -194,7 +195,9 @@ def _diff_cells(outcome: DiffOutcome, width: int) -> tuple[str, str, str, str]:
 def _error_lines(outcome: MetricOutcome | DiffOutcome) -> list[Text]:
     """Render an errored outcome: a red heading and a blank spacer."""
     return [
-        Text(f"{outcome.spec.name} ({outcome.spec.type}): ERROR", style="bold red"),
+        Text(
+            f"{outcome.spec.name} ({outcome.spec.type}): {ERROR_STAT}", style="bold red"
+        ),
         Text(""),
     ]
 

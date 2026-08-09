@@ -7,6 +7,7 @@ import pytest
 
 from tingle.links.git.cli import GitCli
 from tingle.pacts.diff import DiffSourceError, FileDiff, FileStatus
+from tingle.pacts.metrics import BINARY_SNIFF_BYTES
 
 
 def _git(cwd: Path, *args: str) -> None:
@@ -150,15 +151,52 @@ def test_untracked_files_count_as_fully_added(tmp_path: Path) -> None:
     assert files["blob.bin"].added_lines == frozenset()
 
 
-def test_an_untracked_file_that_is_not_utf8_adds_no_lines(tmp_path: Path) -> None:
-    """No NUL, so the sniff passes it; it still is not text git would diff."""
+def test_an_untracked_file_that_is_not_utf8_still_adds_its_lines(
+    tmp_path: Path,
+) -> None:
+    """No NUL, so git would diff it as text, so its lines are added lines.
+
+    Whether a metric may read it is decided later, in mills, and the
+    adapter does not get a second opinion on that here.
+    """
     repo = _branch_repo(tmp_path, "one\n")
     (repo / "latin.txt").write_bytes(b"calf\xe9\n")
 
     files = _by_path(GitCli(repo).branch_diff("main").files)
 
     assert files["latin.txt"].status is FileStatus.ADDED
-    assert files["latin.txt"].added_lines == frozenset()
+    assert files["latin.txt"].added_lines == frozenset({1})
+
+
+def test_the_sniff_window_is_the_one_git_itself_uses(tmp_path: Path) -> None:
+    """The claim the constant makes, checked against the git on this machine.
+
+    A NUL inside the window makes a file binary and a NUL just past it
+    does not -- for the adapter, and for git, which is the whole reason
+    the number is what it is.
+    """
+    repo = _branch_repo(tmp_path, "one\n")
+    (repo / "inside.txt").write_bytes(b"a" * (BINARY_SNIFF_BYTES - 1) + b"\0")
+    (repo / "outside.txt").write_bytes(b"a" * BINARY_SNIFF_BYTES + b"\0")
+
+    files = _by_path(GitCli(repo).branch_diff("main").files)
+
+    assert files["inside.txt"].added_lines == frozenset()
+    assert files["outside.txt"].added_lines == frozenset({1})
+    assert _git_says_binary(repo, "inside.txt")
+    assert not _git_says_binary(repo, "outside.txt")
+
+
+def _git_says_binary(repo: Path, name: str) -> bool:
+    """Ask git whether it would diff this file as text."""
+    result = subprocess.run(
+        ["git", "diff", "--no-index", "--no-ext-diff", "/dev/null", name],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return "Binary files" in result.stdout
 
 
 def test_gitignored_untracked_files_are_excluded(tmp_path: Path) -> None:

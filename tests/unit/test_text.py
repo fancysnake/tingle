@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import PurePath
 
 from tingle.mills.text import decode_text, text_reader
-from tingle.specs.text import BINARY_SNIFF_BYTES
+from tingle.pacts.metrics import BINARY_SNIFF_BYTES
 
 
 def test_decodes_utf8() -> None:
