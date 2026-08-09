@@ -372,13 +372,13 @@ def _mark_sorted_header(table: BrowseTable, state: BrowseState) -> None:
 def _sort_line(
     state: BrowseState, browse: BrowseServiceProtocol, *, rows: tuple[Row, ...]
 ) -> str:
-    """Say what is deciding the order, and what folding costs.
+    """Say what is deciding the order, and what it cost the outline.
 
     A flattened view is worth saying out loud: the reader has just lost
-    the group outline and every occurrence row with it, and the way back
-    is one key they cannot see from the rows alone. A live query says so
-    instead: while one is up it is the thing deciding what is on screen,
-    and escape is the way out of it.
+    the group headers, and the way back is one key they cannot see from
+    the rows alone. A live query says so instead: while one is up it is
+    the thing deciding what is on screen, and escape is the way out of
+    it.
 
     The rows counted are the ones just drawn: projecting them again would
     rescan every occurrence of every metric, once per keystroke typed.
@@ -395,7 +395,7 @@ def _sort_line(
     )
     if browse.outlined(state):
         return f"sort: {stack}"
-    return f"sort: {stack}  ·  flat, no folding — 0 to reset"
+    return f"sort: {stack}  ·  flat, no groups — 0 to reset"
 
 
 def _cells(row: Row) -> tuple[Text, Text, Text]:

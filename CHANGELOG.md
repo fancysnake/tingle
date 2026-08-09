@@ -19,8 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asking for a stacked key the other way up turns it over in place. `0`
   clears the stack. The header of the column deciding the order carries ▲ or
   ▼, and a line under the table names the whole stack. Sorting by anything
-  but `group` flattens the outline, folding and occurrence rows with it,
-  until `0`.
+  but `group` drops the group headers and names each metric's group on its
+  own row instead; metrics still fold, so the top of a `value` sort opens
+  on the files behind the number. `0` brings the headers back.
 - `value` and `score` are separate sorts: the raw count, and the same number
   against the metric's own guide. Only `score` compares metrics whose guides
   differ.

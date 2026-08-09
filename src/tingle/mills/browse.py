@@ -79,13 +79,15 @@ def clear_sort(state: BrowseState) -> BrowseState:
 
 
 def outlined(state: BrowseState) -> bool:
-    """Whether the group outline -- and with it folding -- is available.
+    """Whether the rows still nest under group headers.
 
     Only while nothing is sorted, or while `group` is the sort the reader
     pushed last. Any other primary key orders metrics across the whole
-    run, so they no longer nest under a group; the view flattens to one
-    row per metric and there is nothing left to fold. Clearing the sort
-    brings the outline, the folds and the occurrence rows back.
+    run, so a group header would sit above metrics that are not all its
+    own: the headers go and each metric names its own group instead.
+    Folding is not part of that -- a metric still opens on what it
+    measures and what it found, which is the whole point of sorting by
+    value first.
     """
     return not state.sort or state.sort[0].key is SortKey.GROUP
 
@@ -134,9 +136,10 @@ def set_fold(state: BrowseState, key: str, *, folded: bool) -> BrowseState:
 def toggle_fold_all(state: BrowseState) -> BrowseState:
     """Fold every group at once, or unfold them all once none is unfolded.
 
-    A run with no groups anywhere has metric rows at the top level, so
-    there the metrics fold instead -- whatever the outline's top row is,
-    that is what this collapses the listing to.
+    A run with no groups anywhere -- or a flat sort, which draws no
+    headers either -- has metric rows at the top level, so there the
+    metrics fold instead; whatever the listing's top row is, that is what
+    this collapses it to.
     """
     if not (top := _fold_all_rows(state)):
         return state
@@ -174,11 +177,7 @@ def rows(state: BrowseState) -> tuple[Row, ...]:
     """
     sections = _visible(state)
     if not outlined(state):
-        flattened = [match for section in sections for match in section.matches]
-        return tuple(
-            _metric_row(state, match, depth=0, foldable=False)
-            for match in _sorted(flattened, state.sort)
-        )
+        return tuple(_flat_rows(state, sections))
     return tuple(_outline_rows(state, sections))
 
 
@@ -339,6 +338,23 @@ def _outline_rows(state: BrowseState, sections: tuple[_Section, ...]) -> Iterabl
             yield from _metric_rows(state, match, depth=depth, parent=parent)
 
 
+def _flat_rows(state: BrowseState, sections: tuple[_Section, ...]) -> Iterable[Row]:
+    """Every metric of the run in one list, ordered across the groups.
+
+    Each row carries its own group name, since there is no header above
+    it saying which one it came from, and each still opens on what it
+    measures and what it found: sorting by value and then reading the
+    top row's files is the reason the sort exists.
+    """
+    matches = _sorted(
+        [match for section in sections for match in section.matches], state.sort
+    )
+    for match in matches:
+        yield from _metric_rows(
+            state, match, depth=0, parent=None, qualified=grouped(state)
+        )
+
+
 def _sorted(matches: Iterable[_Match], sort: tuple[Sort, ...]) -> list[_Match]:
     """Apply the sort stack, least significant key first.
 
@@ -420,14 +436,19 @@ def _quiet(summary: GroupSummary) -> bool:
 
 
 def _metric_rows(
-    state: BrowseState, match: _Match, *, depth: int, parent: str | None
+    state: BrowseState,
+    match: _Match,
+    *,
+    depth: int,
+    parent: str | None,
+    qualified: bool = False,
 ) -> Iterable[Row]:
     """Draw a metric, then what it says about itself and what it found.
 
     The detail lines come before the hits: what a metric measures reads
     as an introduction to the list, not a footnote after it.
     """
-    row = _metric_row(state, match, depth=depth, foldable=True, parent=parent)
+    row = _metric_row(state, match, depth=depth, parent=parent, qualified=qualified)
     yield row
     if row.folded is not False:
         return
@@ -473,20 +494,18 @@ def _metric_row(
     match: _Match,
     *,
     depth: int,
-    foldable: bool,
-    parent: str | None = None,
+    parent: str | None,
+    qualified: bool,
 ) -> Row:
     """One metric's own row. Nothing to fold means no fold state at all."""
     key = metric_key(match.outcome.spec.name)
     has_body = bool(match.occurrences) or bool(_details(match.outcome))
-    folded = (
-        _folded(state, key, revealed=match.revealed) if foldable and has_body else None
-    )
+    folded = _folded(state, key, revealed=match.revealed) if has_body else None
     return Row(
         kind=RowKind.METRIC,
         key=key,
         depth=depth,
-        cells=_metric_cells(match.outcome),
+        cells=_metric_cells(match.outcome, qualified=qualified),
         folded=folded,
         parent=parent,
         outcome=match.outcome,
@@ -501,8 +520,14 @@ def _group_cells(name: str | None, summary: GroupSummary) -> tuple[str, str, str
     return (label, "", stat)
 
 
-def _metric_cells(outcome: MetricOutcome | DiffOutcome) -> tuple[str, str, str]:
-    return (outcome.spec.name, outcome.spec.type, _stat(outcome))
+def _metric_cells(
+    outcome: MetricOutcome | DiffOutcome, *, qualified: bool
+) -> tuple[str, str, str]:
+    """Name the metric, and its group too where no header is naming it."""
+    label = outcome.spec.name
+    if qualified:
+        label = f"{outcome.spec.group or UNGROUPED} / {label}"
+    return (label, outcome.spec.type, _stat(outcome))
 
 
 def _stat(outcome: MetricOutcome | DiffOutcome) -> str:

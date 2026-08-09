@@ -87,7 +87,7 @@ class BrowseServiceProtocol(Protocol):
 
     @abstractmethod
     def outlined(self, state: BrowseState) -> bool:
-        """Whether the rows still form an outline that can be folded."""
+        """Whether the rows still nest under group headers."""
 
     @abstractmethod
     def push_sort(

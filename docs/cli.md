@@ -64,10 +64,10 @@ table names the whole stack.
 guide. They answer different questions: what is biggest, and what is
 worst. Only `score` compares metrics with different guides.
 
-**Sorting by anything but `group` flattens the view**, since the metrics no
-longer nest under a group. Folding goes with the outline, and so do the
-occurrence rows. `0` brings all three back, with the folds exactly as they
-were.
+**Sorting by anything but `group` drops the group headers**, since the
+metrics no longer nest under one: every row names its own group instead.
+Folding stays — sort by `value`, then unfold the top row to see the files
+behind the number. `0` brings the headers and the config order back.
 
 ### Search
 

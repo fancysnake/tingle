@@ -81,7 +81,16 @@ def _labels(state: BrowseState) -> list[str]:
 
 
 def _metric_names(state: BrowseState) -> list[str]:
-    return [row.cells[0] for row in rows(state) if row.kind is RowKind.METRIC]
+    """Read the metrics in the order drawn, by name rather than by label.
+
+    A flat sort labels a metric with its group as well, which is the
+    subject of its own test and noise in every test about ordering.
+    """
+    return [
+        row.outcome.spec.name
+        for row in rows(state)
+        if row.kind is RowKind.METRIC and row.outcome is not None
+    ]
 
 
 def _unfolded(state: BrowseState, key: str) -> BrowseState:
@@ -357,7 +366,7 @@ def test_sorting_by_name_then_by_type_gives_type_major_order() -> None:
     ]
 
 
-def test_a_non_group_primary_key_flattens_the_view_and_disables_folding() -> None:
+def test_a_non_group_primary_key_drops_the_group_headers() -> None:
     state = push_sort(_measured(), SortKey.NAME)
 
     assert not outlined(state)
@@ -368,7 +377,38 @@ def test_a_non_group_primary_key_flattens_the_view_and_disables_folding() -> Non
         "noqa-comment",
         "pylint-comment",
     ]
-    assert all(row.folded is None for row in rows(state))
+
+
+def test_a_flat_row_names_the_group_no_header_is_naming_for_it() -> None:
+    state = push_sort(_measured(), SortKey.NAME)
+
+    assert _labels(state) == [
+        f"{UNGROUPED} / legacy-arch",
+        "size / loc",
+        "linting / noqa-comment",
+        "linting / pylint-comment",
+    ]
+
+
+def test_a_flat_row_still_opens_on_what_the_metric_found() -> None:
+    state = push_sort(_measured(), SortKey.VALUE, descending=True)
+
+    state = _unfolded(state, metric_key("legacy-arch"))
+
+    assert _labels(state)[:3] == [
+        "size / loc",
+        f"{UNGROUPED} / legacy-arch",
+        "ranges: src",  # what it measures, then the one hit it found
+    ]
+    assert [row.cells[0] for row in rows(state) if row.kind is RowKind.OCCURRENCE] == [
+        "src/views.py:1"
+    ]
+
+
+def test_a_flat_sort_over_an_ungrouped_run_leaves_the_labels_bare() -> None:
+    state = push_sort(start((_outcome(LEGACY, 7),)), SortKey.NAME)
+
+    assert _labels(state) == ["legacy-arch"]
 
 
 def test_a_group_primary_key_keeps_the_outline_and_orders_groups_by_name() -> None:

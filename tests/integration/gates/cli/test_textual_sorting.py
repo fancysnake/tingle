@@ -50,7 +50,8 @@ def test_sorting_by_name_flattens_the_view_and_orders_every_metric() -> None:
         async with app.run_test() as pilot:
             await pilot.press("n")
 
-            assert labels(app) == ["alpha", "mid", "zeta"]
+            # no headers left, so every row says which group it came from
+            assert labels(app) == ["typing / alpha", "lint / mid", "typing / zeta"]
 
     asyncio.run(scenario())
 
@@ -61,7 +62,8 @@ def test_sorting_by_name_then_type_gives_type_major_order() -> None:
         async with app.run_test() as pilot:
             await pilot.press("n", "t")
 
-            assert labels(app) == ["alpha", "mid", "zeta"]  # file_count, then regex
+            # file_count, then regex
+            assert labels(app) == ["typing / alpha", "lint / mid", "typing / zeta"]
             assert column(app, 1) == ["file_count", "regex_count", "regex_count"]
 
     asyncio.run(scenario())
@@ -88,7 +90,7 @@ def test_sorting_by_score_ranks_against_each_metrics_own_guide() -> None:
             # 90 against 100 even though it is the smaller number
             await pilot.press("C")
 
-            assert labels(app) == ["mid", "alpha", "zeta"]
+            assert labels(app) == ["lint / mid", "typing / alpha", "typing / zeta"]
 
     asyncio.run(scenario())
 
@@ -164,10 +166,10 @@ def test_zero_restores_config_order_the_outline_and_the_fold_state() -> None:
 
             await pilot.press("n")
             assert labels(app) == [
-                "mypy-overrides",
-                "noqa-comments",
-                "python-files",
-                "type-ignores",
+                "typing / mypy-overrides",
+                "lint / noqa-comments",
+                "(ungrouped) / python-files",
+                "typing / type-ignores",
             ]
 
             await pilot.press("0")
@@ -178,17 +180,34 @@ def test_zero_restores_config_order_the_outline_and_the_fold_state() -> None:
     asyncio.run(scenario())
 
 
-def test_a_flat_sort_puts_occurrences_out_of_reach_until_the_sort_is_cleared() -> None:
+def test_the_worst_metric_of_a_flat_sort_opens_on_the_files_it_found() -> None:
+    """Sort by value, then open the top of the list: the reason to sort."""
+
     async def scenario() -> None:
         app = metrics_app(RUN_REPORT)
         async with app.run_test() as pilot:
-            await pilot.press("right")
-            assert "src/a.py:1" in labels(app)
+            await pilot.press("V")
+            assert outline(app) == ["▸ python-files", "▸ noqa-comments"]
 
-            await pilot.press("n")
-            assert outline(app) == ["  noqa-comments", "  python-files"]
-            await pilot.press("right")  # nothing to unfold while flat
-            assert "src/a.py:1" not in labels(app)
+            await pilot.press("down", "right")
+
+            assert outline(app) == [
+                "▸ python-files",
+                "▾ noqa-comments",
+                "    ranges: python",
+                "    src/a.py:1",
+                "    src/b.py:9",
+            ]
+
+    asyncio.run(scenario())
+
+
+def test_a_fold_made_while_flat_is_the_one_the_outline_comes_back_with() -> None:
+    async def scenario() -> None:
+        app = metrics_app(RUN_REPORT)
+        async with app.run_test() as pilot:
+            await pilot.press("V", "down", "right")
+            assert "src/a.py:1" in labels(app)
 
             await pilot.press("0")
 
@@ -208,7 +227,7 @@ def test_the_sort_bar_says_what_is_deciding_the_order() -> None:
 
             await pilot.press("N")
             assert status(app) == (
-                "sort: name desc then group asc  ·  flat, no folding — 0 to reset"
+                "sort: name desc then group asc  ·  flat, no groups — 0 to reset"
             )
 
             await pilot.press("0")
