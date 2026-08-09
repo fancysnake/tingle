@@ -612,7 +612,7 @@ def test_letter_bindings_do_not_eat_the_palette_search_box() -> None:
             await pilot.pause()
             assert app.screen.query_one(Input).value == "fquip"
             assert app.is_running  # "q" did not quit
-            app.pop_screen()
+            await pilot.press("escape")  # leave it the way a reader would
             await pilot.pause()
             assert "type-ignores" in labels(app)  # "f" folded nothing
 
