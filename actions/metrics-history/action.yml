@@ -27,6 +27,18 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Require a clean checkout
+      shell: bash
+      run: |
+        # recording switches this checkout to the data branch and back, and
+        # git refuses to switch away from a modified tracked file — say so
+        # here rather than letting it surface as a raw git error later
+        if ! git diff --quiet HEAD; then
+          echo "::error::the checkout has modified tracked files; commit or discard them before recording"
+          git diff --name-only HEAD >&2
+          exit 1
+        fi
+
     - name: Measure
       shell: bash
       env:
@@ -66,7 +78,11 @@ runs:
           -c user.name=github-actions[bot] \
           -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
           commit --quiet --allow-empty -m "Start $BRANCH"
-        git -C "$empty" push --quiet "$remote" "$BRANCH"
+        git -C "$empty" push --quiet "$remote" "$BRANCH" && exit 0
+        # a concurrent first run got there between the check and the push:
+        # the branch existing is all this step wanted, so confirm and go on
+        echo "$BRANCH was created by another run"
+        git ls-remote --exit-code --heads "$remote" "$BRANCH" > /dev/null
 
     - uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
       with:

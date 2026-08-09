@@ -14,16 +14,8 @@ that something is a **branch**, not an artifact.
 ## The short version
 
 tingle ships an action that records the numbers and publishes a chart of
-their history. It expects `tingle` on `PATH`, so it drops into the job that
-already runs it — [the CI gate](check.md), measuring the build the gate
-judged:
-
-```yaml
-      - run: tingle check
-      - uses: fancysnake/tingle/actions/metrics-history@main
-```
-
-If no job runs tingle yet, the whole workflow is this:
+their history. History is a **main-branch** thing — one point per commit
+that landed — so the whole workflow is this:
 
 ```yaml
 name: Metrics
@@ -45,6 +37,30 @@ jobs:
       - run: pip install tingle
       - uses: fancysnake/tingle/actions/metrics-history@main
 ```
+
+The action expects `tingle` on `PATH`, so it can also join a job that
+already runs it — [the CI gate](check.md), measuring the build the gate
+judged. That job has to run on main pushes as well as pull requests, and
+the step has to skip the pull requests:
+
+```yaml
+      - run: tingle check
+      - uses: fancysnake/tingle/actions/metrics-history@main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+```
+
+!!! warning "Record on main, not on pull requests"
+
+    Without that `if:`, every pull request appends a point for a commit that
+    may never land — and one from a fork cannot append at all: its
+    `GITHUB_TOKEN` is read-only whatever `permissions:` asks for, so the
+    push fails and takes the job with it.
+
+The recording step switches the checkout to the data branch and back, so
+the job's tracked files have to be clean by the time it runs — git will not
+switch away from a modified file. A build that rewrites a lockfile or a
+generated file has to commit or discard it first; the action stops with a
+named error rather than a raw git one.
 
 Each run takes `stat --json`, appends the values to the `gh-pages` branch
 under `metrics/`, and commits a page that plots one time-series per metric,
@@ -134,7 +150,8 @@ site, or read it from anywhere else that wants the numbers.
 ## What it does, unrolled
 
 The payload is two steps, if you would rather inline them — or adapt them to
-a CI that is not GitHub Actions:
+a CI that is not GitHub Actions. Every input above is left at its default
+here, so this is the action's own body:
 
 ```yaml
       - run: |
@@ -143,6 +160,10 @@ a CI that is not GitHub Actions:
           [ "$status" -le 1 ] || exit "$status"
           jq '[.metrics[] | select(.error == null) | {name, unit: "count", value}]' \
             stat.json > points.json
+          if [ "$(jq length points.json)" -eq 0 ]; then
+            echo "::error::every metric errored; there is nothing to record"
+            exit 1
+          fi
       - uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
         with:
           name: tingle
@@ -151,6 +172,8 @@ a CI that is not GitHub Actions:
           github-token: ${{ github.token }}
           auto-push: true
           benchmark-data-dir-path: metrics
+          comment-on-alert: false
+          fail-on-alert: false
 ```
 
 `customSmallerIsBetter` is that action's generic contract — a list of
