@@ -89,6 +89,9 @@ $ echo $?
   attributes changes to your branch.
 - [CI gate](https://fancysnake.github.io/tingle/check/) — failing the build
   on new debt.
+- [History](https://fancysnake.github.io/tingle/history/) — recording a point
+  per commit and publishing a chart of it. tingle's own is at
+  [tingle.fancysnake.dev/history/chart/](https://tingle.fancysnake.dev/history/chart/).
 - [CLI reference](https://fancysnake.github.io/tingle/cli/) — every command
   and flag.
 

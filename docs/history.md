@@ -4,6 +4,13 @@ tingle stores nothing: every run measures the tree in front of it. To watch
 a number drop over months, something has to keep the values — and on GitHub
 that something is a **branch**, not an artifact.
 
+!!! tip "See one first"
+
+    tingle keeps its own history this way, and publishes it:
+    **[tingle.fancysnake.dev/history/chart/][own]**. One line per metric,
+    every point linked to the commit that produced it — that is what the
+    rest of this page sets up.
+
 !!! warning "Artifacts are not history"
 
     `upload-artifact` gives you a file per run. Artifacts expire (90 days by
