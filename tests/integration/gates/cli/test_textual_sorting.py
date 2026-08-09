@@ -8,6 +8,7 @@ from textual_support import (
     GROUPED_REPORT,
     RUN_REPORT,
     column,
+    drawn_headers,
     headers,
     labels,
     metrics_app,
@@ -108,6 +109,19 @@ def test_the_sorted_columns_header_says_which_way_it_is_running() -> None:
 
             await pilot.press("0")
             assert headers(app) == ["Group / Metric", "Type", "Value"]
+
+    asyncio.run(scenario())
+
+
+def test_the_marker_reaches_the_screen_on_a_column_its_values_left_narrow() -> None:
+    """The value column is narrower than its own heading, arrow and all."""
+
+    async def scenario() -> None:
+        app = metrics_app(SORTABLE)
+        async with app.run_test() as pilot:
+            await pilot.press("v")
+
+            assert "Value ▲" in drawn_headers(app)
 
     asyncio.run(scenario())
 

@@ -171,6 +171,16 @@ def headers(app: MetricsApp) -> list[str]:
     return [str(heading.label) for heading in table.columns.values()]
 
 
+def drawn_headers(app: MetricsApp) -> str:
+    """Read the heading row as it reaches the screen, truncation and all.
+
+    A heading is set on the column and drawn from the column's width, which
+    are two different things: a marker the column has no room for is stored
+    and then cut off, so only the drawn line proves the reader can see it.
+    """
+    return app.query_one(BrowseTable).render_line(0).text
+
+
 def status(app: MetricsApp) -> str:
     """Read the line under the table: the sort stack, or the live query."""
     return str(app.query_one(SortBar).render())

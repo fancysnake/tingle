@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+from rich.cells import cell_len
 from rich.text import Text
 from textual.app import App
 from textual.binding import Binding
@@ -360,6 +361,10 @@ def _mark_sorted_header(table: BrowseTable, state: BrowseState) -> None:
             column.label = Text(label + arrow, style="bold")
         else:
             column.label = Text(label)
+        # a column is only ever measured against the cells put in it, so one
+        # whose heading just grew an arrow has to claim the room for it --
+        # otherwise the arrow is cut off any column its values left narrow
+        column.content_width = max(column.content_width, cell_len(column.label.plain))
     table.refresh()
 
 
