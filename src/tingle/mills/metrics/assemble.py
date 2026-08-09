@@ -169,8 +169,8 @@ def per_file_result(located: MetricResult) -> MetricResult:
     the thing is one more.
 
     Details are kept as they are -- the per-file hit count still says how
-    heavily a file is involved -- so for a collapsed result the details sum
-    to more than the value. Each file's occurrence is placed at its first
+    heavily a file is involved -- so for a collapsed result the details can
+    sum to more than the value. Each file's occurrence is placed at its first
     hit, which is the useful line to open.
     """
     first: dict[str, int | None] = {}
