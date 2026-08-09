@@ -52,6 +52,18 @@ and they stay out of the output.
 A name that matches no configured metric is a config error, so a typo cannot
 silently ignore nothing.
 
+## Gating on spread rather than volume
+
+`ignore` is the blunt instrument. Where a metric is not so much expected to grow
+as expected to *churn*, the sharper answer is to gate on how far the thing has
+spread instead of how often it is written:
+[`regex_spread` and `symbol_spread`](metrics.md#spread-regex_spread-and-symbol_spread)
+count the files a thing appears in, so a branch that reworks legacy code passes
+while a branch that carries it into a new file does not.
+
+It is the difference between "stop using this" and "stop spreading this", and
+only the second can be gated on without failing every bug fix.
+
 ## Exit codes
 
 | Code | Meaning |

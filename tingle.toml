@@ -89,6 +89,13 @@ pattern = '#\s*type:\s*ignore'
 description = "`# type: ignore` comments that silence the type checker."
 
 [[metrics]]
+name = "type-ignore-spread"
+type = "regex_spread"
+group = "typing"
+pattern = '#\s*type:\s*ignore'
+description = "Files carrying a `# type: ignore`, however many each holds."
+
+[[metrics]]
 name = "mypy-overrides"
 type = "toml_table_array"
 group = "typing"

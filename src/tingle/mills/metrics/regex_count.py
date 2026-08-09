@@ -12,6 +12,8 @@ from tingle.mills.metrics.assemble import (
     compile_ignores,
     drop_ignored,
     located_metric,
+    per_file_result,
+    presence_crossings,
     validate_ignores,
 )
 from tingle.pacts.metrics import MetricContext, MetricResult, Occurrence
@@ -21,6 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Set as AbstractSet
     from pathlib import PurePath
 
+    from tingle.mills.metrics.assemble import LocatedFinder
     from tingle.pacts.diff import DiffMetricContext, DiffResult, FileDiff
 
 _FLAGS = {"IGNORECASE": re.IGNORECASE, "MULTILINE": re.MULTILINE, "DOTALL": re.DOTALL}
@@ -32,7 +35,22 @@ def regex_count(ctx: MetricContext) -> MetricResult:
     Matching is full-text (multi-line patterns work); each match is
     located at the line where it starts.
     """
-    pattern = _compile(ctx.params)
+    return located_metric(ctx, find=_finder(_compile(ctx.params)))
+
+
+def regex_spread(ctx: MetricContext) -> MetricResult:
+    """Count the files the `pattern` param matches in, however often.
+
+    The same search as `regex_count`, measuring reach instead of volume:
+    a file with forty matches counts once, like a file with one. It is the
+    metric for keeping something from spreading, where rewriting the code
+    that already has it is not the thing being watched.
+    """
+    return per_file_result(regex_count(ctx))
+
+
+def _finder(pattern: re.Pattern[str]) -> LocatedFinder:
+    """Locate every match in a file's text, at the line each one starts on."""
 
     def find(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
         line_starts = _line_starts(text)
@@ -41,7 +59,7 @@ def regex_count(ctx: MetricContext) -> MetricResult:
             for match in pattern.finditer(text)
         ], []
 
-    return located_metric(ctx, find=find)
+    return find
 
 
 def _line_starts(text: str) -> list[int]:
@@ -79,6 +97,22 @@ def regex_count_diff(ctx: DiffMetricContext) -> DiffResult:
         return added, removed, warnings
 
     return accumulate_diff(ctx.files, per_file)
+
+
+def regex_spread_diff(ctx: DiffMetricContext) -> DiffResult:
+    """Count files the branch spread the pattern to, and cleared it from.
+
+    A file matching now but not at the base is one more; a file that
+    matched then and does not now is one less. How much of a matching file
+    the branch rewrote is beside the point, so bug-fixing legacy code nets
+    zero while one fresh file reaching for it does not.
+
+    Both sides are matched full-text, as a full run is, so multi-line
+    patterns and MULTILINE/DOTALL behave here exactly as they do in the
+    Total column -- the caveat on `regex_count` in diff mode does not
+    apply to this metric.
+    """
+    return presence_crossings(ctx, find=_finder(_compile(ctx.params)))
 
 
 def _matches_on_lines(

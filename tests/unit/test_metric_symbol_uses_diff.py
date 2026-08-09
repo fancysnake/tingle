@@ -82,7 +82,7 @@ def test_base_syntax_error_warns_and_skips_side() -> None:
 
     assert result.added == 1
     assert result.removed == 0
-    assert any("base side skipped (syntax error" in w for w in result.warnings)
+    assert any("base side: skipped (syntax error" in w for w in result.warnings)
 
 
 def test_unreadable_current_side_warns() -> None:
