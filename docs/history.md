@@ -120,8 +120,30 @@ branch of its own instead:
           data-branch: metrics-data
 ```
 
-This is how tingle records its own metrics. Nothing renders that branch, but
-the history is now a file you own: `metrics/data.js`, a single
+This is how tingle records its own metrics. The branch still holds the chart
+the action generates — it is simply not served from there, so copy it into
+the site your generator just built, in the job that publishes it:
+
+```yaml
+      - run: mkdocs build --strict
+      - name: Add the metrics history chart
+        env:
+          REPO: ${{ github.server_url }}/${{ github.repository }}.git
+        run: |
+          data=$(mktemp -d)
+          git clone --quiet --depth 1 --branch metrics-data "$REPO" "$data"
+          mkdir -p site/history/chart
+          cp -R "$data/metrics/." site/history/chart/
+```
+
+The chart is then a page of your documentation like any other — tingle's own
+is at [tingle.fancysnake.dev/history/chart/][own], published exactly this
+way. It is self-contained: an `index.html` that loads its `data.js` beside
+it, so wherever you drop the directory is where the chart works.
+
+  [own]: https://tingle.fancysnake.dev/history/chart/
+
+The history is also a file you own: `metrics/data.js`, a single
 `window.BENCHMARK_DATA = {...}` assignment. Its `entries` are keyed by chart
 name — the `name` input — and each is an array of points, one per recorded
 build, carrying that build's commit metadata and a `benches` list of
