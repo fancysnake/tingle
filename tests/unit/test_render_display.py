@@ -274,6 +274,20 @@ def test_diff_table_says_error_where_the_numbers_would_go() -> None:
     assert "boom" in text  # the row is still there to say which metric it was
 
 
+def test_diff_table_says_unknown_where_a_total_could_not_be_worked_out() -> None:
+    """An unknown total reads as "?", as it does in the heading and the browser."""
+    unknown = DiffOutcome(
+        spec=MetricSpec(name="a", type="file_count"),
+        range_names=(),
+        emoji="",
+        result=DiffResult(net=1, added=1, removed=0),
+    )
+
+    text = _rendered(diff_table(_diff_report(unknown)))
+
+    assert "?" in text
+
+
 def test_run_json_carries_guide_and_description() -> None:
     payload = json.loads(
         run_json(_report(_outcome("a", guide=25, description="Why this matters.")))

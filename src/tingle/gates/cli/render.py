@@ -183,10 +183,10 @@ def _diff_cells(outcome: DiffOutcome, width: int) -> tuple[str, str, str, str]:
         _added_cell(outcome.result.added),
         _removed_cell(outcome.result.removed),
         _net_cell(outcome.result.net),
-        (
-            stat_text(outcome.emoji, outcome.total.value, width=width)
-            if outcome.total
-            else ""
+        stat_text(
+            outcome.emoji,
+            outcome.total.value if outcome.total is not None else None,
+            width=width,
         ),
     )
 
