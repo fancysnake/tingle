@@ -260,6 +260,20 @@ def test_diff_table_group_row_judges_the_standing_total_not_the_net() -> None:
     assert "🎉" not in text  # which the net alone would have called a triumph
 
 
+def test_diff_table_says_error_where_the_numbers_would_go() -> None:
+    errored = DiffOutcome(
+        spec=MetricSpec(name="boom", type="file_count"),
+        range_names=(),
+        emoji="",
+        error="ValueError: boom",
+    )
+
+    text = _rendered(diff_table(_diff_report(errored, _diff_outcome("a", total=5))))
+
+    assert "ERROR" in text
+    assert "boom" in text  # the row is still there to say which metric it was
+
+
 def test_run_json_carries_guide_and_description() -> None:
     payload = json.loads(
         run_json(_report(_outcome("a", guide=25, description="Why this matters.")))
