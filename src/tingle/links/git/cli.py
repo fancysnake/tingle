@@ -125,9 +125,12 @@ class GitCli:
         metric may read what is left is tingle's own rule, and it lives in
         mills, after the diff is built.
 
-        The lines are counted off the bytes for the same reason: git's
-        idea of a line break is the ASCII one, not everything Python will
-        split a string on.
+        The lines are counted the way git counts them, on line feeds
+        alone: a file it did diff is reported against git's own numbering,
+        so one it never diffed has to be numbered the same way or the same
+        metric counts differently for being untracked. Python splits lines
+        on more than that -- a carriage return, a form feed -- and every
+        one of those would be a line git never saw.
         """
         try:
             data = (self._root / path).read_bytes()
@@ -135,7 +138,8 @@ class GitCli:
             return ()
         if b"\0" in data[:BINARY_SNIFF_BYTES]:
             return ()
-        return range(1, len(data.splitlines()) + 1)
+        lines = data.count(b"\n") + bool(data and not data.endswith(b"\n"))
+        return range(1, lines + 1)
 
     def _run(self, *args: str) -> str:
         result = self._git(*args)

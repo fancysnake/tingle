@@ -246,6 +246,11 @@ type = "independence"
 modules = ["tingle.links.*"]
 
 [[tool.importlinter.contracts]]
+name = "inside-specs"
+type = "independence"
+modules = ["tingle.specs.*"]
+
+[[tool.importlinter.contracts]]
 name = "inside-edges"
 type = "independence"
 modules = ["tingle.edges.*"]

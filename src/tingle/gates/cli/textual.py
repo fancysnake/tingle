@@ -38,19 +38,10 @@ NO_MARKER = "  "
 #: One level of the outline.
 INDENT = "  "
 
-#: Which key sorts by what. Value and score are both here because they
-#: answer different questions: what is biggest, and what is worst.
-#:
-#: The letter sorts upwards and the shifted letter sorts downwards, so the
-#: reader asks for a direction rather than remembering which one each key
-#: happens to prefer.
-SORT_KEYS = {
-    "g": SortKey.GROUP,
-    "n": SortKey.NAME,
-    "t": SortKey.TYPE,
-    "v": SortKey.VALUE,
-    "c": SortKey.SCORE,
-}
+#: The column headings, in the order they are added, each with the key the
+#: table knows it by. Stated once: the header marking reads them back to
+#: rebuild a label rather than stripping last redraw's arrow off the widget.
+COLUMNS = (("Group / Metric", "label"), ("Type", "type"), ("Value", "value"))
 
 #: Which column each sort key lives in, so the header of the one in charge
 #: can be picked out. Group and name share the first column; score shares
@@ -134,17 +125,21 @@ class MetricsApp(App[None]):
     BINDINGS: ClassVar = [
         Binding("slash", "search", "Search"),
         Binding("f", "toggle_fold_all", "Fold all"),
-        Binding("g", "sort('g')", "Sort group"),
-        Binding("n", "sort('n')", "Sort name"),
-        Binding("t", "sort('t')", "Sort type"),
-        Binding("v", "sort('v')", "Sort value"),
-        Binding("c", "sort('c')", "Sort score"),
-        # the shifted letter is the same sort the other way up
-        Binding("G", "sort_desc('g')", "Sort group desc", show=False),
-        Binding("N", "sort_desc('n')", "Sort name desc", show=False),
-        Binding("T", "sort_desc('t')", "Sort type desc", show=False),
-        Binding("V", "sort_desc('v')", "Sort value desc", show=False),
-        Binding("C", "sort_desc('c')", "Sort score desc", show=False),
+        # value and score are both bound because they answer different
+        # questions: what is biggest, and what is worst
+        Binding("g", "sort('group')", "Sort group"),
+        Binding("n", "sort('name')", "Sort name"),
+        Binding("t", "sort('type')", "Sort type"),
+        Binding("v", "sort('value')", "Sort value"),
+        Binding("c", "sort('score')", "Sort score"),
+        # the shifted letter is the same sort the other way up, so the
+        # reader asks for a direction rather than remembering which one
+        # each key happens to prefer
+        Binding("G", "sort_desc('group')", "Sort group desc", show=False),
+        Binding("N", "sort_desc('name')", "Sort name desc", show=False),
+        Binding("T", "sort_desc('type')", "Sort type desc", show=False),
+        Binding("V", "sort_desc('value')", "Sort value desc", show=False),
+        Binding("C", "sort_desc('score')", "Sort score desc", show=False),
         Binding("0", "clear_sort", "Reset sort"),
         Binding("q", "quit", "Quit"),
     ]
@@ -161,7 +156,7 @@ class MetricsApp(App[None]):
         self._report = report
         self._opener = opener
         self._browse = browse
-        self._state = browse.fold_quiet_groups(browse.start(report.outcomes))
+        self._state = browse.fold_quiet_groups(browse.start(report.sections))
         self._rows: tuple[Row, ...] = ()
 
     def compose(self) -> ComposeResult:
@@ -169,9 +164,8 @@ class MetricsApp(App[None]):
         yield Header()
         self.sub_title = str(self._report.root)
         table = BrowseTable(cursor_type="row")
-        table.add_column("Group / Metric", key="label")
-        table.add_column("Type", key="type")
-        table.add_column("Value", key="value")
+        for heading, key in COLUMNS:
+            table.add_column(heading, key=key)
         yield table
         yield SearchBar(placeholder="search", classes="hidden")
         yield SortBar()
@@ -217,11 +211,11 @@ class MetricsApp(App[None]):
         self._push_sort(key, descending=True)
 
     def _push_sort(self, key: str, *, descending: bool) -> None:
-        if (sort := SORT_KEYS.get(key)) is not None:
-            self._state = self._browse.push_sort(
-                self._state, sort, descending=descending
-            )
-            self._draw()
+        """Push the sort a binding named; the binding names the key itself."""
+        self._state = self._browse.push_sort(
+            self._state, SortKey(key), descending=descending
+        )
+        self._draw()
 
     def action_clear_sort(self) -> None:
         """Drop every sort, bringing back config order and the outline."""
@@ -358,30 +352,21 @@ def _mark_sorted_header(table: BrowseTable, state: BrowseState) -> None:
     """
     primary = state.sort[0] if state.sort else None
     marked = SORT_COLUMNS[primary.key] if primary is not None else None
-    for index, column in enumerate(table.columns.values()):
-        label = _unmarked(str(column.label))
-        if index == marked and primary is not None:
-            arrow = DESCENDING if primary.descending else ASCENDING
-            column.label = Text(label + arrow, style="bold")
-        else:
-            column.label = Text(label)
+    columns = zip(COLUMNS, table.columns.values(), strict=True)
+    for index, ((heading, _key), column) in enumerate(columns):
+        arrow = (
+            (DESCENDING if primary.descending else ASCENDING)
+            if primary is not None and index == marked
+            else ""
+        )
+        column.label = Text(heading + arrow, style="bold" if arrow else "")
         # a column is only ever measured against the cells put in it, so one
         # whose heading just grew an arrow has to claim the room for it --
-        # otherwise the arrow is cut off any column its values left narrow
+        # otherwise the arrow is cut off any column its values left narrow.
+        # `columns` and `content_width` are textual's own, and a layout rule
+        # that changes on an upgrade is what this is working around.
         column.content_width = max(column.content_width, cell_len(column.label.plain))
     table.refresh()
-
-
-def _unmarked(label: str) -> str:
-    """Take last redraw's arrow back off a heading, if it had one.
-
-    Whole suffixes rather than a set of characters to strip: a heading is
-    allowed to end in an arrow of its own, and only the one this put there
-    should come off.
-    """
-    for marker in (ASCENDING, DESCENDING):
-        label = label.removesuffix(marker)
-    return label
 
 
 def _sort_line(
@@ -398,10 +383,10 @@ def _sort_line(
     The rows counted are the ones just drawn: projecting them again would
     rescan every occurrence of every metric, once per keystroke typed.
     """
-    if state.query:
+    if (search := state.search) is not None:
         found = sum(1 for row in rows if row.kind is RowKind.METRIC)
         matched = f"{found} metric{'' if found == 1 else 's'}"
-        return f"search: {state.query!r} — {matched} — esc to leave"
+        return f"search: {search.query!r} — {matched} — esc to leave"
     if not state.sort:
         return "sort: config order"
     stack = SORT_SEPARATOR.join(

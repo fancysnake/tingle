@@ -8,13 +8,15 @@ and skipped on the other.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from pathlib import PurePath
+from typing import TypeAlias
 
 from tingle.pacts.metrics import BINARY_SNIFF_BYTES
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-    from pathlib import PurePath
+#: What a metric is handed in place of a port's raw bytes: the same lookup,
+#: with the readability rule already applied to what comes back.
+TextReader: TypeAlias = Callable[[PurePath], "str | None"]
 
 
 def decode_text(data: bytes | None) -> str | None:
@@ -35,10 +37,13 @@ def decode_text(data: bytes | None) -> str | None:
         return None
 
 
-def text_reader(
-    read: Callable[[PurePath], bytes | None],
-) -> Callable[[PurePath], str | None]:
-    """Adapt a byte-returning reader into the text reader a metric is given."""
+def text_reader(read: Callable[[PurePath], bytes | None]) -> TextReader:
+    """Adapt a port's byte reader into the text reader a metric is given.
+
+    Called at the seam, where the port is picked up, and never at a call
+    site: one reader per source is what makes the rule applied once rather
+    than remembered five times.
+    """
 
     def read_text(path: PurePath) -> str | None:
         return decode_text(read(path))

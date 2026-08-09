@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from tingle.mills import browse
 from tingle.mills.browse import (
     clear_sort,
     fold_quiet_groups,
@@ -11,15 +14,27 @@ from tingle.mills.browse import (
     rows,
     set_fold,
     set_query,
-    start,
     toggle_fold_all,
 )
-from tingle.mills.display import outcome_emoji
+from tingle.mills.display import outcome_emoji, sections
 from tingle.pacts.browse import BrowseState, RowKind, Sort, SortKey
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
 from tingle.pacts.report import UNGROUPED, MetricOutcome
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+
+def start(outcomes: Sequence[MetricOutcome | DiffOutcome]) -> BrowseState:
+    """Open a session the way a gate does: over the report's own sections.
+
+    Grouping is the report's, so a session is started from what it built
+    rather than from a bare tuple no report would hand over.
+    """
+    return browse.start(sections(tuple(outcomes)))
+
 
 NOQA = MetricSpec(name="noqa-comment", type="regex_count", group="linting")
 PYLINT = MetricSpec(name="pylint-comment", type="regex_count", group="linting")
@@ -458,6 +473,7 @@ def test_a_diff_row_shows_the_branch_impact_beside_the_standing_total() -> None:
 
 
 def test_a_diff_with_no_standing_total_says_the_total_is_unknown() -> None:
+    """Only the total is unknown; what the branch moved is still known."""
     outcome = DiffOutcome(
         spec=NOQA,
         range_names=("src",),
@@ -466,8 +482,10 @@ def test_a_diff_with_no_standing_total_says_the_total_is_unknown() -> None:
         guide=100,
     )
 
-    _, noqa, *_ = rows(start((outcome,)))
-    assert noqa.cells[2] == "net +2 of ?"
+    header, noqa, *_ = rows(start((outcome,)))
+    assert noqa.cells[2] == "+3 / -1 (net +2 of ?)"
+    # and a group holding it cannot claim a standing debt of its own
+    assert header.cells[2] == "net +2 of ?"
 
 
 def test_a_diff_reporting_only_a_net_shows_the_standing_total_alone() -> None:
@@ -581,6 +599,23 @@ def test_an_explicit_fold_during_a_search_beats_the_reveal() -> None:
     assert _labels(state) == ["linting", "pylint-comment"]
 
 
+def test_a_row_folded_during_a_search_can_be_unfolded_again_inside_it() -> None:
+    """The second gesture replaces the first rather than stacking on it."""
+    state = set_query(_measured(), "runner.py")
+    state = set_fold(state, group_key("linting"), folded=True)
+    assert _labels(state) == ["linting"]
+
+    state = set_fold(state, group_key("linting"), folded=False)
+
+    # and the search's own reveal is back with it, hit and all
+    assert _labels(state) == [
+        "linting",
+        "pylint-comment",
+        "ranges: src",
+        "src/mills/runner.py:1",
+    ]
+
+
 def test_leaving_the_search_restores_the_fold_state_untouched() -> None:
     state = set_fold(_measured(), metric_key("pylint-comment"), folded=True)
     before = _labels(state)
@@ -589,7 +624,7 @@ def test_leaving_the_search_restores_the_fold_state_untouched() -> None:
     state = set_fold(state, group_key("linting"), folded=True)
     state = set_query(state, "")
 
-    assert state.overlay == {}
+    assert state.search is None
     assert _labels(state) == before
 
 

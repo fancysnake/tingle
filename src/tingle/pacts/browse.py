@@ -8,16 +8,14 @@ a widget tree. Nothing here knows a terminal exists.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from tingle.pacts.diff import DiffOutcome
     from tingle.pacts.metrics import Occurrence
-    from tingle.pacts.report import MetricOutcome
+    from tingle.pacts.report import MetricOutcome, ReportSection
 
 
 class SortKey(StrEnum):
@@ -101,22 +99,69 @@ class Row:
 
 
 @dataclass(frozen=True)
+class Search:
+    """A live query, and the folds the reader made while it was up.
+
+    A search reveals rows to show what it found, and an explicit fold
+    beats that reveal -- but a gesture made inside a search may not
+    outlive it, so it is held here rather than in the session's own fold
+    set. Clearing the query drops the whole object, which is what makes
+    that rule a shape rather than a branch someone has to remember.
+
+    Folded and unfolded are two sets rather than one mapping so that
+    every field of a frozen state is as frozen as the dataclass says it
+    is; `with_fold` is the only writer, and it keeps them apart.
+    """
+
+    query: str
+    folded: frozenset[str] = frozenset()
+    unfolded: frozenset[str] = frozenset()
+
+    def with_fold(self, key: str, *, folded: bool) -> Search:
+        """Record one gesture, replacing whatever this search said before."""
+        if folded:
+            return Search(
+                query=self.query,
+                folded=self.folded | {key},
+                unfolded=self.unfolded - {key},
+            )
+        return Search(
+            query=self.query, folded=self.folded - {key}, unfolded=self.unfolded | {key}
+        )
+
+    def gesture(self, key: str) -> bool | None:
+        """Whether the reader folded this row during the search, if they did."""
+        if key in self.folded:
+            return True
+        if key in self.unfolded:
+            return False
+        return None
+
+
+@dataclass(frozen=True)
 class BrowseState:
     """Everything a browsing session is, as data.
+
+    `sections` is the report's own grouping, kept as the report handed it
+    over: the session reorders and filters it, and never works out which
+    group a metric belongs to a second time.
 
     `sort` is a stack, most recently pushed first, so consecutive sorts
     stack rather than replace each other. `folded` holds the keys of the
     groups and metrics the reader has folded; it survives sorting and
     searching untouched.
 
-    `overlay` is the fold gestures made *during* a search, keyed the same
-    way. A search reveals rows to show what it found, and an explicit
-    fold beats that reveal -- but neither may outlive the query, so they
-    are kept apart from `folded` and dropped when the query is cleared.
+    `search` is None when no query is up, which is the only way to say it.
     """
 
-    outcomes: tuple[MetricOutcome | DiffOutcome, ...] = ()
+    sections: tuple[ReportSection[MetricOutcome | DiffOutcome], ...] = ()
     sort: tuple[Sort, ...] = ()
     folded: frozenset[str] = frozenset()
-    query: str = ""
-    overlay: Mapping[str, bool] = field(default_factory=dict)
+    search: Search | None = None
+
+    @property
+    def outcomes(self) -> tuple[MetricOutcome | DiffOutcome, ...]:
+        """Every outcome the session is over, in the order sections hold them."""
+        return tuple(
+            outcome for section in self.sections for outcome in section.outcomes
+        )

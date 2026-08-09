@@ -168,6 +168,36 @@ def test_an_untracked_file_that_is_not_utf8_still_adds_its_lines(
     assert files["latin.txt"].added_lines == frozenset({1})
 
 
+def test_untracked_lines_are_counted_the_way_git_counts_them(tmp_path: Path) -> None:
+    """A carriage return is not a line break to git, so it is not one here.
+
+    Checked against the git on this machine rather than asserted from
+    memory: an untracked file is numbered the way a tracked one would be,
+    or the same metric counts differently for never having been committed.
+    """
+    repo = _branch_repo(tmp_path, "one\n")
+    (repo / "returns.txt").write_bytes(b"a\rb\n")
+    (repo / "unfinished.txt").write_bytes(b"a\nb")
+
+    files = _by_path(GitCli(repo).branch_diff("main").files)
+
+    assert files["returns.txt"].added_lines == frozenset({1})
+    assert _git_counts_lines(repo, "returns.txt") == 1
+    assert files["unfinished.txt"].added_lines == frozenset({1, 2})
+    assert _git_counts_lines(repo, "unfinished.txt") == 2
+
+
+def test_an_untracked_file_that_cannot_be_read_adds_no_lines(tmp_path: Path) -> None:
+    """Git lists a dangling symlink as untracked; there is nothing to count."""
+    repo = _branch_repo(tmp_path, "one\n")
+    (repo / "dangling.txt").symlink_to(repo / "gone.txt")
+
+    files = _by_path(GitCli(repo).branch_diff("main").files)
+
+    assert files["dangling.txt"].status is FileStatus.ADDED
+    assert files["dangling.txt"].added_lines == frozenset()
+
+
 def test_the_sniff_window_is_the_one_git_itself_uses(tmp_path: Path) -> None:
     """The claim the constant makes, checked against the git on this machine.
 
@@ -185,6 +215,18 @@ def test_the_sniff_window_is_the_one_git_itself_uses(tmp_path: Path) -> None:
     assert files["outside.txt"].added_lines == frozenset({1})
     assert _git_says_binary(repo, "inside.txt")
     assert not _git_says_binary(repo, "outside.txt")
+
+
+def _git_counts_lines(repo: Path, name: str) -> int:
+    """Ask git how many lines it would report the file as adding."""
+    result = subprocess.run(
+        ["git", "diff", "--no-index", "--no-ext-diff", "--numstat", "/dev/null", name],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return int(result.stdout.split("\t")[0])
 
 
 def _git_says_binary(repo: Path, name: str) -> bool:

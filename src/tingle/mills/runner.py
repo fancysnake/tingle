@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, TypeVar
 
 from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
-from tingle.mills.text import text_reader
+from tingle.mills.text import TextReader, text_reader
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 from tingle.pacts.report import MetricOutcome, RunReport
@@ -19,6 +19,21 @@ if TYPE_CHECKING:
     from tingle.pacts.diff import DiffOutcome
 
 _Outcome = TypeVar("_Outcome", bound="MetricOutcome | DiffOutcome")
+
+
+@dataclass(frozen=True)
+class _RunContext:
+    """What every metric in one run is measured against.
+
+    Built once and handed down whole: none of it varies by metric, and
+    threading each piece separately is what grows the signature.
+    """
+
+    config: Config
+    project: ProjectFiles
+    read: TextReader
+    metric_types: Mapping[str, MetricType]
+    loc: ProjectLoc
 
 
 def run(
@@ -35,9 +50,18 @@ def run(
             raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
     walked = tuple(project.walk())
-    loc = ProjectLoc(config, project=project, walked=walked)
+    # the port hands over bytes; what counts as readable text is decided
+    # here, once, and every metric is given the same reader
+    read = text_reader(project.read)
+    context = _RunContext(
+        config=config,
+        project=project,
+        read=read,
+        metric_types=metric_types,
+        loc=ProjectLoc(config, read=read, walked=walked),
+    )
     outcomes = tuple(
-        _outcome(spec, config, project=project, metric_types=metric_types, loc=loc)
+        _outcome(spec, context)
         for spec in config.metrics
         if only is None or spec.name in only
     )
@@ -46,26 +70,19 @@ def run(
     )
 
 
-def _outcome(
-    spec: MetricSpec,
-    config: Config,
-    *,
-    project: ProjectFiles,
-    metric_types: Mapping[str, MetricType],
-    loc: ProjectLoc,
-) -> MetricOutcome:
+def _outcome(spec: MetricSpec, context: _RunContext) -> MetricOutcome:
     """Measure one metric, turning a failure into an errored outcome."""
-    range_specs, range_names = ranges_for(spec, config)
-    files = resolve(loc.walked, range_specs)
-    guide = effective_guide(spec, config.display, loc=loc.lines)
-    context = MetricContext(
+    range_specs, range_names = ranges_for(spec, context.config)
+    files = resolve(context.loc.walked, range_specs)
+    guide = effective_guide(spec, context.config.display, loc=context.loc.lines)
+    metric_context = MetricContext(
         files=files,
-        read=text_reader(project.read),
-        exists=project.exists,
+        read=context.read,
+        exists=context.project.exists,
         params=spec.params,
     )
     try:
-        result = metric_types[spec.type].func(context)
+        result = context.metric_types[spec.type].func(metric_context)
     # metric isolation: one failure must not stop the run
     except Exception as exc:  # pylint: disable=broad-exception-caught
         return errored(
@@ -95,7 +112,10 @@ def errored(
 
     A run and a diff isolate their metrics the same way and say the same
     thing about one that failed, so they say it in one place; only the
-    kind of outcome they hand back differs.
+    kind of outcome they hand back differs. Both kinds carry these five
+    fields and no more of them, so the constructor is theirs in common --
+    and writing it out on each side is the duplication `duplicate-code`
+    is there to catch.
     """
     return kind(
         spec=spec,

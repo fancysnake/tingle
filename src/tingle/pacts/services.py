@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.metrics import MetricType
-    from tingle.pacts.report import MetricOutcome, RunReport
+    from tingle.pacts.report import MetricOutcome, ReportSection, RunReport
 
 
 class ConfigServiceProtocol(Protocol):
@@ -76,8 +76,10 @@ class BrowseServiceProtocol(Protocol):
     """
 
     @abstractmethod
-    def start(self, outcomes: Sequence[MetricOutcome | DiffOutcome]) -> BrowseState:
-        """Open a session over the outcomes of a finished report."""
+    def start(
+        self, sections: Sequence[ReportSection[MetricOutcome | DiffOutcome]]
+    ) -> BrowseState:
+        """Open a session over the sections of a finished report."""
 
     @abstractmethod
     def rows(self, state: BrowseState) -> tuple[Row, ...]:

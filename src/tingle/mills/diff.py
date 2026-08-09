@@ -9,7 +9,7 @@ from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.mills.runner import errored, ranges_for
-from tingle.mills.text import text_reader
+from tingle.mills.text import TextReader, text_reader
 from tingle.pacts.config import Config, ConfigError, MetricSpec
 from tingle.pacts.diff import (
     BranchDiff,
@@ -29,6 +29,14 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class _Readers:
+    """The two sides a diff metric reads, each adapted from bytes once."""
+
+    current: TextReader
+    base: TextReader
+
+
+@dataclass(frozen=True)
 class DiffRunner:
     """Runs the diff variant of every configured metric plus its total."""
 
@@ -45,8 +53,14 @@ class DiffRunner:
                 raise ConfigError([f'unknown metric "{name}"' for name in unknown])
 
         branch_diff = self.diff_source.branch_diff(base)
+        # both ports hand over bytes; what counts as readable text is
+        # decided here, once per side, and never at a call site
+        readers = _Readers(
+            current=text_reader(self.project.read),
+            base=text_reader(self.diff_source.read_base),
+        )
         loc = ProjectLoc(
-            self.config, project=self.project, walked=tuple(self.project.walk())
+            self.config, read=readers.current, walked=tuple(self.project.walk())
         )
 
         outcomes: list[DiffOutcome] = []
@@ -58,7 +72,9 @@ class DiffRunner:
                 skipped.append(spec.name)
                 continue
             outcomes.append(
-                self._outcome(spec, diff_func, branch_diff=branch_diff, loc=loc)
+                self._outcome(
+                    spec, diff_func, branch_diff=branch_diff, loc=loc, readers=readers
+                )
             )
 
         return DiffReport(
@@ -77,18 +93,19 @@ class DiffRunner:
         *,
         branch_diff: BranchDiff,
         loc: ProjectLoc,
+        readers: _Readers,
     ) -> DiffOutcome:
         range_specs, range_names = ranges_for(spec, self.config)
         guide = effective_guide(spec, self.config.display, loc=loc.lines)
         diff_context = DiffMetricContext(
             files=_filter_files(branch_diff.files, range_specs),
-            read=text_reader(self.project.read),
-            read_base=text_reader(self.diff_source.read_base),
+            read=readers.current,
+            read_base=readers.base,
             params=spec.params,
         )
         total_context = MetricContext(
             files=resolve(loc.walked, range_specs),
-            read=text_reader(self.project.read),
+            read=readers.current,
             exists=self.project.exists,
             params=spec.params,
         )

@@ -16,15 +16,15 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from tingle.mills.display import group_summary, severity_ratio
-from tingle.pacts.browse import BrowseState, Row, RowKind, Sort, SortKey
+from tingle.pacts.browse import BrowseState, Row, RowKind, Search, Sort, SortKey
 from tingle.pacts.diff import DiffOutcome
-from tingle.pacts.report import ERROR_STAT, UNGROUPED
+from tingle.pacts.report import ERROR_STAT, UNGROUPED, net_text, stat_text
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
 
     from tingle.pacts.metrics import Occurrence
-    from tingle.pacts.report import GroupSummary, MetricOutcome
+    from tingle.pacts.report import GroupSummary, MetricOutcome, ReportSection
 
 
 def metric_key(name: str) -> str:
@@ -37,15 +37,24 @@ def group_key(name: str | None) -> str:
     return f"group:{name or ''}"
 
 
-def start(outcomes: Sequence[MetricOutcome | DiffOutcome]) -> BrowseState:
+def start(
+    sections: Sequence[ReportSection[MetricOutcome | DiffOutcome]],
+) -> BrowseState:
     """Open a session over a finished report: every metric folded.
+
+    The report's sections are taken as they are. Which group a metric
+    belongs to, and what a group adds up to, were decided when the report
+    was built; a session that worked them out again would be a second
+    implementation of the same grouping, free to disagree with the one the
+    static views draw.
 
     Metrics start folded and groups start open, so the listing opens as an
     outline of what was measured rather than as every located hit at once.
     """
-    return BrowseState(
-        outcomes=tuple(outcomes),
-        folded=frozenset(metric_key(outcome.spec.name) for outcome in outcomes),
+    state = BrowseState(sections=tuple(sections))
+    return replace(
+        state,
+        folded=frozenset(metric_key(outcome.spec.name) for outcome in state.outcomes),
     )
 
 
@@ -84,23 +93,25 @@ def outlined(state: BrowseState) -> bool:
 def grouped(state: BrowseState) -> bool:
     """Whether the run has groups at all, whatever the view is doing to them.
 
-    Read off every outcome the session holds rather than the visible
-    rows, so a search that spared only ungrouped metrics -- or a sort
-    that flattened the outline -- does not make a grouped run look flat.
+    Read off the report's own sections rather than the visible rows, so a
+    search that spared only ungrouped metrics -- or a sort that flattened
+    the outline -- does not make a grouped run look flat.
     """
-    return any(outcome.spec.group is not None for outcome in state.outcomes)
+    return any(section.name is not None for section in state.sections)
 
 
 def set_query(state: BrowseState, query: str) -> BrowseState:
     """Search for `query`, or leave search mode when it is empty.
 
     Fold gestures made during a search are part of the search: they last
-    while the query does and are dropped with it, leaving the outline the
-    reader built exactly as it was.
+    while the query does and go with it, leaving the outline the reader
+    built exactly as it was.
     """
     if not query:
-        return replace(state, query="", overlay={})
-    return replace(state, query=query)
+        return replace(state, search=None)
+    if state.search is None:
+        return replace(state, search=Search(query=query))
+    return replace(state, search=replace(state.search, query=query))
 
 
 def set_fold(state: BrowseState, key: str, *, folded: bool) -> BrowseState:
@@ -110,11 +121,11 @@ def set_fold(state: BrowseState, key: str, *, folded: bool) -> BrowseState:
     every row in one pass; a caller acting on a row already holds that
     answer as `Row.folded` and passes back the other one.
 
-    During a search the gesture is recorded apart from the fold set, so
-    that leaving the search leaves the outline untouched.
+    During a search the gesture is recorded on the search, so that leaving
+    it leaves the outline untouched.
     """
-    if state.query:
-        return replace(state, overlay={**state.overlay, key: folded})
+    if (search := state.search) is not None:
+        return replace(state, search=search.with_fold(key, folded=folded))
     if folded:
         return replace(state, folded=state.folded | {key})
     return replace(state, folded=state.folded - {key})
@@ -148,9 +159,9 @@ def fold_quiet_groups(state: BrowseState) -> BrowseState:
     not this one.
     """
     quiet = frozenset(
-        group_key(name)
-        for name, section in _sections(_matches(state), state.sort)
-        if _quiet(_section_summary(section))
+        group_key(section.name)
+        for section in _visible(state)
+        if _quiet(section.summary)
     )
     return replace(state, folded=state.folded | quiet)
 
@@ -161,13 +172,14 @@ def rows(state: BrowseState) -> tuple[Row, ...]:
     The one function the interactive gate renders; everything else here
     exists to answer it.
     """
-    matches = _matches(state)
+    sections = _visible(state)
     if not outlined(state):
+        flattened = [match for section in sections for match in section.matches]
         return tuple(
             _metric_row(state, match, depth=0, foldable=False)
-            for match in _sorted(matches, state.sort)
+            for match in _sorted(flattened, state.sort)
         )
-    return tuple(_outline_rows(state, matches))
+    return tuple(_outline_rows(state, sections))
 
 
 @dataclass(frozen=True)
@@ -186,7 +198,72 @@ class _Match:
     revealed: bool
 
 
-def _matches(state: BrowseState) -> tuple[_Match, ...]:
+@dataclass(frozen=True)
+class _Section:
+    """One of the report's groups, as the query and the sort leave it.
+
+    `summary` is the report's own wherever the query kept the whole group,
+    and the sum of what survived wherever it did not: under a live query a
+    group header totals what is on screen, which is the one place a
+    section's sum is deliberately not the report's.
+    """
+
+    name: str | None
+    matches: tuple[_Match, ...]
+    summary: GroupSummary
+
+
+def _visible(state: BrowseState) -> tuple[_Section, ...]:
+    """Return the report's sections, as the query and the sort leave them.
+
+    Sections holding nothing the query found are dropped whole; the rest
+    keep the grouping the report already decided.
+    """
+    searched = (_searched(section, state.search) for section in state.sections)
+    return _ordered(tuple(s for s in searched if s.matches), state.sort)
+
+
+def _searched(
+    section: ReportSection[MetricOutcome | DiffOutcome], search: Search | None
+) -> _Section:
+    """Narrow one section to what the query found, re-summing only if it did."""
+    matches = _matches(section.outcomes, search)
+    summary = (
+        section.summary
+        if len(matches) == len(section.outcomes)
+        else group_summary(tuple(match.outcome for match in matches))
+    )
+    return _Section(name=section.name, matches=matches, summary=summary)
+
+
+def _ordered(
+    sections: tuple[_Section, ...], sort: tuple[Sort, ...]
+) -> tuple[_Section, ...]:
+    """Put the groups, and the metrics inside each, in the order to draw them.
+
+    Config order by default, as everywhere else in tingle; by name when
+    the reader sorted by group, and backwards when they asked for it that
+    way. Either way the ungrouped section comes last -- it is a remainder,
+    not a group with an empty name, so turning the order over does not
+    lift it to the top.
+    """
+    ordered = list(sections)
+    if sort and sort[0].key is SortKey.GROUP:
+        named = sorted(
+            (section for section in ordered if section.name is not None),
+            key=lambda section: section.name or "",
+            reverse=sort[0].descending,
+        )
+        ordered = [*named, *(s for s in ordered if s.name is None)]
+    return tuple(
+        replace(section, matches=tuple(_sorted(section.matches, sort)))
+        for section in ordered
+    )
+
+
+def _matches(
+    outcomes: Sequence[MetricOutcome | DiffOutcome], search: Search | None
+) -> tuple[_Match, ...]:
     """Apply the query: which metrics are visible, showing which hits.
 
     Matching is case-sensitive substring, against everything a metric
@@ -195,19 +272,19 @@ def _matches(state: BrowseState) -> tuple[_Match, ...]:
     its occurrences, whether or not that occurrence is currently on
     screen. Nobody is going to unfold the whole tree before searching it.
     """
-    if not state.query:
+    if search is None:
         return tuple(
             _Match(outcome, _occurrences(outcome), revealed=False)
-            for outcome in state.outcomes
+            for outcome in outcomes
         )
     matches: list[_Match] = []
-    for outcome in state.outcomes:
+    for outcome in outcomes:
         occurrences = _occurrences(outcome)
-        if _titled(outcome, state.query):
+        if _titled(outcome, search.query):
             matches.append(_Match(outcome, occurrences, revealed=False))
-        elif _described(outcome, state.query):
+        elif _described(outcome, search.query):
             matches.append(_Match(outcome, occurrences, revealed=True))
-        elif hits := tuple(o for o in occurrences if state.query in o.path):
+        elif hits := tuple(o for o in occurrences if search.query in o.path):
             matches.append(_Match(outcome, hits, revealed=True))
     return tuple(matches)
 
@@ -244,45 +321,22 @@ def _occurrences(outcome: MetricOutcome | DiffOutcome) -> tuple[Occurrence, ...]
     return outcome.result.occurrences
 
 
-def _outline_rows(state: BrowseState, matches: tuple[_Match, ...]) -> Iterable[Row]:
+def _outline_rows(state: BrowseState, sections: tuple[_Section, ...]) -> Iterable[Row]:
     """Group headers with their metrics, and their metrics' hits, nested."""
     has_groups = grouped(state)
-    for name, section in _sections(matches, state.sort):
+    for section in sections:
         depth, parent = 0, None
         if has_groups:
-            key = group_key(name)
+            key = group_key(section.name)
             # a search reveals every group holding something it found, or
             # the metric it found would stay hidden one level up
-            folded = _folded(state, key, revealed=bool(state.query))
-            yield _group_row(name, section, key=key, folded=folded)
+            folded = _folded(state, key, revealed=state.search is not None)
+            yield _group_row(section, key=key, folded=folded)
             if folded:
                 continue
             depth, parent = 1, key
-        for match in section:
+        for match in section.matches:
             yield from _metric_rows(state, match, depth=depth, parent=parent)
-
-
-def _sections(
-    matches: tuple[_Match, ...], sort: tuple[Sort, ...]
-) -> list[tuple[str | None, list[_Match]]]:
-    """Split the metrics into their groups, in the order to draw them.
-
-    Config order by default, as everywhere else in tingle; by name when
-    the reader sorted by group, and backwards when they asked for it that
-    way. Either way the ungrouped section comes last -- it is a remainder,
-    not a group with an empty name, so turning the order over does not
-    lift it to the top.
-    """
-    sections: dict[str | None, list[_Match]] = {}
-    for match in matches:
-        sections.setdefault(match.outcome.spec.group, []).append(match)
-    ungrouped = sections.pop(None, None)
-    ordered: list[tuple[str | None, list[_Match]]] = list(sections.items())
-    if sort and sort[0].key is SortKey.GROUP:
-        ordered.sort(key=lambda section: section[0] or "", reverse=sort[0].descending)
-    if ungrouped is not None:
-        ordered.append((None, ungrouped))
-    return [(name, _sorted(section, sort)) for name, section in ordered]
 
 
 def _sorted(matches: Iterable[_Match], sort: tuple[Sort, ...]) -> list[_Match]:
@@ -345,32 +399,15 @@ def _score(outcome: MetricOutcome | DiffOutcome) -> float | None:
     return severity_ratio(value, outcome.guide)
 
 
-def _group_row(
-    name: str | None, section: list[_Match], *, key: str, folded: bool
-) -> Row:
-    """Build a group header out of what its metrics add up to.
-
-    The total is what has arrived so far and climbs as the run goes on:
-    a partial sum says more than a blank, and blanking it until the last
-    metric lands would leave the header saying nothing for the whole run.
-    """
+def _group_row(section: _Section, *, key: str, folded: bool) -> Row:
+    """Build a group header out of what its metrics add up to."""
     return Row(
         kind=RowKind.GROUP,
         key=key,
         depth=0,
-        cells=_group_cells(name, _section_summary(section)),
+        cells=_group_cells(section.name, section.summary),
         folded=folded,
     )
-
-
-def _section_summary(section: Sequence[_Match]) -> GroupSummary:
-    """Add up what a group's metrics say -- the ones a query left, at that.
-
-    Under a live query a group header totals only the metrics the query
-    matched, which is the one place a section's sum is deliberately not
-    the report's: it says what is on screen.
-    """
-    return group_summary(tuple(match.outcome for match in section))
 
 
 def _quiet(summary: GroupSummary) -> bool:
@@ -458,9 +495,9 @@ def _metric_row(
 
 def _group_cells(name: str | None, summary: GroupSummary) -> tuple[str, str, str]:
     label = name if name is not None else UNGROUPED
-    stat = f"{summary.emoji} {summary.value}"
+    stat = stat_text(summary.emoji, summary.value)
     if summary.net is not None:
-        stat = f"net {summary.net:+d} of {stat}"
+        stat = f"{net_text(summary.net)} of {stat}"
     return (label, "", stat)
 
 
@@ -479,28 +516,26 @@ def _stat(outcome: MetricOutcome | DiffOutcome) -> str:
         return ERROR_STAT
     if isinstance(outcome, DiffOutcome):
         return _diff_stat(outcome)
-    return f"{outcome.emoji} {outcome.result.value}"
+    return stat_text(outcome.emoji, outcome.result.value)
 
 
 def _diff_stat(outcome: DiffOutcome) -> str:
     """Say what a branch did to a metric, beside where the metric now stands."""
     if (result := outcome.result) is None:  # pragma: no cover - caller guards
         return ERROR_STAT
-    net = f"net {result.net:+d}"
-    if outcome.total is None:
-        return f"{net} of ?"
-    standing = f"{net} of {outcome.emoji} {outcome.total.value}"
+    total = outcome.total.value if outcome.total is not None else None
+    standing = f"{net_text(result.net)} of {stat_text(outcome.emoji, total)}"
     if result.added is None or result.removed is None:
         return standing
     return f"+{result.added} / -{result.removed} ({standing})"
 
 
 def _folded(state: BrowseState, key: str, *, revealed: bool) -> bool:
-    """Resolve one row's fold state: overlay, then reveal, then fold set."""
-    if not state.query:
+    """Resolve one row's fold state: gesture, then reveal, then fold set."""
+    if (search := state.search) is None:
         return key in state.folded
-    if key in state.overlay:
-        return state.overlay[key]
+    if (gesture := search.gesture(key)) is not None:
+        return gesture
     return not revealed and key in state.folded
 
 

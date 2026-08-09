@@ -93,6 +93,11 @@ def group_summary(outcomes: Iterable[MetricOutcome | DiffOutcome]) -> GroupSumma
 
     A diff's standing `value` is the sum of the metrics' current totals,
     not of their nets: a net of zero does not mean the debt is zero.
+
+    One member whose total could not be measured makes the whole group's
+    unknown. Leaving it out would hand the reader the sum of the rest,
+    which reads as the group's debt and is smaller than it -- the one
+    number a header must never quietly understate.
     """
     value = 0
     guide = 0
@@ -100,6 +105,7 @@ def group_summary(outcomes: Iterable[MetricOutcome | DiffOutcome]) -> GroupSumma
     has_error = False
     changed = False
     is_diff = False
+    unknown = False
 
     for outcome in outcomes:
         if outcome.result is None:
@@ -112,15 +118,17 @@ def group_summary(outcomes: Iterable[MetricOutcome | DiffOutcome]) -> GroupSumma
             changed = changed or bool(
                 outcome.result.net or outcome.result.added or outcome.result.removed
             )
-            if outcome.total is not None:
+            if outcome.total is None:
+                unknown = True
+            else:
                 value += outcome.total.value
         else:
             value += outcome.result.value
 
     return GroupSummary(
-        value=value,
+        value=None if unknown else value,
         guide=guide,
-        emoji=severity_emoji(value, guide),
+        emoji="" if unknown else severity_emoji(value, guide),
         has_error=has_error,
         net=net if is_diff else None,
         changed=changed,
