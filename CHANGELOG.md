@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A metric's description and the ranges it measures over are rows under it,
   shown when it is unfolded. A metric that failed puts its error there too,
   instead of only saying `ERROR` in the value column.
+- A GitHub Actions composite action,
+  `fancysnake/tingle/actions/metrics-history`, that records `stat --json` on
+  a branch and publishes a chart of each metric's history.
 
 ### Changed
 
