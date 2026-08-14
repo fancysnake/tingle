@@ -80,6 +80,9 @@ extra:
       link: https://github.com/fancysnake/tingle
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/tingle/
+    - icon: fontawesome/solid/globe
+      link: https://fancysnake.dev
+      name: fancysnake.dev
 
 # every internal link must resolve; docs:build runs with --strict
 validation:
