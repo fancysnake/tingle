@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A GitHub Actions composite action,
   `fancysnake/tingle/actions/metrics-history`, that records `stat --json` on
   a branch and publishes a chart of each metric's history.
-- [History](https://tingle.fancysnake.dev/history/) documents how to serve
-  that chart from a site whose Pages source is already a build artifact, by
-  copying it into the generated site. tingle's own history is published this
-  way, at <https://tingle.fancysnake.dev/history/chart/>.
+- `fancysnake/tingle/actions/metrics-history/publish`, the other half: it
+  fetches that chart into a site being built, for repositories whose Pages
+  source is already a build artifact and so cannot serve the data branch.
+- [History](https://tingle.fancysnake.dev/history/) documents both halves.
+  tingle's own history is published this way, at
+  <https://tingle.fancysnake.dev/history/chart/>.
 
 ## [0.4.1] - 2026-08-09
 

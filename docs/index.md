@@ -61,4 +61,4 @@ Three things, in rising order of opinion:
   a chart of them. [tingle's own][own] is the shape of the result.
 - **[CLI reference](cli.md)** — every command and flag.
 
-  [own]: https://tingle.fancysnake.dev/history/chart/
+  [own]: history/chart/index.html

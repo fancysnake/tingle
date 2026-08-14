@@ -1,6 +1,6 @@
 site_name: tingle
 site_description: Code metrics for the era of constant refactoring.
-site_url: https://fancysnake.github.io/tingle/
+site_url: https://tingle.fancysnake.dev/
 repo_url: https://github.com/fancysnake/tingle
 repo_name: fancysnake/tingle
 edit_uri: edit/main/docs/

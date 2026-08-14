@@ -7,9 +7,9 @@ that something is a **branch**, not an artifact.
 !!! tip "See one first"
 
     tingle keeps its own history this way, and publishes it:
-    **[tingle.fancysnake.dev/history/chart/][own]**. One line per metric,
-    every point linked to the commit that produced it — that is what the
-    rest of this page sets up.
+    **[the chart beside this page][own]**. One line per metric, every point
+    linked to the commit that produced it — that is what the rest of this
+    page sets up.
 
 !!! warning "Artifacts are not history"
 
@@ -128,27 +128,39 @@ branch of its own instead:
 ```
 
 This is how tingle records its own metrics. The branch still holds the chart
-the action generates — it is simply not served from there, so copy it into
-the site your generator just built, in the job that publishes it:
+the action generates — it is simply not served from there, so fetch it into
+your source tree **before** the build, in the job that publishes the site:
 
 ```yaml
+      - uses: fancysnake/tingle/actions/metrics-history/publish@main
+        with:
+          data-branch: metrics-data
+          into: docs/history/chart
       - run: mkdocs build --strict
-      - name: Add the metrics history chart
-        env:
-          REPO: ${{ github.server_url }}/${{ github.repository }}.git
-        run: |
-          data=$(mktemp -d)
-          git clone --quiet --depth 1 --branch metrics-data "$REPO" "$data"
-          mkdir -p site/history/chart
-          cp -R "$data/metrics/." site/history/chart/
 ```
 
-The chart is then a page of your documentation like any other — tingle's own
-is at [tingle.fancysnake.dev/history/chart/][own], published exactly this
-way. It is self-contained: an `index.html` that loads its `data.js` beside
-it, so wherever you drop the directory is where the chart works.
+`into:` is a path your generator copies verbatim into its output — `docs/`
+for MkDocs, `content/` or `static/` elsewhere. The chart is then a page of
+your documentation like any other, and the link to it is a relative one your
+build checks, rather than an absolute URL nobody validates. tingle's own is
+[the chart this page opened with][own], published exactly this way.
 
-  [own]: https://tingle.fancysnake.dev/history/chart/
+| Input | Default | Meaning |
+|---|---|---|
+| `data-branch` | `gh-pages` | branch the history was recorded to |
+| `data-dir` | `metrics` | directory in that branch holding the chart |
+| `into` | required | directory the chart is copied into |
+| `github-token` | `github.token` | token used to read the data branch |
+
+The chart is self-contained — an `index.html` that loads its `data.js`
+beside it — so commit a placeholder `index.html` at `into:` and ignore the
+`data.js` that lands next to it. The step tolerates exactly one failure, the
+data branch not existing yet, which is every repository's first run: the
+placeholder is what ships in its place, and the build still passes. Every
+other failure stops the job rather than deploying a site whose chart link is
+dead.
+
+  [own]: history/chart/index.html
 
 The history is also a file you own: `metrics/data.js`, a single
 `window.BENCHMARK_DATA = {...}` assignment. Its `entries` are keyed by chart

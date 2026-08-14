@@ -21,20 +21,19 @@ jobs:
         with:
           persist-credentials: false
       - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4
-      - run: mise run docs:build
       # Pages serves this site, so the recorded history has no branch of its
-      # own to be served from: fold its chart into the site before upload
-      - name: Add the metrics history chart
-        env:
-          REPO: ${{ github.server_url }}/${{ github.repository }}.git
-        run: |
-          data=$(mktemp -d)
-          if git clone --quiet --depth 1 --branch metrics-data "$REPO" "$data"; then
-            mkdir -p site/history/chart
-            cp -R "$data/metrics/." site/history/chart/
-          else
-            echo "::notice::no metrics-data branch; the site ships without the chart"
-          fi
+      # own to be served from: fetch its chart over the placeholder committed
+      # at that path. Before the build, not after, so MkDocs carries it into
+      # the site and `--strict` checks the pages that link to it.
+      #
+      # This workflow and Metrics history both fire on the same push and run
+      # concurrently, so the chart published here is normally one commit
+      # behind; the next push to main brings it level.
+      - uses: ./actions/metrics-history/publish
+        with:
+          data-branch: metrics-data
+          into: docs/history/chart
+      - run: mise run docs:build
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: site
