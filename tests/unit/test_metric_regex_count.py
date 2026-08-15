@@ -1,29 +1,13 @@
 from __future__ import annotations
 
-from pathlib import PurePath
-from typing import TYPE_CHECKING, Any
+from support import metric_context
 
 from tingle.mills.metrics.regex_count import regex_count, validate_params
-from tingle.pacts.metrics import MetricContext
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-
-def _context(
-    contents: Mapping[str, str | None], params: Mapping[str, Any]
-) -> MetricContext:
-    return MetricContext(
-        files=tuple(PurePath(name) for name in contents),
-        read=lambda path: contents.get(str(path)),
-        exists=lambda path: str(path) in contents,
-        params=params,
-    )
 
 
 def test_counts_matches_across_files() -> None:
     result = regex_count(
-        _context(
+        metric_context(
             {"a.py": "x = 1  # noqa\ny = 2  # noqa\n", "b.py": "z = 3  # noqa\n"},
             {"pattern": r"#\s*noqa"},
         )
@@ -36,14 +20,14 @@ def test_counts_matches_across_files() -> None:
 
 def test_occurrence_line_numbers() -> None:
     text = "TODO at start\nclean line\n  trailing TODO\n\nTODO after blank"
-    result = regex_count(_context({"a.py": text}, {"pattern": "TODO"}))
+    result = regex_count(metric_context({"a.py": text}, {"pattern": "TODO"}))
 
     assert [o.line for o in result.occurrences] == [1, 3, 5]
 
 
 def test_occurrence_line_for_multiline_match_is_its_start() -> None:
     result = regex_count(
-        _context(
+        metric_context(
             {"a.py": "one\nstart\nend\n"},
             {"pattern": r"start\nend", "flags": ["DOTALL"]},
         )
@@ -54,20 +38,20 @@ def test_occurrence_line_for_multiline_match_is_its_start() -> None:
 
 
 def test_occurrences_in_crlf_text() -> None:
-    result = regex_count(_context({"a.py": "x\r\nTODO\r\n"}, {"pattern": "TODO"}))
+    result = regex_count(metric_context({"a.py": "x\r\nTODO\r\n"}, {"pattern": "TODO"}))
 
     assert [o.line for o in result.occurrences] == [2]
 
 
 def test_empty_file_has_no_occurrences() -> None:
-    result = regex_count(_context({"a.py": ""}, {"pattern": "TODO"}))
+    result = regex_count(metric_context({"a.py": ""}, {"pattern": "TODO"}))
 
     assert result.value == 0
     assert not result.occurrences
 
 
 def test_zero_matches_has_empty_details() -> None:
-    result = regex_count(_context({"a.py": "clean\n"}, {"pattern": "TODO"}))
+    result = regex_count(metric_context({"a.py": "clean\n"}, {"pattern": "TODO"}))
 
     assert result.value == 0
     assert not result.details
@@ -75,14 +59,16 @@ def test_zero_matches_has_empty_details() -> None:
 
 def test_flags_are_applied() -> None:
     result = regex_count(
-        _context({"a.py": "TODO\ntodo\n"}, {"pattern": "todo", "flags": ["IGNORECASE"]})
+        metric_context(
+            {"a.py": "TODO\ntodo\n"}, {"pattern": "todo", "flags": ["IGNORECASE"]}
+        )
     )
 
     assert result.value == 2
 
 
 def test_unreadable_file_warns() -> None:
-    result = regex_count(_context({"blob.bin": None}, {"pattern": "x"}))
+    result = regex_count(metric_context({"blob.bin": None}, {"pattern": "x"}))
 
     assert result.value == 0
     assert result.warnings == ("blob.bin: skipped (binary, unreadable, or missing)",)

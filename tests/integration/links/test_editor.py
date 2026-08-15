@@ -1,6 +1,16 @@
 from __future__ import annotations
 
+import re
+import subprocess
+from typing import TYPE_CHECKING
+
+import pytest
+
 from tingle.links.editor import VsCodeCli
+from tingle.pacts.editor import EditorError
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def _cli(
@@ -63,3 +73,31 @@ def test_open_does_nothing_when_code_vanished_from_path() -> None:
     cli.open("/proj/src/a.py", 42)
 
     assert not calls
+
+
+def test_a_shim_that_will_not_answer_becomes_an_editor_error() -> None:
+    """The adapter owns subprocess; what it hands upwards is an EditorError."""
+
+    def _hang(_args: Sequence[str]) -> None:
+        raise subprocess.TimeoutExpired(cmd="code", timeout=5)
+
+    cli = VsCodeCli(
+        environ={"TERM_PROGRAM": "vscode"}, which=lambda _: "/usr/bin/code", spawn=_hang
+    )
+
+    with pytest.raises(
+        EditorError, match=re.escape("could not open /proj/src/a.py:42")
+    ):
+        cli.open("/proj/src/a.py", 42)
+
+
+def test_a_shim_that_vanished_between_probe_and_spawn_becomes_one_too() -> None:
+    def _gone(_args: Sequence[str]) -> None:
+        raise FileNotFoundError(2, "No such file or directory")
+
+    cli = VsCodeCli(
+        environ={"TERM_PROGRAM": "vscode"}, which=lambda _: "/usr/bin/code", spawn=_gone
+    )
+
+    with pytest.raises(EditorError):
+        cli.open("/proj/src/a.py", None)

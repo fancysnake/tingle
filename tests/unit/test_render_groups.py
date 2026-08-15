@@ -3,47 +3,29 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tingle.gates.cli.render import group_sections, report_table, run_json, run_listing
-from tingle.pacts.config import MetricSpec
+from tingle.gates.cli.render import report_table, run_json, run_listing
+from tingle.mills.display import outcome_emoji, sections
+from tingle.pacts.config import DEFAULT_GUIDE, MetricSpec
 from tingle.pacts.metrics import MetricResult
 from tingle.pacts.report import MetricOutcome, RunReport
 
 
 def _outcome(name: str, group: str | None = None, *, value: int = 1) -> MetricOutcome:
+    result = MetricResult(value=value)
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
-        result=MetricResult(value=value),
+        emoji=outcome_emoji(result, DEFAULT_GUIDE),
+        result=result,
     )
 
 
 def _report(*outcomes: MetricOutcome) -> RunReport:
     return RunReport(
-        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=outcomes
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        sections=sections(outcomes),
     )
-
-
-def test_group_sections_first_appearance_order_ungrouped_last() -> None:
-    sections = group_sections(
-        (
-            _outcome("a", "typing"),
-            _outcome("b", "lint"),
-            _outcome("c", "typing"),  # scattered member of an earlier group
-            _outcome("d"),  # ungrouped
-        )
-    )
-
-    names = [(group, [o.spec.name for o in outs]) for group, outs in sections]
-    assert names == [("typing", ["a", "c"]), ("lint", ["b"]), (None, ["d"])]
-
-
-def test_group_sections_no_groups_single_section_original_order() -> None:
-    sections = group_sections((_outcome("a"), _outcome("b")))
-
-    assert len(sections) == 1
-    group, outs = sections[0]
-    assert group is None
-    assert [o.spec.name for o in outs] == ["a", "b"]
 
 
 def test_listing_has_group_headings() -> None:

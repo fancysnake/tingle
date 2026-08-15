@@ -14,8 +14,8 @@ from tingle.mills.ranges import resolve
 if TYPE_CHECKING:
     from pathlib import PurePath
 
+    from tingle.mills.text import TextReader
     from tingle.pacts.config import Config, RangeSpec
-    from tingle.pacts.metrics import ProjectFiles
 
 
 class ProjectLoc:
@@ -30,11 +30,11 @@ class ProjectLoc:
     """
 
     def __init__(
-        self, config: Config, *, project: ProjectFiles, walked: tuple[PurePath, ...]
+        self, config: Config, *, read: TextReader, walked: tuple[PurePath, ...]
     ) -> None:
         """Hold what counting will need, without counting anything yet."""
         self._config = config
-        self._project = project
+        self._read = read
         self.walked = walked
         self._lines: int | None = None
 
@@ -58,6 +58,6 @@ class ProjectLoc:
         """Sum the lines of every readable file in the loc range."""
         total = 0
         for path in resolve(self.walked, [self.range_spec()]):
-            if (text := self._project.read(path)) is not None:
+            if (text := self._read(path)) is not None:
                 total += len(text.splitlines())
         return total

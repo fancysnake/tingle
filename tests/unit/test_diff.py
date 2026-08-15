@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from typing import TYPE_CHECKING
 
 import pytest
+from support import PROJECT, make_config
 
 from tingle.mills.diff import DiffRunner
-from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
+from tingle.pacts.config import ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.diff import (
     BranchDiff,
     DiffMetricContext,
@@ -17,21 +18,7 @@ from tingle.pacts.diff import (
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
-
-
-class FakeProject:
-    def __init__(self, contents: Mapping[str, str]) -> None:
-        self._contents = dict(contents)
-
-    def walk(self) -> Iterable[PurePath]:
-        return sorted(PurePath(name) for name in self._contents)
-
-    def read(self, path: PurePath) -> str | None:
-        return self._contents.get(str(path))
-
-    def exists(self, path: PurePath) -> bool:
-        return str(path) in self._contents
+    from collections.abc import Mapping
 
 
 class FakeDiffSource:
@@ -44,12 +31,19 @@ class FakeDiffSource:
         self.requested_base = base
         return self._branch
 
-    def read_base(self, path: PurePath) -> str | None:
-        return self._base.get(str(path))
+    def read_base(self, path: PurePath) -> bytes | None:
+        text = self._base.get(str(path))
+        return None if text is None else text.encode()
 
 
 def _touched_files(ctx: DiffMetricContext) -> DiffResult:
     return DiffResult(net=len(ctx.files), added=len(ctx.files), removed=0)
+
+
+def _base_lines(ctx: DiffMetricContext) -> DiffResult:
+    """Count the base side's lines, which means actually reading it."""
+    texts = [ctx.read_base(file.path) for file in ctx.files]
+    return DiffResult(net=sum(len(text.splitlines()) for text in texts if text))
 
 
 def _total_files(ctx: MetricContext) -> MetricResult:
@@ -73,11 +67,10 @@ METRIC_TYPES = {
         name="boom_total", func=_boom_total, diff_func=_touched_files
     ),
     "no_diff": MetricType(name="no_diff", func=_total_files),
+    "base_lines": MetricType(
+        name="base_lines", func=_total_files, diff_func=_base_lines
+    ),
 }
-
-PYTHON_RANGE = RangeSpec(name="python", include=("**/*.py",), default=True)
-
-PROJECT = FakeProject({"a.py": "", "b.py": "", "notes.md": ""})
 
 BRANCH = BranchDiff(
     base_ref="main",
@@ -93,18 +86,8 @@ BRANCH = BranchDiff(
 )
 
 
-def _config(*metrics: MetricSpec) -> Config:
-    return Config(
-        root=Path("/proj"),
-        source=Path("/proj/tingle.toml"),
-        ranges={"python": PYTHON_RANGE},
-        metrics=metrics,
-        default_range=PYTHON_RANGE,
-    )
-
-
 def test_runs_diff_and_total() -> None:
-    config = _config(MetricSpec(name="files", type="touched"))
+    config = make_config(MetricSpec(name="files", type="touched"))
     source = FakeDiffSource(BRANCH, {})
 
     report = DiffRunner(config, PROJECT, source, METRIC_TYPES).run("main")
@@ -119,14 +102,22 @@ def test_runs_diff_and_total() -> None:
     assert outcome.total.value == 2
 
 
+def test_the_base_side_reaches_a_metric_as_text_not_as_bytes() -> None:
+    """The adapter hands over bytes; the runner decodes on the way in."""
+    config = make_config(MetricSpec(name="base", type="base_lines"))
+    source = FakeDiffSource(BRANCH, {"a.py": "one\ntwo\nthree\n"})
+
+    report = DiffRunner(config, PROJECT, source, METRIC_TYPES).run("main")
+
+    outcome = report.outcomes[0]
+    assert outcome.result is not None
+    assert outcome.result.net == 3
+
+
 def test_range_filtering_applies_to_changed_files() -> None:
-    everything = RangeSpec(name="everything", include=("**/*",))
-    config = Config(
-        root=Path("/proj"),
-        source=Path("/proj/tingle.toml"),
-        ranges={"python": PYTHON_RANGE, "everything": everything},
-        metrics=(MetricSpec(name="all", type="touched", ranges=("everything",)),),
-        default_range=PYTHON_RANGE,
+    config = make_config(
+        MetricSpec(name="all", type="touched", ranges=("everything",)),
+        extra_ranges={"everything": RangeSpec(name="everything", include=("**/*",))},
     )
 
     report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
@@ -139,7 +130,7 @@ def test_range_filtering_applies_to_changed_files() -> None:
 
 
 def test_raising_diff_func_is_isolated() -> None:
-    config = _config(
+    config = make_config(
         MetricSpec(name="broken", type="boom_diff"),
         MetricSpec(name="files", type="touched"),
     )
@@ -155,7 +146,7 @@ def test_raising_diff_func_is_isolated() -> None:
 
 
 def test_raising_total_func_is_isolated() -> None:
-    config = _config(MetricSpec(name="broken-total", type="boom_total"))
+    config = make_config(MetricSpec(name="broken-total", type="boom_total"))
 
     report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
         "main"
@@ -165,7 +156,7 @@ def test_raising_total_func_is_isolated() -> None:
 
 
 def test_type_without_diff_func_is_skipped() -> None:
-    config = _config(
+    config = make_config(
         MetricSpec(name="plain", type="no_diff"),
         MetricSpec(name="files", type="touched"),
     )
@@ -179,7 +170,7 @@ def test_type_without_diff_func_is_skipped() -> None:
 
 
 def test_only_filter() -> None:
-    config = _config(
+    config = make_config(
         MetricSpec(name="first", type="touched"),
         MetricSpec(name="second", type="touched"),
     )
@@ -192,7 +183,7 @@ def test_only_filter() -> None:
 
 
 def test_only_filter_rejects_unknown() -> None:
-    config = _config(MetricSpec(name="files", type="touched"))
+    config = make_config(MetricSpec(name="files", type="touched"))
 
     with pytest.raises(ConfigError) as excinfo:
         DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(

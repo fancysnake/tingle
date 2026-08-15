@@ -58,6 +58,10 @@ class ConfigService:
         """Create the starter config; raises FileExistsError if present."""
         return self.store.write_starter(cwd)
 
+    def list_metric_types(self) -> tuple[MetricType, ...]:
+        """Every metric type a config may name, in name order."""
+        return tuple(sorted(self.metric_types.values(), key=lambda t: t.name))
+
 
 @dataclass(frozen=True)
 class MetricsService:

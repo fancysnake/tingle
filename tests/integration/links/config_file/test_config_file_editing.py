@@ -14,15 +14,17 @@ append_metric = _store.append_metric
 edit_target = _store.edit_target
 write_starter = _store.write_starter
 
+# Deliberately not the config the CLI tests use: this suite only cares that
+# whatever was already in the file survives being appended to.
 EXISTING = """# my metrics
-[ranges.python]
+[ranges.sources]
 include = ["src/**/*.py"]  # only sources
 
 [[metrics]]
-name = "noqa-comments"
+name = "todo-comments"
 type = "regex_count"
-range = "python"
-pattern = '#\\s*noqa'
+range = "sources"
+pattern = '#\\s*TODO'
 """
 
 

@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
-from tingle.links.text import decode_text
 from tingle.pacts.diff import BranchDiff, DiffSourceError, FileDiff, FileStatus
+from tingle.pacts.metrics import sniffed_binary
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -63,8 +63,8 @@ class GitCli:
             base_ref=base_ref, merge_base=merge_base, files=(*diff_files, *untracked)
         )
 
-    def read_base(self, path: PurePath) -> str | None:
-        """Return the file's text at the merge-base, mirroring worktree read()."""
+    def read_base(self, path: PurePath) -> bytes | None:
+        """Return the file's bytes at the merge-base, mirroring worktree read()."""
         if self._merge_base is None:
             msg = "read_base() called before branch_diff()"
             raise DiffSourceError(msg)
@@ -72,7 +72,7 @@ class GitCli:
         result = self._git("show", blob_ref)
         if result.returncode != 0:
             return None
-        return decode_text(result.stdout)
+        return result.stdout
 
     def _resolve_ref(self, base: str) -> str:
         for candidate in (base, f"origin/{base}"):
@@ -117,13 +117,29 @@ class GitCli:
         return untracked
 
     def _worktree_line_numbers(self, path: PurePath) -> Iterable[int]:
+        """Every line of an untracked file, which the branch wholly added.
+
+        Git reports no line numbers for a binary file it diffs, so the same
+        judgement is made here for the files it never diffed -- the NUL
+        sniff and nothing else, because that is all git asks. Whether a
+        metric may read what is left is tingle's own rule, and it lives in
+        mills, after the diff is built.
+
+        The lines are counted the way git counts them, on line feeds
+        alone: a file it did diff is reported against git's own numbering,
+        so one it never diffed has to be numbered the same way or the same
+        metric counts differently for being untracked. Python splits lines
+        on more than that -- a carriage return, a form feed -- and every
+        one of those would be a line git never saw.
+        """
         try:
             data = (self._root / path).read_bytes()
         except OSError:
             return ()
-        if (text := decode_text(data)) is None:
+        if sniffed_binary(data):
             return ()
-        return range(1, len(text.splitlines()) + 1)
+        lines = data.count(b"\n") + bool(data and not data.endswith(b"\n"))
+        return range(1, lines + 1)
 
     def _run(self, *args: str) -> str:
         result = self._git(*args)

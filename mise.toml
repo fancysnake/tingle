@@ -11,6 +11,10 @@ python = "3.11"
 
 [env]
 _.python.venv = { path = ".venv", create = true }
+# the shared task file reads .env.test itself, but only for its test and
+# type-check tasks; loading it here as well is what gives the lint and format
+# tasks the same SRC_PATHS/TEST_PATHS/SCRIPT_PATHS/TOML_PATHS.
+_.file = ".env.test"
 # integration tests chdir into tmpdirs, so coverage must be told an absolute
 # destination or the data file is written into a directory that then vanishes
 COVERAGE_FILE = "{{ config_root }}/.coverage.unit"
@@ -18,7 +22,7 @@ PACKAGE = "tingle"
 SRC_PATHS = "src"
 TEST_PATHS = "tests"
 SCRIPT_PATHS = ""
-TOML_PATHS = ".taplo.toml pyproject.toml mise.toml tingle.toml"
+TOML_PATHS = "*.toml"
 
 [task_config]
 includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"]

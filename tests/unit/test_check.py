@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from tingle.mills.check import judge
+from tingle.mills.display import sections
 from tingle.pacts.config import CheckPolicy, CheckSpec, MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 
@@ -18,6 +19,7 @@ def _outcome(name: str, net: int | None, *, error: str | None = None) -> DiffOut
     return DiffOutcome(
         spec=MetricSpec(name=name, type="regex_count"),
         range_names=("python",),
+        emoji="",  # judging reads the numbers, never the rank
         result=result,
         error=error,
     )
@@ -29,7 +31,7 @@ def _report(*outcomes: DiffOutcome) -> DiffReport:
         source=ROOT / "tingle.toml",
         base_ref="main",
         merge_base="abc123",
-        outcomes=outcomes,
+        sections=sections(outcomes),
     )
 
 

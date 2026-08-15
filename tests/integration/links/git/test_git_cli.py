@@ -7,17 +7,7 @@ import pytest
 
 from tingle.links.git.cli import GitCli
 from tingle.pacts.diff import DiffSourceError, FileDiff, FileStatus
-
-
-@pytest.fixture(autouse=True)
-def isolated_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
-    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
-    monkeypatch.setenv("GIT_AUTHOR_NAME", "tingle-tests")
-    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "tests@tingle.invalid")
-    monkeypatch.setenv("GIT_COMMITTER_NAME", "tingle-tests")
-    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "tests@tingle.invalid")
-    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+from tingle.pacts.metrics import BINARY_SNIFF_BYTES
 
 
 def _git(cwd: Path, *args: str) -> None:
@@ -161,6 +151,96 @@ def test_untracked_files_count_as_fully_added(tmp_path: Path) -> None:
     assert files["blob.bin"].added_lines == frozenset()
 
 
+def test_an_untracked_file_that_is_not_utf8_still_adds_its_lines(
+    tmp_path: Path,
+) -> None:
+    """No NUL, so git would diff it as text, so its lines are added lines.
+
+    Whether a metric may read it is decided later, in mills, and the
+    adapter does not get a second opinion on that here.
+    """
+    repo = _branch_repo(tmp_path, "one\n")
+    (repo / "latin.txt").write_bytes(b"calf\xe9\n")
+
+    files = _by_path(GitCli(repo).branch_diff("main").files)
+
+    assert files["latin.txt"].status is FileStatus.ADDED
+    assert files["latin.txt"].added_lines == frozenset({1})
+
+
+def test_untracked_lines_are_counted_the_way_git_counts_them(tmp_path: Path) -> None:
+    """A carriage return is not a line break to git, so it is not one here.
+
+    Checked against the git on this machine rather than asserted from
+    memory: an untracked file is numbered the way a tracked one would be,
+    or the same metric counts differently for never having been committed.
+    """
+    repo = _branch_repo(tmp_path, "one\n")
+    (repo / "returns.txt").write_bytes(b"a\rb\n")
+    (repo / "unfinished.txt").write_bytes(b"a\nb")
+
+    files = _by_path(GitCli(repo).branch_diff("main").files)
+
+    assert files["returns.txt"].added_lines == frozenset({1})
+    assert _git_counts_lines(repo, "returns.txt") == 1
+    assert files["unfinished.txt"].added_lines == frozenset({1, 2})
+    assert _git_counts_lines(repo, "unfinished.txt") == 2
+
+
+def test_an_untracked_file_that_cannot_be_read_adds_no_lines(tmp_path: Path) -> None:
+    """Git lists a dangling symlink as untracked; there is nothing to count."""
+    repo = _branch_repo(tmp_path, "one\n")
+    (repo / "dangling.txt").symlink_to(repo / "gone.txt")
+
+    files = _by_path(GitCli(repo).branch_diff("main").files)
+
+    assert files["dangling.txt"].status is FileStatus.ADDED
+    assert files["dangling.txt"].added_lines == frozenset()
+
+
+def test_the_sniff_window_is_the_one_git_itself_uses(tmp_path: Path) -> None:
+    """The claim the constant makes, checked against the git on this machine.
+
+    A NUL inside the window makes a file binary and a NUL just past it
+    does not -- for the adapter, and for git, which is the whole reason
+    the number is what it is.
+    """
+    repo = _branch_repo(tmp_path, "one\n")
+    (repo / "inside.txt").write_bytes(b"a" * (BINARY_SNIFF_BYTES - 1) + b"\0")
+    (repo / "outside.txt").write_bytes(b"a" * BINARY_SNIFF_BYTES + b"\0")
+
+    files = _by_path(GitCli(repo).branch_diff("main").files)
+
+    assert files["inside.txt"].added_lines == frozenset()
+    assert files["outside.txt"].added_lines == frozenset({1})
+    assert _git_says_binary(repo, "inside.txt")
+    assert not _git_says_binary(repo, "outside.txt")
+
+
+def _git_counts_lines(repo: Path, name: str) -> int:
+    """Ask git how many lines it would report the file as adding."""
+    result = subprocess.run(
+        ["git", "diff", "--no-index", "--no-ext-diff", "--numstat", "/dev/null", name],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return int(result.stdout.split("\t")[0])
+
+
+def _git_says_binary(repo: Path, name: str) -> bool:
+    """Ask git whether it would diff this file as text."""
+    result = subprocess.run(
+        ["git", "diff", "--no-index", "--no-ext-diff", "/dev/null", name],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return "Binary files" in result.stdout
+
+
 def test_gitignored_untracked_files_are_excluded(tmp_path: Path) -> None:
     repo = _branch_repo(tmp_path, "one\n")
     (repo / ".gitignore").write_text("*.log\n")
@@ -211,7 +291,7 @@ def test_config_root_in_repo_subdirectory(tmp_path: Path) -> None:
     files = _by_path(git.branch_diff("main").files)
 
     assert list(files) == ["inside.py"]
-    assert git.read_base(PurePath("inside.py")) == "one\n"
+    assert git.read_base(PurePath("inside.py")) == b"one\n"
 
 
 def test_read_base_returns_merge_base_content(tmp_path: Path) -> None:
@@ -222,7 +302,7 @@ def test_read_base_returns_merge_base_content(tmp_path: Path) -> None:
     git = GitCli(repo)
     git.branch_diff("main")
 
-    assert git.read_base(PurePath("src/a.py")) == "original\n"
+    assert git.read_base(PurePath("src/a.py")) == b"original\n"
     assert git.read_base(PurePath("src/new.py")) is None
 
 
