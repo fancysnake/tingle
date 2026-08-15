@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786773302507,
+  "lastUpdate": 1786790011303,
   "repoUrl": "https://github.com/fancysnake/tingle",
   "entries": {
     "tingle": [
@@ -518,6 +518,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/fancysnake/tingle/commit/38514e97f8ae6d3617bcc466d8cad802b74412b4"
         },
         "date": 1786773302086,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "fmt-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "taplo-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "codespell-comment",
+            "value": 2,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-format-ignore",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "noqa-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-ignores",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-per-file-ignores",
+            "value": 15,
+            "unit": "count"
+          },
+          {
+            "name": "pylint-comment",
+            "value": 5,
+            "unit": "count"
+          },
+          {
+            "name": "pylint-disables",
+            "value": 3,
+            "unit": "count"
+          },
+          {
+            "name": "long-files",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "type-ignores",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "type-ignore-spread",
+            "value": 3,
+            "unit": "count"
+          },
+          {
+            "name": "mypy-overrides",
+            "value": 1,
+            "unit": "count"
+          },
+          {
+            "name": "deferred-import-contracts",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "any-uses",
+            "value": 1,
+            "unit": "count"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e3ba216cd8d2d56ba1d72ee777b3eba1272b0eca",
+          "message": "Merge pull request #38 from fancysnake/feat/publish-metrics-chart\n\nFeat/publish metrics chart",
+          "timestamp": "2026-08-15T12:33:10+02:00",
+          "tree_id": "cca5dc11b7d4ce6f23a40325b313123798c824e9",
+          "url": "https://github.com/fancysnake/tingle/commit/e3ba216cd8d2d56ba1d72ee777b3eba1272b0eca"
+        },
+        "date": 1786790010860,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
