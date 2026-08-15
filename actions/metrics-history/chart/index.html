@@ -93,7 +93,14 @@
   <a href="https://github.com/marketplace/actions/continuous-benchmark">github-action-benchmark</a>.
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"></script>
+<!-- this page is committed onto every consumer's data branch and served from
+     their Pages site, so the CDN is a dependency the action hands to them:
+     pinned by version, and by content through the integrity hash. The two
+     move together — a version bump left with the old hash blocks the script
+     and leaves every consumer's page chartless. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"
+        integrity="sha256-KBLLiCX9xXRp6y97sFXpQpJE5ZmSBRHuR36ChJm2Mss="
+        crossorigin="anonymous"></script>
 <script src="data.js"></script>
 <script>
   'use strict';
