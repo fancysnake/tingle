@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786773165178,
+  "lastUpdate": 1786773302507,
   "repoUrl": "https://github.com/fancysnake/tingle",
   "entries": {
     "tingle": [
@@ -419,6 +419,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/fancysnake/tingle/commit/5ee4b73fff274da76c8c114a24316a5946addd6f"
         },
         "date": 1786773164712,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "fmt-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "taplo-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "codespell-comment",
+            "value": 2,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-format-ignore",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "noqa-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-ignores",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-per-file-ignores",
+            "value": 15,
+            "unit": "count"
+          },
+          {
+            "name": "pylint-comment",
+            "value": 5,
+            "unit": "count"
+          },
+          {
+            "name": "pylint-disables",
+            "value": 3,
+            "unit": "count"
+          },
+          {
+            "name": "long-files",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "type-ignores",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "type-ignore-spread",
+            "value": 3,
+            "unit": "count"
+          },
+          {
+            "name": "mypy-overrides",
+            "value": 1,
+            "unit": "count"
+          },
+          {
+            "name": "deferred-import-contracts",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "any-uses",
+            "value": 1,
+            "unit": "count"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "38514e97f8ae6d3617bcc466d8cad802b74412b4",
+          "message": "Merge pull request #34 from fancysnake/renovate/codecov-codecov-action-7.x\n\nUpdate codecov/codecov-action action to v7",
+          "timestamp": "2026-08-15T07:54:40+02:00",
+          "tree_id": "4130c794edd86630452f15001a0aaafd31a56329",
+          "url": "https://github.com/fancysnake/tingle/commit/38514e97f8ae6d3617bcc466d8cad802b74412b4"
+        },
+        "date": 1786773302086,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
