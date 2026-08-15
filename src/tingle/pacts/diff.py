@@ -8,12 +8,11 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
-from tingle.pacts.config import DEFAULT_GUIDE
+from tingle.pacts.report import MeasuredOutcome
 
 if TYPE_CHECKING:
     from pathlib import Path, PurePath
 
-    from tingle.pacts.config import MetricSpec
     from tingle.pacts.metrics import MetricResult, Occurrence
     from tingle.pacts.report import ReportSection
 
@@ -106,22 +105,16 @@ DiffMetricFunction: TypeAlias = Callable[[DiffMetricContext], DiffResult]
 
 
 @dataclass(frozen=True)
-class DiffOutcome:
+class DiffOutcome(MeasuredOutcome):
     """Diff result of one metric plus the current full-repo total.
 
-    `guide` and `emoji` are already resolved, as on MetricOutcome, and
-    `emoji` is as undefaulted for the same reason. It ranks the standing
-    total, not the net: what the branch moved is the net's own business,
-    and a net of zero is not no debt.
+    `emoji`, inherited with the rest of what a run and a diff say alike,
+    ranks the standing total rather than the net: what the branch moved is
+    the net's own business, and a net of zero is not no debt.
     """
 
-    spec: MetricSpec
-    range_names: tuple[str, ...]
-    emoji: str
     result: DiffResult | None = None
     total: MetricResult | None = None
-    error: str | None = None
-    guide: int = DEFAULT_GUIDE
 
 
 @dataclass(frozen=True)

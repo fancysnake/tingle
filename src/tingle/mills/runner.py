@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
@@ -15,10 +15,6 @@ from tingle.pacts.report import MetricOutcome, RunReport
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping
-
-    from tingle.pacts.diff import DiffOutcome
-
-_Outcome = TypeVar("_Outcome", bound="MetricOutcome | DiffOutcome")
 
 
 @dataclass(frozen=True)
@@ -85,8 +81,8 @@ def _outcome(spec: MetricSpec, context: _RunContext) -> MetricOutcome:
         result = context.metric_types[spec.type].func(metric_context)
     # metric isolation: one failure must not stop the run
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        return errored(
-            MetricOutcome, spec, range_names=range_names, guide=guide, exc=exc
+        return MetricOutcome.errored(
+            spec, range_names=range_names, guide=guide, exc=exc
         )
 
     if not files and spec.ranges:
@@ -96,32 +92,6 @@ def _outcome(spec: MetricSpec, context: _RunContext) -> MetricOutcome:
         range_names=range_names,
         emoji=outcome_emoji(result, guide),
         result=result,
-        guide=guide,
-    )
-
-
-def errored(
-    kind: type[_Outcome],
-    spec: MetricSpec,
-    *,
-    range_names: tuple[str, ...],
-    guide: int,
-    exc: Exception,
-) -> _Outcome:
-    """Report a metric that raised: the reason kept, and nothing ranked.
-
-    A run and a diff isolate their metrics the same way and say the same
-    thing about one that failed, so they say it in one place; only the
-    kind of outcome they hand back differs. Both kinds carry these five
-    fields and no more of them, so the constructor is theirs in common --
-    and writing it out on each side is the duplication `duplicate-code`
-    is there to catch.
-    """
-    return kind(
-        spec=spec,
-        range_names=range_names,
-        emoji="",
-        error=f"{type(exc).__name__}: {exc}",
         guide=guide,
     )
 

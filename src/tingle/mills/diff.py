@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
-from tingle.mills.runner import errored, ranges_for
+from tingle.mills.runner import ranges_for
 from tingle.mills.text import TextReader, text_reader
 from tingle.pacts.config import Config, ConfigError, MetricSpec
 from tingle.pacts.diff import (
@@ -117,8 +117,8 @@ class DiffRunner:
                 self.metric_types[spec.type].func(total_context),
             )
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            return errored(
-                DiffOutcome, spec, range_names=range_names, guide=guide, exc=exc
+            return DiffOutcome.errored(
+                spec, range_names=range_names, guide=guide, exc=exc
             )
         return DiffOutcome(
             spec=spec,

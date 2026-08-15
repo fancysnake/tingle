@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 from tingle.pacts.config import DEFAULT_GUIDE
 
@@ -51,8 +51,8 @@ def net_text(net: int) -> str:
 
 
 @dataclass(frozen=True)
-class MetricOutcome:
-    """Result of one metric: either a MetricResult or an error message.
+class MeasuredOutcome:
+    """What a run and a diff say about one metric in common.
 
     `guide` is already resolved: the metric's own, or the one from
     `[display]`. Renderers read it as-is and never redo the fallback.
@@ -62,14 +62,47 @@ class MetricOutcome:
     rather than each recomputing its own. It has no default: empty means
     an errored outcome with no value to rank, and a producer that forgot
     would otherwise say the same thing without meaning it.
+
+    What the two kinds measure differs and is theirs alone; that a metric
+    was asked, and what it said if it could not answer, is shared -- so it
+    is stated once, here, rather than agreed twice.
     """
 
     spec: MetricSpec
     range_names: tuple[str, ...]
     emoji: str
-    result: MetricResult | None = None
     error: str | None = None
     guide: int = DEFAULT_GUIDE
+
+    @classmethod
+    def errored(
+        cls,
+        spec: MetricSpec,
+        *,
+        range_names: tuple[str, ...],
+        guide: int,
+        exc: Exception,
+    ) -> Self:
+        """Report a metric that raised: the reason kept, and nothing ranked.
+
+        A run and a diff isolate their metrics the same way and say the
+        same thing about one that failed; only the kind of outcome they
+        hand back differs, which is what `cls` is.
+        """
+        return cls(
+            spec=spec,
+            range_names=range_names,
+            emoji="",
+            error=f"{type(exc).__name__}: {exc}",
+            guide=guide,
+        )
+
+
+@dataclass(frozen=True)
+class MetricOutcome(MeasuredOutcome):
+    """Result of one metric: either a MetricResult or an error message."""
+
+    result: MetricResult | None = None
 
 
 #: Covariant because a section is frozen and only ever read out of: a
