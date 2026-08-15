@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786773082087,
+  "lastUpdate": 1786773165178,
   "repoUrl": "https://github.com/fancysnake/tingle",
   "entries": {
     "tingle": [
@@ -320,6 +320,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/fancysnake/tingle/commit/af85a26ee6ddda8a4f1b0c2c3eb22ccf75bd5dd2"
         },
         "date": 1786773081603,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "fmt-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "taplo-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "codespell-comment",
+            "value": 2,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-format-ignore",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "noqa-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-ignores",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-per-file-ignores",
+            "value": 15,
+            "unit": "count"
+          },
+          {
+            "name": "pylint-comment",
+            "value": 5,
+            "unit": "count"
+          },
+          {
+            "name": "pylint-disables",
+            "value": 3,
+            "unit": "count"
+          },
+          {
+            "name": "long-files",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "type-ignores",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "type-ignore-spread",
+            "value": 3,
+            "unit": "count"
+          },
+          {
+            "name": "mypy-overrides",
+            "value": 1,
+            "unit": "count"
+          },
+          {
+            "name": "deferred-import-contracts",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "any-uses",
+            "value": 1,
+            "unit": "count"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5ee4b73fff274da76c8c114a24316a5946addd6f",
+          "message": "Merge pull request #27 from fancysnake/renovate/pypa-gh-action-pypi-publish-1.x\n\nUpdate pypa/gh-action-pypi-publish action to v1.14.2",
+          "timestamp": "2026-08-15T07:52:11+02:00",
+          "tree_id": "e6b0e66fbf223d5a1cf2def788aed0394e099854",
+          "url": "https://github.com/fancysnake/tingle/commit/5ee4b73fff274da76c8c114a24316a5946addd6f"
+        },
+        "date": 1786773164712,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
