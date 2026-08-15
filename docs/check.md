@@ -90,7 +90,7 @@ jobs:
           fetch-depth: 0        # check needs history for the merge-base
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.11"
       - run: pip install tingle
       - run: tingle check
 ```

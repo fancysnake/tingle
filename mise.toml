@@ -5,9 +5,9 @@ experimental = true
 enter = "poetry install"
 
 [tools]
-pipx = "1.15.0"
+pipx = "1.16.7"
 "pipx:poetry" = "2.4.1"
-python = "3.14.6"
+python = "3.11"
 
 [env]
 _.python.venv = { path = ".venv", create = true }
