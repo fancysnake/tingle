@@ -57,6 +57,13 @@ SORT_COLUMNS = {
 #: Marks the header of the column currently deciding the order.
 ASCENDING, DESCENDING = " ▲", " ▼"
 
+#: Stands in for that marker on the columns not currently deciding it. A
+#: column is measured against its heading when it is added and never
+#: again, so every heading claims the room for a marker from the start;
+#: one that grew it later would have it cut off wherever the column's own
+#: values left it narrow.
+MARKER_ROOM = " " * cell_len(ASCENDING)
+
 #: Separates the sort stack, most significant first.
 SORT_SEPARATOR = " then "
 
@@ -165,7 +172,7 @@ class MetricsApp(App[None]):
         self.sub_title = str(self._report.root)
         table = BrowseTable(cursor_type="row")
         for heading, key in COLUMNS:
-            table.add_column(heading, key=key)
+            table.add_column(heading + MARKER_ROOM, key=key)
         yield table
         yield SearchBar(placeholder="search", classes="hidden")
         yield SortBar()
@@ -359,13 +366,11 @@ def _mark_sorted_header(table: BrowseTable, state: BrowseState) -> None:
             if primary is not None and index == marked
             else ""
         )
-        column.label = Text(heading + arrow, style="bold" if arrow else "")
-        # a column is only ever measured against the cells put in it, so one
-        # whose heading just grew an arrow has to claim the room for it --
-        # otherwise the arrow is cut off any column its values left narrow.
-        # `columns` and `content_width` are textual's own, and a layout rule
-        # that changes on an upgrade is what this is working around.
-        column.content_width = max(column.content_width, cell_len(column.label.plain))
+        # the marker takes the place the heading already left for it, so
+        # every label is the width the column was measured against
+        column.label = Text(
+            heading + (arrow or MARKER_ROOM), style="bold" if arrow else ""
+        )
     table.refresh()
 
 

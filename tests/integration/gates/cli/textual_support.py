@@ -177,9 +177,13 @@ def cursor(app: MetricsApp) -> str:
 
 
 def headers(app: MetricsApp) -> list[str]:
-    """Read the column headings, which carry the sort marker when one is set."""
+    """Read the column headings, which carry the sort marker when one is set.
+
+    The room a heading keeps for a marker it does not currently carry is
+    trailing space, and reads as the heading alone.
+    """
     table = app.query_one(BrowseTable)
-    return [str(heading.label) for heading in table.columns.values()]
+    return [str(heading.label).rstrip() for heading in table.columns.values()]
 
 
 def drawn_headers(app: MetricsApp) -> str:
