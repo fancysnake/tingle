@@ -78,7 +78,7 @@ others that have none.
 Turn Pages on — *Settings → Pages → Deploy from a branch → `gh-pages`* — and
 the charts are at `https://<owner>.github.io/<repo>/metrics/`.
 
-!!! note "Why the y axis is logarithmic"
+!!! note "Why the y-axis is logarithmic"
 
     A group puts metrics of very different sizes on one plot — a count of
     400 and a count of 2 — and a linear axis flattens the small one into the
@@ -214,7 +214,8 @@ here, so this is the action's own body:
           tingle stat --json > stat.json || status=$?
           [ "$status" -le 1 ] || exit "$status"
           jq '[.metrics[] | select(.error == null)
-               | {name, unit: "count", value, extra: (.group // "ungrouped")}]' \
+               | {name, unit: "count", value}
+                 + (if .group then {extra: .group} else {} end)]' \
             stat.json > points.json
           if [ "$(jq length points.json)" -eq 0 ]; then
             echo "::error::every metric errored; there is nothing to record"
@@ -235,14 +236,18 @@ here, so this is the action's own body:
 `customSmallerIsBetter` is that action's generic contract — a list of
 `{name, unit, value}` objects, lower is better — which is exactly the shape
 of a tingle metric, and `extra` is its free field, which tingle spends on the
-group. The `jq` drops metrics that errored, since they have no value to plot,
+group. A metric with no group leaves `extra` off rather than setting it null:
+that action validates the field with a coercing string schema, so a null
+would arrive at the page as the string `"null"` and read as a group by that
+name. The `jq` drops metrics that errored, since they have no value to plot,
 and the exit-status line keeps a single broken metric from killing the run.
 
 Inlined this way you get the benchmark action's own page — a chart per
 metric, ignoring `extra`. It writes that page only when the data directory
-has no `index.html`, so tingle's chart is
-[`actions/metrics-history/chart/index.html`][page] copied over it; the action
-does that on every run, after recording.
+has no `index.html`, so putting tingle's chart —
+[`actions/metrics-history/chart/index.html`][page] — there first is enough to
+keep it: the action pushes the page to the branch *before* recording, and the
+benchmark step then finds one in place and leaves it alone.
 
   [page]: https://github.com/fancysnake/tingle/blob/main/actions/metrics-history/chart/index.html
 
@@ -254,7 +259,7 @@ git checkout --orphan gh-pages && git commit --allow-empty -m "Start gh-pages"
 git push origin gh-pages
 ```
 
-— or use the action, which does it for you.
+— or use the action, which creates it and seeds the page in the same step.
 
 !!! note "Leave the alerts off"
 

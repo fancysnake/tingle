@@ -101,19 +101,22 @@
     // the categorical palette has eight slots and none of them is reused: a
     // group holding more than eight metrics is split across as many charts
     const SLOTS = 8;
+    // a metric with no group belongs to no section of the config. The
+    // recorder leaves `extra` off it entirely, so this is the one place that
+    // names them, and a real group called `ungrouped` stays its own section.
     const UNGROUPED = 'ungrouped';
-    // ticks are chosen from these, so a log axis reads in round counts
-    const NICE = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100, 200, 300, 500, 1000,
-                  2000, 3000, 5000, 10000];
 
     const charts = [];
 
-    // metric names, group names and commit ids all come from the recorded
-    // data and land in markup below
-    function esc(text) {
-      return String(text).replace(/[&<>"]/g, character => (
-        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[character]
-      ));
+    // A log axis cannot place 0, and 0 is the value every metric is aiming
+    // at: the axis carries value + 1 and the count is read back off it.
+    // These two are the only places that know the offset exists.
+    function toAxis(count) {
+      return count === null ? null : count + 1;
+    }
+
+    function fromAxis(value) {
+      return Math.round(value) - 1;
     }
 
     function css(name) {
@@ -121,70 +124,91 @@
         .getPropertyValue(name).trim();
     }
 
-    // Newest point wins: a metric moved to another group is drawn where the
-    // config puts it now, and points recorded before groups were stored at
-    // all carry no `extra` to contradict it.
-    function readSeries(entries) {
-      const groupOf = new Map();
-      const order = [];
-      for (const entry of entries) {
-        for (const bench of entry.benches) {
-          groupOf.set(bench.name, bench.extra || UNGROUPED);
-        }
+    // one node, appended and captioned: the page builds its markup rather
+    // than concatenating it, so no recorded string needs escaping
+    function add(parent, tag, text) {
+      const node = parent.appendChild(document.createElement(tag));
+      if (text !== undefined) {
+        node.textContent = text;
       }
+      return node;
+    }
+
+    // One pass over the history: every metric comes back with one value per
+    // entry, null where that build recorded no point for it.
+    //
+    // Newest point wins for the group, so a metric moved to another group is
+    // drawn where the config puts it now, and points recorded before groups
+    // were stored at all carry no `extra` to contradict it.
+    function readSeries(entries) {
+      const series = new Map();
+      entries.forEach((entry, index) => {
+        for (const bench of entry.benches) {
+          if (!series.has(bench.name)) {
+            series.set(bench.name, {
+              name: bench.name,
+              group: null,
+              values: entries.map(() => null),
+            });
+          }
+          const metric = series.get(bench.name);
+          metric.group = bench.extra || null;
+          metric.values[index] = bench.value;
+        }
+      });
+
       // the last entry is the current config, so it decides the reading
       // order; metrics no longer measured follow, oldest first
-      for (const entry of [entries[entries.length - 1], ...entries]) {
-        for (const bench of entry.benches) {
-          if (!order.includes(bench.name)) {
-            order.push(bench.name);
+      const current = entries[entries.length - 1].benches.map(bench => bench.name);
+      const order = current.concat(
+        [...series.keys()].filter(name => !current.includes(name))
+      );
+
+      // groups read in first-mention order; the loose metrics are collected
+      // apart and appended, so they read last however early one appeared
+      const groups = new Map();
+      const loose = [];
+      for (const name of order) {
+        const metric = series.get(name);
+        if (metric.group === null) {
+          loose.push(metric);
+        } else {
+          if (!groups.has(metric.group)) {
+            groups.set(metric.group, []);
+          }
+          groups.get(metric.group).push(metric);
+        }
+      }
+      const sections = [...groups]
+        .map(([group, metrics]) => ({ group, metrics }));
+      if (loose.length > 0) {
+        sections.push({ group: UNGROUPED, metrics: loose });
+      }
+      return sections;
+    }
+
+    // 0, then 1, 2, 3 and 5 in each decade up to the one holding `max`, so
+    // the axis reads in round counts however large a metric grows
+    function axisTicks(max) {
+      const ticks = [0];
+      for (let decade = 1; ticks[ticks.length - 1] < max; decade *= 10) {
+        for (const step of [1, 2, 3, 5]) {
+          ticks.push(step * decade);
+          if (ticks[ticks.length - 1] >= max) {
+            break;
           }
         }
-      }
-      const groups = new Map();
-      for (const name of order) {
-        const group = groupOf.get(name);
-        if (!groups.has(group)) {
-          groups.set(group, []);
-        }
-        groups.get(group).push(name);
-      }
-      // an ungrouped metric belongs to no section of the config; it reads
-      // last rather than wherever its first metric happened to land
-      if (groups.has(UNGROUPED)) {
-        const loose = groups.get(UNGROUPED);
-        groups.delete(UNGROUPED);
-        groups.set(UNGROUPED, loose);
-      }
-      return groups;
-    }
-
-    function valuesOf(entries, name) {
-      return entries.map(entry => {
-        const bench = entry.benches.find(b => b.name === name);
-        return bench ? bench.value : null;
-      });
-    }
-
-    function axisTicks(max) {
-      const ticks = NICE.filter(value => value <= max);
-      if (ticks[ticks.length - 1] < max) {
-        ticks.push(NICE.find(value => value > max) || max);
       }
       return ticks;
     }
 
-    function plot(canvas, entries, names) {
+    function plot(canvas, entries, metrics) {
       const labels = entries.map(entry => entry.commit.id.slice(0, 7));
-      const datasets = names.map((name, index) => {
-        const values = valuesOf(entries, name);
+      const datasets = metrics.map((metric, index) => {
         const color = css(`--series-${index + 1}`);
         return {
-          label: name,
-          // a log axis cannot place 0, and 0 is the value every metric is
-          // aiming at: the axis plots value + 1, and reads back the count
-          data: values.map(value => (value === null ? null : value + 1)),
-          counts: values,
+          label: metric.name,
+          data: metric.values.map(count => toAxis(count)),
           borderColor: color,
           backgroundColor: color,
           borderWidth: 2,
@@ -195,8 +219,8 @@
           spanGaps: true,
         };
       });
-      const measured = datasets
-        .flatMap(dataset => dataset.counts)
+      const measured = metrics
+        .flatMap(metric => metric.values)
         .filter(value => value !== null);
       const ticks = axisTicks(Math.max(1, ...measured));
 
@@ -217,10 +241,10 @@
             },
             y: {
               type: 'logarithmic',
-              min: 1,
-              max: ticks[ticks.length - 1] + 1,
+              min: toAxis(0),
+              max: toAxis(ticks[ticks.length - 1]),
               afterBuildTicks: axis => {
-                axis.ticks = ticks.map(value => ({ value: value + 1 }));
+                axis.ticks = ticks.map(count => ({ value: toAxis(count) }));
               },
               border: { display: false },
               grid: { color: css('--grid') },
@@ -232,7 +256,7 @@
               ticks: {
                 autoSkip: false,
                 color: css('--text-secondary'),
-                callback: value => String(Math.round(value) - 1),
+                callback: value => String(fromAxis(value)),
               },
             },
           },
@@ -255,7 +279,7 @@
                 afterTitle: items =>
                   entries[items[0].dataIndex].commit.message.split('\n')[0],
                 label: item =>
-                  `${item.dataset.label}: ${item.dataset.counts[item.dataIndex]}`,
+                  `${item.dataset.label}: ${fromAxis(item.parsed.y)}`,
               },
             },
           },
@@ -269,22 +293,64 @@
       }));
     }
 
-    function table(entries, names) {
-      const head = names
-        .map((name, index) =>
-          `<th><span class="swatch" style="background:var(--series-${index + 1})"></span>${esc(name)}</th>`)
-        .join('');
-      const rows = entries.slice().reverse().map(entry => {
-        const cells = names.map(name => {
-          const bench = entry.benches.find(b => b.name === name);
-          return `<td>${bench ? bench.value : '—'}</td>`;
-        }).join('');
-        const commit = esc(entry.commit.id.slice(0, 7));
-        return `<tr><td><a href="${esc(entry.commit.url)}">${commit}</a></td>${cells}</tr>`;
-      }).join('');
-      return '<details><summary>Table</summary><div class="scroll">' +
-        `<table><thead><tr><th>commit</th>${head}</tr></thead>` +
-        `<tbody>${rows}</tbody></table></div></details>`;
+    function table(entries, metrics) {
+      const details = document.createElement('details');
+      add(details, 'summary', 'Table');
+      const scroll = add(details, 'div');
+      scroll.className = 'scroll';
+      const grid = add(scroll, 'table');
+
+      const head = add(add(grid, 'thead'), 'tr');
+      add(head, 'th', 'commit');
+      metrics.forEach((metric, index) => {
+        const cell = add(head, 'th');
+        const swatch = add(cell, 'span');
+        swatch.className = 'swatch';
+        swatch.style.background = `var(--series-${index + 1})`;
+        cell.appendChild(document.createTextNode(metric.name));
+      });
+
+      // newest build first: the table is read for what just moved
+      const body = add(grid, 'tbody');
+      for (let index = entries.length - 1; index >= 0; index -= 1) {
+        const row = add(body, 'tr');
+        const commit = entries[index].commit;
+        add(add(row, 'td'), 'a', commit.id.slice(0, 7)).href = commit.url;
+        for (const metric of metrics) {
+          const value = metric.values[index];
+          // a metric that errored on that build has no number to show
+          add(row, 'td', value === null ? '—' : String(value));
+        }
+      }
+      return details;
+    }
+
+    // one panel per chart: a group, or a slice of one wider than the
+    // palette. Every naming rule is settled here, so rendering a panel is
+    // the same work whichever it is.
+    function panels(byChart) {
+      const named = Object.keys(byChart);
+      const list = [];
+      for (const [chartName, points] of Object.entries(byChart)) {
+        if (points.length === 0) {
+          continue;
+        }
+        const entries = points.slice().sort((a, b) => a.date - b.date);
+        for (const section of readSeries(entries)) {
+          const label = named.length === 1
+            ? section.group
+            : `${chartName} · ${section.group}`;
+          const parts = Math.ceil(section.metrics.length / SLOTS);
+          for (let part = 0; part < parts; part += 1) {
+            list.push({
+              heading: parts > 1 ? `${label} (${part + 1})` : label,
+              entries,
+              metrics: section.metrics.slice(part * SLOTS, (part + 1) * SLOTS),
+            });
+          }
+        }
+      }
+      return list;
     }
 
     function render() {
@@ -312,27 +378,15 @@
         document.getElementById('title').textContent = named[0];
         document.title = `${named[0]} — metrics history`;
       }
-      for (const [chartName, points] of Object.entries(data.entries)) {
-        if (points.length === 0) {
-          continue;
-        }
-        const entries = points.slice().sort((a, b) => a.date - b.date);
-        for (const [group, names] of readSeries(entries)) {
-          for (let start = 0; start < names.length; start += SLOTS) {
-            const part = names.slice(start, start + SLOTS);
-            const section = document.createElement('section');
-            section.className = 'group';
-            const label = named.length === 1 ? group : `${chartName} · ${group}`;
-            const heading = names.length > SLOTS
-              ? `${label} (${start / SLOTS + 1})`
-              : label;
-            section.innerHTML =
-              `<h2>${esc(heading)}</h2><div class="plot"><canvas></canvas></div>` +
-              table(entries, part);
-            main.appendChild(section);
-            plot(section.querySelector('canvas'), entries, part);
-          }
-        }
+      for (const panel of panels(data.entries)) {
+        const section = add(main, 'section');
+        section.className = 'group';
+        add(section, 'h2', panel.heading);
+        const plotted = add(section, 'div');
+        plotted.className = 'plot';
+        const canvas = add(plotted, 'canvas');
+        section.appendChild(table(panel.entries, panel.metrics));
+        plot(canvas, panel.entries, panel.metrics);
       }
     }
 
