@@ -244,6 +244,20 @@ def test_diff_listing_renders_an_errored_metric_as_a_red_heading() -> None:
     assert "a (file_count)" in text
 
 
+def test_diff_listing_heads_each_group_with_where_it_stands() -> None:
+    """A grouped diff listing says the group's standing debt, as a run's does."""
+    text = _plain(
+        diff_listing(
+            _diff_report(
+                _diff_outcome("a", "size", net=1, total=150, guide=100),
+                _diff_outcome("b", "size", net=0, total=150, guide=100),
+            )
+        )
+    )
+
+    assert "## size  🔥 300" in text
+
+
 def test_diff_table_group_row_judges_the_standing_total_not_the_net() -> None:
     """A net of zero does not mean the group carries no debt."""
     text = _rendered(

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
-from tingle.pacts.report import MeasuredOutcome
+from tingle.pacts.report import MeasuredOutcome, Stat
 
 if TYPE_CHECKING:
     from pathlib import Path, PurePath
@@ -115,6 +115,17 @@ class DiffOutcome(MeasuredOutcome):
 
     result: DiffResult | None = None
     total: MetricResult | None = None
+
+    @property
+    def stat(self) -> Stat | None:
+        """Where the metric now stands, if the full tree could be measured.
+
+        A branch can move a metric whose standing total nobody could work
+        out, so this goes absent on its own: the net is still known.
+        """
+        if self.total is None:
+            return None
+        return Stat(emoji=self.emoji, value=self.total.value)
 
 
 @dataclass(frozen=True)

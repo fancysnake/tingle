@@ -7,7 +7,13 @@ import pytest
 
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, Occurrence
-from tingle.pacts.report import GroupSummary, MetricOutcome, ReportSection, RunReport
+from tingle.pacts.report import (
+    GroupSummary,
+    MetricOutcome,
+    ReportSection,
+    RunReport,
+    Stat,
+)
 
 
 def test_config_error_aggregates_messages() -> None:
@@ -83,6 +89,24 @@ def test_run_report_construction() -> None:
     # the outcomes a report answers with are the ones its sections hold
     assert report.outcomes == (outcome,)
     assert report.outcomes[0].error is None
+
+
+def test_a_metric_that_failed_has_nothing_for_a_view_to_show() -> None:
+    """The one question a view asks: is there a number and a rank for it.
+
+    A metric that raised answers no, so the rank it was built with is
+    never read and cannot be mistaken for a judgement of its own.
+    """
+    spec = MetricSpec(name="noqa", type="regex_count")
+    failed = MetricOutcome.errored(
+        spec, range_names=(), guide=100, exc=ValueError("boom")
+    )
+
+    assert failed.stat is None
+    assert failed.error == "ValueError: boom"
+    assert MetricOutcome(
+        spec=spec, range_names=(), emoji="🎉", result=MetricResult(value=3)
+    ).stat == Stat(emoji="🎉", value=3)
 
 
 def test_config_construction() -> None:

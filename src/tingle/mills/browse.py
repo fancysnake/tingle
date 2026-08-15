@@ -514,7 +514,7 @@ def _metric_row(
 
 def _group_cells(name: str | None, summary: GroupSummary) -> tuple[str, str, str]:
     label = name if name is not None else UNGROUPED
-    stat = stat_text(summary.emoji, summary.value)
+    stat = stat_text(summary.stat)
     if summary.net is not None:
         stat = f"{net_text(summary.net)} of {stat}"
     return (label, "", stat)
@@ -541,15 +541,14 @@ def _stat(outcome: MetricOutcome | DiffOutcome) -> str:
         return ERROR_STAT
     if isinstance(outcome, DiffOutcome):
         return _diff_stat(outcome)
-    return stat_text(outcome.emoji, outcome.result.value)
+    return stat_text(outcome.stat)
 
 
 def _diff_stat(outcome: DiffOutcome) -> str:
     """Say what a branch did to a metric, beside where the metric now stands."""
     if (result := outcome.result) is None:  # pragma: no cover - caller guards
         return ERROR_STAT
-    total = outcome.total.value if outcome.total is not None else None
-    standing = f"{net_text(result.net)} of {stat_text(outcome.emoji, total)}"
+    standing = f"{net_text(result.net)} of {stat_text(outcome.stat)}"
     if result.added is None or result.removed is None:
         return standing
     return f"+{result.added} / -{result.removed} ({standing})"

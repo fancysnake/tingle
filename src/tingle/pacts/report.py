@@ -27,22 +27,36 @@ ERROR_STAT = "ERROR"
 UNKNOWN_STAT = "?"
 
 
-def stat_text(emoji: str, value: int | None, *, width: int = 0) -> str:
+@dataclass(frozen=True)
+class Stat:
+    """A number a view can show, and the rank the mill gave that number.
+
+    The two travel together because neither is worth showing alone, and
+    because "there is nothing to rank here" is then one absent Stat rather
+    than an empty emoji beside a missing value -- which is a pair a caller
+    could get half right.
+    """
+
+    emoji: str
+    value: int
+
+
+def stat_text(stat: Stat | None, *, width: int = 0) -> str:
     """Render a measured number, led by the rank the mill gave it.
 
     Both views of a run compose this, so the sentence is a contract for the
-    same reason the emoji in it is one: a number that reads differently in
+    same reason the rank in it is one: a number that reads differently in
     the table and in the browser is the drift the shared rank was meant to
     close, moved one layer along.
 
     `width` right-pads the number with spaces so that, down a column, every
     emoji lands in the same place and the digits line up under each other.
-    A value of None is a total that could not be worked out, which ranks as
+    No stat at all is a number nobody could work out, which ranks as
     nothing and reads as such.
     """
-    if value is None:
+    if stat is None:
         return UNKNOWN_STAT
-    return f"{emoji} {value:>{width}}"
+    return f"{stat.emoji} {stat.value:>{width}}"
 
 
 def net_text(net: int) -> str:
@@ -103,6 +117,13 @@ class MetricOutcome(MeasuredOutcome):
     """Result of one metric: either a MetricResult or an error message."""
 
     result: MetricResult | None = None
+
+    @property
+    def stat(self) -> Stat | None:
+        """What a view shows in the value column, if the metric answered."""
+        if self.result is None:
+            return None
+        return Stat(emoji=self.emoji, value=self.result.value)
 
 
 #: Covariant because a section is frozen and only ever read out of: a
@@ -174,3 +195,10 @@ class GroupSummary:
     has_error: bool = False
     net: int | None = None
     changed: bool = False
+
+    @property
+    def stat(self) -> Stat | None:
+        """What a heading shows, if the group's debt could be worked out."""
+        if self.value is None:
+            return None
+        return Stat(emoji=self.emoji, value=self.value)

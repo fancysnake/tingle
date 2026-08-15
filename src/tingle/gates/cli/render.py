@@ -35,7 +35,7 @@ def _section_heading(
     """
     if section.name is None and not has_named:
         return None
-    stat = stat_text(section.summary.emoji, section.summary.value)
+    stat = stat_text(section.summary.stat)
     return Text(f"## {_group_label(section.name)}  {stat}", style="bold")
 
 
@@ -83,13 +83,13 @@ def report_table(report: RunReport) -> Table:
                 f"[b]{_group_label(section.name)}[/b]",
                 "",
                 "",
-                f"[b]{stat_text(summary.emoji, summary.value, width=width)}[/b]",
+                f"[b]{stat_text(summary.stat, width=width)}[/b]",
             )
         for outcome in section.outcomes:
             value = (
                 f"[red]{ERROR_STAT}[/]"
                 if outcome.result is None
-                else stat_text(outcome.emoji, outcome.result.value, width=width)
+                else stat_text(outcome.stat, width=width)
             )
             table.add_row(
                 _metric_label(outcome.spec.name, grouped=grouped),
@@ -164,7 +164,7 @@ def diff_table(report: DiffReport) -> Table:
                 "",
                 _net_cell(summary.net or 0),
                 # the standing debt, not the net: a net of zero is not no debt
-                f"[b]{stat_text(summary.emoji, summary.value, width=width)}[/b]",
+                f"[b]{stat_text(summary.stat, width=width)}[/b]",
             )
         for outcome in section.outcomes:
             table.add_row(
@@ -183,11 +183,7 @@ def _diff_cells(outcome: DiffOutcome, width: int) -> tuple[str, str, str, str]:
         _added_cell(outcome.result.added),
         _removed_cell(outcome.result.removed),
         _net_cell(outcome.result.net),
-        stat_text(
-            outcome.emoji,
-            outcome.total.value if outcome.total is not None else None,
-            width=width,
-        ),
+        stat_text(outcome.stat, width=width),
     )
 
 
@@ -213,7 +209,7 @@ def run_listing(report: RunReport) -> list[Text]:
             if outcome.result is None:
                 lines.extend(_error_lines(outcome))
                 continue
-            stat = stat_text(outcome.emoji, outcome.result.value)
+            stat = stat_text(outcome.stat)
             lines.append(
                 Text(f"{outcome.spec.name} ({outcome.spec.type}): {stat}", style="bold")
             )
