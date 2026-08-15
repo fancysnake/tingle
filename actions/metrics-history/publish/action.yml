@@ -1,0 +1,52 @@
+name: tingle metrics history publish
+description: >-
+  Copy the chart `metrics-history` recorded onto the data branch into the site
+  a generator is about to build — for repositories whose Pages source is
+  already an artifact, so the data branch cannot be served directly.
+
+inputs:
+  data-branch:
+    description: Branch the history was committed to.
+    default: gh-pages
+  data-dir:
+    description: Directory in that branch holding the chart and its data.
+    default: metrics
+  into:
+    description: Directory the chart is copied into. Created when missing.
+    required: true
+  github-token:
+    description: Token used to read the data branch.
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Copy the recorded chart into the site
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.data-branch }}
+        DATA_DIR: ${{ inputs.data-dir }}
+        INTO: ${{ inputs.into }}
+        TOKEN: ${{ inputs.github-token }}
+      run: |
+        # authenticated, so this works for a private repository too — the
+        # read scope the docs job already has is enough
+        remote="https://x-access-token:$TOKEN@${GITHUB_SERVER_URL#https://}/$GITHUB_REPOSITORY.git"
+        # the branch does not exist until the first recorded run, and a site
+        # with no history yet still has to build. That is the one tolerated
+        # failure: `ls-remote --exit-code` says 2 for "no such ref", and
+        # anything else is the clone being broken rather than empty — a
+        # network blip, a rate limit, a revoked token. Those must fail here,
+        # not deploy a site whose chart link is dead.
+        status=0
+        git ls-remote --exit-code --heads "$remote" "$BRANCH" > /dev/null || status=$?
+        if [ "$status" -eq 2 ]; then
+          echo "::notice::no $BRANCH branch yet; the site keeps its placeholder chart"
+          exit 0
+        fi
+        [ "$status" -eq 0 ] || exit "$status"
+
+        data=$(mktemp -d)
+        git clone --quiet --depth 1 --branch "$BRANCH" "$remote" "$data"
+        mkdir -p "$INTO"
+        cp -R "$data/$DATA_DIR/." "$INTO/"

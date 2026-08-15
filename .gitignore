@@ -220,3 +220,7 @@ __marimo__/
 CURRENT_TASK.md
 PLAN.md
 QA.md
+
+# the recorded chart is fetched into this directory during the docs build;
+# only the placeholder page it overwrites is tracked
+/docs/history/chart/data.js

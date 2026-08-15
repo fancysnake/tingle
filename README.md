@@ -14,7 +14,7 @@ package that should disappear.
 It runs once, prints the numbers, and stores nothing — pipe the JSON into
 whatever tracks history for you (CI artifacts, dashboards, a spreadsheet).
 
-**📖 Documentation: <https://fancysnake.github.io/tingle/>**
+**📖 Documentation: <https://tingle.fancysnake.dev/>**
 
 ## Install
 
@@ -52,7 +52,7 @@ pattern = '#\s*noqa'
 
 You can count regex matches, uses of a Python symbol, entries in a TOML or
 INI list (this is how you count ignored lint rules), files, and lines.
-See the [metric types](https://fancysnake.github.io/tingle/metrics/).
+See the [metric types](https://tingle.fancysnake.dev/metrics/).
 
 ## What it does
 
@@ -61,11 +61,11 @@ Three things, in rising order of opinion:
 - **Measure.** `tingle stat` counts what you told it to count and prints the
   numbers. Metric values never affect the exit code — tingle measures, it
   does not judge.
-- **[Attribute](https://fancysnake.github.io/tingle/diff/).** `tingle stat
+- **[Attribute](https://tingle.fancysnake.dev/diff/).** `tingle stat
   --diff` measures only what the current branch changed, against the
   merge-base with a base branch, so commits that landed on the base after
   you branched don't pollute your numbers.
-- **[Judge](https://fancysnake.github.io/tingle/check/).** `tingle check` is
+- **[Judge](https://tingle.fancysnake.dev/check/).** `tingle check` is
   the CI gate: the same branch measurement, but it exits 1 if the branch
   made things worse, so a pull request that takes on debt fails the build.
 
@@ -81,16 +81,19 @@ $ echo $?
 
 ## Documentation
 
-- [Configuration](https://fancysnake.github.io/tingle/configuration/) —
+- [Configuration](https://tingle.fancysnake.dev/configuration/) —
   `tingle.toml`, ranges, groups.
-- [Metric types](https://fancysnake.github.io/tingle/metrics/) — what you
-  can count, and the limits of each counter.
-- [Branch impact](https://fancysnake.github.io/tingle/diff/) — how `--diff`
+- [Metric types](https://tingle.fancysnake.dev/metrics/) — what you can
+  count, and the limits of each counter.
+- [Branch impact](https://tingle.fancysnake.dev/diff/) — how `--diff`
   attributes changes to your branch.
-- [CI gate](https://fancysnake.github.io/tingle/check/) — failing the build
-  on new debt.
-- [CLI reference](https://fancysnake.github.io/tingle/cli/) — every command
-  and flag.
+- [CI gate](https://tingle.fancysnake.dev/check/) — failing the build on new
+  debt.
+- [History](https://tingle.fancysnake.dev/history/) — recording a point per
+  commit and publishing a chart of it, like
+  [tingle's own](https://tingle.fancysnake.dev/history/chart/).
+- [CLI reference](https://tingle.fancysnake.dev/cli/) — every command and
+  flag.
 
 ## Development
 
@@ -105,7 +108,7 @@ $ mise run lint:py      # ruff, mypy, pylint, import-linter
 $ mise run docs:serve   # preview the docs site
 ```
 
-See [contributing](https://fancysnake.github.io/tingle/contributing/) for
+See [contributing](https://tingle.fancysnake.dev/contributing/) for
 the GLIMPSE source layout and the layer contracts.
 
 ## License

@@ -57,4 +57,8 @@ Three things, in rising order of opinion:
 - **[Branch impact](diff.md)** — how `--diff` attributes changes to your
   branch.
 - **[CI gate](check.md)** — failing the build on new debt.
+- **[History](history.md)** — recording the numbers per commit and publishing
+  a chart of them. [tingle's own][own] is the shape of the result.
 - **[CLI reference](cli.md)** — every command and flag.
+
+  [own]: history/chart/index.html

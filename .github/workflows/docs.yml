@@ -21,6 +21,18 @@ jobs:
         with:
           persist-credentials: false
       - uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4
+      # Pages serves this site, so the recorded history has no branch of its
+      # own to be served from: fetch its chart over the placeholder committed
+      # at that path. Before the build, not after, so MkDocs carries it into
+      # the site and `--strict` checks the pages that link to it.
+      #
+      # This workflow and Metrics history both fire on the same push and run
+      # concurrently, so the chart published here is normally one commit
+      # behind; the next push to main brings it level.
+      - uses: ./actions/metrics-history/publish
+        with:
+          data-branch: metrics-data
+          into: docs/history/chart
       - run: mise run docs:build
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
