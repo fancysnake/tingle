@@ -20,6 +20,15 @@ if TYPE_CHECKING:
 BINARY_SNIFF_BYTES = 8000
 
 
+def sniffed_binary(data: bytes) -> bool:
+    """Report whether git would call these bytes binary.
+
+    The window and the test are one fact, so they are stated together and
+    read the same on both sides of `read()`.
+    """
+    return b"\0" in data[:BINARY_SNIFF_BYTES]
+
+
 class ProjectFiles(Protocol):
     """Read-only view of the project tree."""
 

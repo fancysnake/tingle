@@ -15,7 +15,7 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
 from tingle.pacts.diff import BranchDiff, DiffSourceError, FileDiff, FileStatus
-from tingle.pacts.metrics import BINARY_SNIFF_BYTES
+from tingle.pacts.metrics import sniffed_binary
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -136,7 +136,7 @@ class GitCli:
             data = (self._root / path).read_bytes()
         except OSError:
             return ()
-        if b"\0" in data[:BINARY_SNIFF_BYTES]:
+        if sniffed_binary(data):
             return ()
         lines = data.count(b"\n") + bool(data and not data.endswith(b"\n"))
         return range(1, lines + 1)

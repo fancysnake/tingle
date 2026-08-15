@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import PurePath
 from typing import TypeAlias
 
-from tingle.pacts.metrics import BINARY_SNIFF_BYTES
+from tingle.pacts.metrics import sniffed_binary
 
 #: What a metric is handed in place of a port's raw bytes: the same lookup,
 #: with the readability rule already applied to what comes back.
@@ -25,11 +25,14 @@ def decode_text(data: bytes | None) -> str | None:
     `None` in means `None` out, so a reader that could not find the file at
     all needs no separate branch at the call site.
 
-    Binary is guessed the way git does: a NUL byte near the start.
+    Binary is guessed the way git does, and then the decode gate on top of
+    it is tingle's own: git diffs a latin-1 file, a metric cannot read one.
+    That extra gate is the whole difference between this question and the
+    adapter's, which is why only the sniff underneath it is shared.
     """
     if data is None:
         return None
-    if b"\0" in data[:BINARY_SNIFF_BYTES]:
+    if sniffed_binary(data):
         return None
     try:
         return data.decode("utf-8")
