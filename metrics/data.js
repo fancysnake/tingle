@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786790011303,
+  "lastUpdate": 1786793171486,
   "repoUrl": "https://github.com/fancysnake/tingle",
   "entries": {
     "tingle": [
@@ -687,6 +687,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "deferred-import-contracts",
             "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "any-uses",
+            "value": 1,
+            "unit": "count"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "332e92d1173c8d5ce3b489b169525393852d093c",
+          "message": "Merge pull request #35 from fancysnake/chore/glimpse-contracts\n\nChore/glimpse contracts",
+          "timestamp": "2026-08-15T13:25:34+02:00",
+          "tree_id": "98ac2df63f10ca9af0ab527f7f95dcd5220893d2",
+          "url": "https://github.com/fancysnake/tingle/commit/332e92d1173c8d5ce3b489b169525393852d093c"
+        },
+        "date": 1786793170936,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "fmt-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "taplo-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "codespell-comment",
+            "value": 2,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-format-ignore",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "noqa-comment",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-ignores",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "ruff-per-file-ignores",
+            "value": 15,
+            "unit": "count"
+          },
+          {
+            "name": "pylint-comment",
+            "value": 5,
+            "unit": "count"
+          },
+          {
+            "name": "pylint-disables",
+            "value": 3,
+            "unit": "count"
+          },
+          {
+            "name": "long-files",
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "name": "type-ignores",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "name": "type-ignore-spread",
+            "value": 3,
+            "unit": "count"
+          },
+          {
+            "name": "mypy-overrides",
+            "value": 1,
+            "unit": "count"
+          },
+          {
+            "name": "deferred-import-contracts",
+            "value": 0,
             "unit": "count"
           },
           {
