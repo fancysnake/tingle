@@ -94,6 +94,19 @@ def test_write_starter_delegates_to_the_store() -> None:
     store.write_starter.assert_called_once_with(CWD)
 
 
+def test_list_metric_types_orders_by_name() -> None:
+    """The gate prints them straight out, so the order is settled here."""
+    unordered = {
+        name: MetricType(name=name, func=lambda _ctx: MetricResult(value=0))
+        for name in ("regex_count", "file_count", "line_count")
+    }
+    service = ConfigService(store=MagicMock(), metric_types=unordered)
+
+    names = [metric_type.name for metric_type in service.list_metric_types()]
+
+    assert names == ["file_count", "line_count", "regex_count"]
+
+
 def _config() -> Config:
     return validate(RAW, METRIC_TYPES, root=CWD, source=SOURCE)
 

@@ -12,7 +12,6 @@ from rich.console import Console
 from rich.table import Table
 
 from tingle.gates.cli import render
-from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.pacts.config import (
     CheckPolicy,
     Config,
@@ -23,7 +22,10 @@ from tingle.pacts.config import (
 from tingle.pacts.diff import DiffReport, DiffSourceError
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from tingle.pacts.check import CheckVerdict
+    from tingle.pacts.metrics import MetricType
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ServicesProtocol
 
@@ -240,7 +242,7 @@ class CliGate:
     ) -> None:
         """List configured metrics, or available metric types with --types."""
         if types:
-            self._stdout.print(_types_table())
+            self._stdout.print(_types_table(self._services.config.list_metric_types()))
             return
         self._stdout.print(_metrics_table(self._load(config)))
 
@@ -299,17 +301,18 @@ class CliGate:
     def _interactive(self, request: _MetricRequest) -> None:
         """Run the metrics, then hand the report to the interactive TUI."""
         # imported lazily: textual is heavy and only needed on this path
-        from tingle.gates.tui.app import (  # pylint: disable=import-outside-toplevel
+        from tingle.gates.cli.textual import (  # pylint: disable=import-outside-toplevel
             MetricsApp,
         )
 
+        opener, browse = self._services.editor, self._services.browse
         if request.diff:
             diff_report = self._collect_diff(request)
-            MetricsApp(diff_report, self._services.editor).run()
+            MetricsApp(diff_report, opener, browse=browse).run()
             self._finish_diff(diff_report)
         else:
             run_report = self._collect_run(request)
-            MetricsApp(run_report, self._services.editor).run()
+            MetricsApp(run_report, opener, browse=browse).run()
             self._finish_run(run_report)
 
     def _print_stat(self, request: _MetricRequest, *, json_out: bool) -> None:
@@ -442,9 +445,9 @@ class CliGate:
         raise typer.Exit(2)
 
 
-def _types_table() -> Table:
+def _types_table(metric_types: Sequence[MetricType]) -> Table:
     table = Table("Type", "Required params", "Optional params", "Description")
-    for metric_type in sorted(METRIC_TYPES.values(), key=lambda t: t.name):
+    for metric_type in metric_types:
         table.add_row(
             metric_type.name,
             ", ".join(metric_type.params.required),

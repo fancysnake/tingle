@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 from tingle.links.config_file.toml import TomlConfigStore
 from tingle.links.editor import VsCodeCli
 from tingle.links.fs.local import LocalProjectFiles
 from tingle.links.git.cli import GitCli
+from tingle.mills import browse
 from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.mills.services import ConfigService, MetricsService
+
+if TYPE_CHECKING:
+    from tingle.pacts.services import BrowseServiceProtocol
 
 
 class Services:
@@ -28,6 +33,16 @@ class Services:
             diff_source=GitCli,
             metric_types=METRIC_TYPES,
         )
+
+    @cached_property
+    def browse(self) -> BrowseServiceProtocol:
+        """What an interactive session shows, and in what order.
+
+        The mill is handed over as itself: its functions are pure and hold
+        no dependencies, so there is nothing for a wrapper to construct,
+        and the module already has the shape the protocol asks for.
+        """
+        return browse
 
     @cached_property
     def editor(self) -> VsCodeCli:

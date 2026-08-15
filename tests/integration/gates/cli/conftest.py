@@ -8,9 +8,13 @@ of the same name — pytest requires the parameter to match the fixture.
 from __future__ import annotations
 
 import subprocess
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+
+from tingle.gates.cli import typer as typer_gate
+from tingle.gates.cli.textual import MetricsApp
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -21,7 +25,7 @@ include = ["src/**/*.py"]
 default = true
 
 [[metrics]]
-name = "noqa-comments"
+name = "lint-escapes"
 type = "regex_count"
 pattern = '#\\s*noqa'
 
@@ -29,6 +33,24 @@ pattern = '#\\s*noqa'
 name = "ruff-ignores"
 type = "toml_list_length"
 key = "tool.ruff.lint.ignore"
+"""
+
+#: Like CONFIG, but counting files instead of reading pyproject.toml -- what
+#: the plain `report` tests measure, since they build no pyproject.
+COUNTING_CONFIG = """
+[ranges.python]
+include = ["src/**/*.py"]
+default = true
+
+[[metrics]]
+name = "lint-escapes"
+type = "regex_count"
+range = "python"
+pattern = '#\\s*noqa'
+
+[[metrics]]
+name = "python-files"
+type = "file_count"
 """
 
 BASE_PYPROJECT = '[tool.ruff.lint]\nignore = ["E501"]\n'
@@ -42,6 +64,12 @@ def config_text() -> str:
 
 
 @pytest.fixture
+def counting_config_text() -> str:
+    """Return the tingle.toml the plain report tests are built around."""
+    return COUNTING_CONFIG
+
+
+@pytest.fixture
 def workdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Make an empty directory the current one, and return it."""
     monkeypatch.chdir(tmp_path)
@@ -50,18 +78,6 @@ def workdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _git(cwd: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
-
-
-@pytest.fixture(autouse=True)
-def isolated_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Keep git off the developer's own config and out of enclosing repos."""
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
-    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
-    monkeypatch.setenv("GIT_AUTHOR_NAME", "tingle-tests")
-    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "tests@tingle.invalid")
-    monkeypatch.setenv("GIT_COMMITTER_NAME", "tingle-tests")
-    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "tests@tingle.invalid")
-    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
 
 
 @pytest.fixture
@@ -84,3 +100,22 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (src / "new.py").write_text("w = 4  # noqa\n")  # untracked
     monkeypatch.chdir(root)
     return root
+
+
+@pytest.fixture
+def interactive(monkeypatch: pytest.MonkeyPatch) -> list[MetricsApp]:
+    """Make stdout look like a terminal, and catch the app the gate builds.
+
+    The app is real and so is the service graph behind it; only `run` is
+    replaced, since a launched TUI would sit waiting for a keystroke.
+    """
+    built: list[MetricsApp] = []
+
+    def record(self: MetricsApp) -> None:
+        built.append(self)
+
+    monkeypatch.setattr(
+        typer_gate, "sys", SimpleNamespace(stdout=SimpleNamespace(isatty=lambda: True))
+    )
+    monkeypatch.setattr(MetricsApp, "run", record)
+    return built

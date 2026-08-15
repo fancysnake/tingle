@@ -8,27 +8,85 @@ Reports go to stdout; warnings and per-metric errors go to stderr, so
 Interactive mode on a terminal; the static summary table otherwise (CI,
 pipes).
 
-The TUI is a three-level accordion of group → metric → file results,
-navigated with the arrow keys. Groups and their metric rows (each showing
-its stats) are visible at rest.
+The TUI is one table. Group headers, the metrics under them and — once a
+metric is unfolded — what it measures and every hit it located are all
+rows in it, indented into an outline:
+
+```text
+  Group / Metric        Type              Value
+▾ linting                                 🚧 24
+    noqa-comment        regex_count       🎉  0
+  ▾ pylint-comment      regex_count       🚧  4
+      lint escapes we still carry
+      ranges: python
+      src/mills/runner.py:1
+      src/mills/diff.py:12
+```
 
 | Key | Action |
 |---|---|
-| `↑` / `↓` (`k` / `j`) | move between headers, and the occurrence lines of an unfolded metric |
-| `→` / `←` (`l` / `h`) | unfold / fold the focused header |
-| ++space++ / ++enter++ / click | toggle the focused header — or, on an occurrence line, open it |
-| `f` | fold or unfold every group at once, leaving file results as they are |
+| `↑` / `↓` (`k` / `j`) | move the cursor between rows |
+| `→` / `←` (`l` / `h`) | unfold / fold — from a hit, `←` folds the metric above it |
+| ++space++ / ++enter++ | fold or unfold the row — or, on a located hit, open it |
+| `f` | fold or unfold every group at once, leaving each metric as it is |
+| `/` | search |
+| `g` `n` `t` `v` `c` | sort by group, name, type, value, score |
+| `G` `N` `T` `V` `C` | the same sorts, the other way up |
+| `0` | clear the sort |
 | `p` | command palette |
 | `q` | quit |
 
-Each group and metric folds independently. Unfolding a metric shows its
-occurrences in place. With no groups configured it is a flat accordion of
-metrics, and `f` folds those instead.
+Each group and metric folds independently. Unfolding a metric shows what
+it measures, the ranges it measures over, and its occurrences. A metric
+that failed shows its error there too. With no groups configured the
+metrics are the top level, and `f` folds those instead. A group with
+nothing to report — no hits at all, or, in a diff, a branch that moved
+nothing — starts folded, unless it holds an error.
 
-Arrow down onto an occurrence and press ++space++ or ++enter++ to **open it
-in VS Code** — the file at its line, in the window you are already in. This
+Move onto an occurrence and press ++space++ or ++enter++ to **open it in
+VS Code** — the file at its line, in the window you are already in. This
 works from VS Code's integrated terminal, which puts the `code` command on
 `PATH`; run elsewhere, the key just says there is no editor to open into.
+
+### Sorting
+
+Sorts stack, most recent first, so consecutive keys compose: `n` then `t`
+gives type-major order with names ordered inside each type. Pushing a key
+already in the stack moves it to the front rather than repeating it, so
+asking for it the other way up turns that sort over in place.
+
+The lowercase key sorts upwards and the shifted one downwards. The header
+of the column deciding the order carries ▲ or ▼ — `value` and `score`
+share a column, and either can be pointing either way. A line under the
+table names the whole stack.
+
+`value` is the raw count, `score` the same number against the metric's own
+guide. They answer different questions: what is biggest, and what is
+worst. Only `score` compares metrics with different guides.
+
+**Sorting by anything but `group` drops the group headers**, since the
+metrics no longer nest under one: every row names its own group instead.
+Folding stays — sort by `value`, then unfold the top row to see the files
+behind the number. `0` brings the headers and the config order back.
+
+### Search
+
+`/` opens a query box. Matching is case-sensitive substring, against
+everything a metric says about itself — its name, its group's, its
+description and its range names — and against the path of every one of
+its occurrences, whether or not that occurrence is on screen. Searching a
+fully folded tree finds files inside it.
+
+What a match reveals depends on where it was found. Matched on a name or
+a group, the metric is left exactly as you had it: the row already shows
+why it is there. Matched on a description or a range name, the metric
+opens to show those words. Matched through its files, it opens showing
+**only** the files that matched.
+
+Folding during a search is respected while the query stands, and forgotten
+with it. ++enter++ hands the rows back without giving up the query, so you
+can fold and open hits inside a search; ++escape++ leaves, restoring the
+outline exactly as it was.
 
 `tingle --diff [--base REF]` opens the [branch-impact](diff.md) view.
 

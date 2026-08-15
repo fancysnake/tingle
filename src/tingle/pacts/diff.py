@@ -8,13 +8,13 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
-from tingle.pacts.config import DEFAULT_GUIDE
+from tingle.pacts.report import MeasuredOutcome, Stat
 
 if TYPE_CHECKING:
     from pathlib import Path, PurePath
 
-    from tingle.pacts.config import MetricSpec
     from tingle.pacts.metrics import MetricResult, Occurrence
+    from tingle.pacts.report import ReportSection
 
 
 class DiffSourceError(Exception):
@@ -61,8 +61,8 @@ class DiffSource(Protocol):
         """Diff the working tree against merge-base(base, HEAD)."""
 
     @abstractmethod
-    def read_base(self, path: PurePath) -> str | None:
-        """Return base-side file text, or None if missing/binary/undecodable."""
+    def read_base(self, path: PurePath) -> bytes | None:
+        """Return the base-side file's raw bytes, mirroring worktree read()."""
 
 
 class DiffSourceFactory(Protocol):
@@ -105,30 +105,47 @@ DiffMetricFunction: TypeAlias = Callable[[DiffMetricContext], DiffResult]
 
 
 @dataclass(frozen=True)
-class DiffOutcome:
+class DiffOutcome(MeasuredOutcome):
     """Diff result of one metric plus the current full-repo total.
 
-    `guide` is already resolved, as on MetricOutcome.
+    `emoji`, inherited with the rest of what a run and a diff say alike,
+    ranks the standing total rather than the net: what the branch moved is
+    the net's own business, and a net of zero is not no debt.
     """
 
-    spec: MetricSpec
-    range_names: tuple[str, ...]
     result: DiffResult | None = None
     total: MetricResult | None = None
-    error: str | None = None
-    guide: int = DEFAULT_GUIDE
+
+    @property
+    def stat(self) -> Stat | None:
+        """Where the metric now stands, if the full tree could be measured.
+
+        A branch can move a metric whose standing total nobody could work
+        out, so this goes absent on its own: the net is still known.
+        """
+        if self.total is None:
+            return None
+        return Stat(emoji=self.emoji, value=self.total.value)
 
 
 @dataclass(frozen=True)
 class DiffReport:
     """The outcome of one `tingle diff` run.
 
-    `skipped` names metrics whose type has no diff variant.
+    Sections are the only storage, as on RunReport; `skipped` names
+    metrics whose type has no diff variant.
     """
 
     root: Path
     source: Path
     base_ref: str
     merge_base: str
-    outcomes: tuple[DiffOutcome, ...]
+    sections: tuple[ReportSection[DiffOutcome], ...]
     skipped: tuple[str, ...] = ()
+
+    @property
+    def outcomes(self) -> tuple[DiffOutcome, ...]:
+        """Every outcome the run produced, in the order sections draw them."""
+        return tuple(
+            outcome for section in self.sections for outcome in section.outcomes
+        )

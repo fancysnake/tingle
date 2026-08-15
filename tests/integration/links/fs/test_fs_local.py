@@ -29,22 +29,20 @@ def test_walk_includes_dot_directories(tmp_path: Path) -> None:
     assert PurePath(".git/config") in files
 
 
-def test_read_text(tmp_path: Path) -> None:
+def test_read_returns_raw_bytes(tmp_path: Path) -> None:
     (tmp_path / "a.py").write_text("print('hi')\n")
 
-    assert LocalProjectFiles(tmp_path).read(PurePath("a.py")) == "print('hi')\n"
+    assert LocalProjectFiles(tmp_path).read(PurePath("a.py")) == b"print('hi')\n"
 
 
-def test_read_binary_returns_none(tmp_path: Path) -> None:
+def test_read_does_not_judge_what_is_readable(tmp_path: Path) -> None:
+    """Binary and undecodable files come back verbatim; mills decides."""
     (tmp_path / "blob.bin").write_bytes(b"\x00\x01\x02")
-
-    assert LocalProjectFiles(tmp_path).read(PurePath("blob.bin")) is None
-
-
-def test_read_bad_utf8_returns_none(tmp_path: Path) -> None:
     (tmp_path / "latin.txt").write_bytes(b"calf\xe9")
 
-    assert LocalProjectFiles(tmp_path).read(PurePath("latin.txt")) is None
+    files = LocalProjectFiles(tmp_path)
+    assert files.read(PurePath("blob.bin")) == b"\x00\x01\x02"
+    assert files.read(PurePath("latin.txt")) == b"calf\xe9"
 
 
 def test_read_missing_returns_none(tmp_path: Path) -> None:

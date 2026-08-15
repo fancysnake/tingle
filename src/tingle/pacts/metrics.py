@@ -12,6 +12,22 @@ if TYPE_CHECKING:
 
     from tingle.pacts.diff import DiffMetricFunction
 
+#: Bytes sniffed for a NUL before a file is called binary, which is the
+#: window git's own differ uses. Two layers apply it -- mills to decide
+#: what a metric may read, the git adapter to decide what git would have
+#: diffed -- so it is a fact about the bytes crossing `read()` rather than
+#: either layer's own rule.
+BINARY_SNIFF_BYTES = 8000
+
+
+def sniffed_binary(data: bytes) -> bool:
+    """Report whether git would call these bytes binary.
+
+    The window and the test are one fact, so they are stated together and
+    read the same on both sides of `read()`.
+    """
+    return b"\0" in data[:BINARY_SNIFF_BYTES]
+
 
 class ProjectFiles(Protocol):
     """Read-only view of the project tree."""
@@ -21,8 +37,12 @@ class ProjectFiles(Protocol):
         """Yield every file under the project root as a relative path."""
 
     @abstractmethod
-    def read(self, path: PurePath) -> str | None:
-        """Return file text, or None if missing, binary, or undecodable."""
+    def read(self, path: PurePath) -> bytes | None:
+        """Return the file's raw bytes, or None if it cannot be read.
+
+        Adapters do not decode: whether bytes are text is a measurement
+        rule, and it is applied in one place upstream of every metric.
+        """
 
     @abstractmethod
     def exists(self, path: PurePath) -> bool:
@@ -54,11 +74,6 @@ class Occurrence:
     path: str
     line: int | None = None
     note: str | None = None
-
-    @property
-    def sort_key(self) -> tuple[str, int, str]:
-        """Deterministic ordering: by path, then line, then note."""
-        return (self.path, self.line or 0, self.note or "")
 
     def __str__(self) -> str:
         """Render as path:line, path: note, or bare path."""

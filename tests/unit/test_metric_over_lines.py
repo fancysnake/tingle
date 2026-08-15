@@ -1,56 +1,25 @@
 from __future__ import annotations
 
 from pathlib import PurePath
-from typing import TYPE_CHECKING, Any
 
 import pytest
+from support import diff_context, metric_context, modified
 
 from tingle.mills.metrics.counts import (
     file_count,
     file_count_diff,
     validate_count_params,
 )
-from tingle.pacts.diff import DiffMetricContext, FileDiff, FileStatus
+from tingle.pacts.diff import FileDiff, FileStatus
 from tingle.pacts.metrics import MetricContext
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
 
 
 def _text(lines: int) -> str:
     return "".join(f"line {n}\n" for n in range(lines))
 
 
-def _context(contents: Mapping[str, str], params: Mapping[str, Any]) -> MetricContext:
-    return MetricContext(
-        files=tuple(PurePath(name) for name in contents),
-        read=lambda path: contents.get(str(path)),
-        exists=lambda path: str(path) in contents,
-        params=params,
-    )
-
-
-def _diff_context(
-    current: Mapping[str, str],
-    *,
-    base: Mapping[str, str],
-    files: tuple[FileDiff, ...],
-    params: Mapping[str, Any],
-) -> DiffMetricContext:
-    return DiffMetricContext(
-        files=files,
-        read=lambda path: current.get(str(path)),
-        read_base=lambda path: base.get(str(path)),
-        params=params,
-    )
-
-
-def _modified(path: str) -> FileDiff:
-    return FileDiff(path=PurePath(path), status=FileStatus.MODIFIED)
-
-
 def test_without_over_lines_every_file_counts() -> None:
-    ctx = _context({"a.py": _text(5000), "b.py": ""}, {})
+    ctx = metric_context({"a.py": _text(5000), "b.py": ""}, {})
 
     assert file_count(ctx).value == 2
 
@@ -75,7 +44,7 @@ def test_without_over_lines_no_file_is_ever_read() -> None:
 
 def test_the_gate_is_strict() -> None:
     """`over_lines = 1000` means "longer than 1000", not "1000 or more"."""
-    ctx = _context(
+    ctx = metric_context(
         {"exactly.py": _text(1000), "over.py": _text(1001)}, {"over_lines": 1000}
     )
 
@@ -86,7 +55,9 @@ def test_the_gate_is_strict() -> None:
 
 
 def test_details_carry_how_oversized_each_file_is() -> None:
-    ctx = _context({"big.py": _text(1500), "small.py": _text(10)}, {"over_lines": 1000})
+    ctx = metric_context(
+        {"big.py": _text(1500), "small.py": _text(10)}, {"over_lines": 1000}
+    )
 
     result = file_count(ctx)
 
@@ -94,7 +65,7 @@ def test_details_carry_how_oversized_each_file_is() -> None:
 
 
 def test_an_unreadable_file_warns_once_the_gate_is_set() -> None:
-    ctx = _context({"logo.png": _text(2000)}, {"over_lines": 1000})
+    ctx = metric_context({"logo.png": _text(2000)}, {"over_lines": 1000})
     ctx = MetricContext(
         files=ctx.files, read=lambda _: None, exists=ctx.exists, params=ctx.params
     )
@@ -117,10 +88,10 @@ def test_an_unreadable_file_warns_once_the_gate_is_set() -> None:
 )
 def test_diff_counts_crossings(case: tuple[int, int, int, int]) -> None:
     before, now, added, removed = case
-    ctx = _diff_context(
+    ctx = diff_context(
         {"a.py": _text(now)},
         base={"a.py": _text(before)},
-        files=(_modified("a.py"),),
+        files=(modified("a.py"),),
         params={"over_lines": 1000},
     )
 
@@ -132,7 +103,7 @@ def test_diff_counts_crossings(case: tuple[int, int, int, int]) -> None:
 
 def test_diff_counts_a_file_created_over_the_gate() -> None:
     """No base side at all: creation above the gate is a crossing."""
-    ctx = _diff_context(
+    ctx = diff_context(
         {"new.py": _text(1200)},
         base={},
         files=(FileDiff(path=PurePath("new.py"), status=FileStatus.ADDED),),
@@ -146,7 +117,7 @@ def test_diff_counts_a_file_created_over_the_gate() -> None:
 
 
 def test_diff_counts_an_oversized_file_deleted() -> None:
-    ctx = _diff_context(
+    ctx = diff_context(
         {},
         base={"old.py": _text(1200)},
         files=(FileDiff(path=PurePath("old.py"), status=FileStatus.DELETED),),
@@ -161,7 +132,7 @@ def test_diff_counts_an_oversized_file_deleted() -> None:
 
 def test_diff_ignores_a_small_file_created() -> None:
     """Without the gate this would count; with it, only oversized files do."""
-    ctx = _diff_context(
+    ctx = diff_context(
         {"new.py": _text(10)},
         base={},
         files=(FileDiff(path=PurePath("new.py"), status=FileStatus.ADDED),),
@@ -172,7 +143,7 @@ def test_diff_ignores_a_small_file_created() -> None:
 
 
 def test_diff_without_the_gate_still_counts_created_and_deleted() -> None:
-    ctx = _diff_context(
+    ctx = diff_context(
         {"new.py": ""},
         base={"old.py": ""},
         files=(

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from importlib import metadata
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+from textual_support import column
 from typer.testing import CliRunner
 
+from tingle.gates.cli import typer as typer_gate
+from tingle.gates.cli.textual import MetricsApp
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 from tingle.mills.metrics.registry import METRIC_TYPES
@@ -18,32 +23,15 @@ if TYPE_CHECKING:
 runner = CliRunner()
 app = CliGate(Services()).app
 
-CONFIG = """
-[ranges.python]
-include = ["src/**/*.py"]
-default = true
-
-[[metrics]]
-name = "noqa-comments"
-type = "regex_count"
-range = "python"
-pattern = '#\\s*noqa'
-
-[[metrics]]
-name = "python-files"
-type = "file_count"
-"""
-
 
 @pytest.fixture
-def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    (tmp_path / "tingle.toml").write_text(CONFIG)
-    src = tmp_path / "src"
+def project(workdir: Path, counting_config_text: str) -> Path:
+    (workdir / "tingle.toml").write_text(counting_config_text)
+    src = workdir / "src"
     src.mkdir()
     (src / "a.py").write_text("x = 1  # noqa\ny = 2  # noqa\n")
     (src / "b.py").write_text("z = 3  # noqa\n")
-    monkeypatch.chdir(tmp_path)
-    return tmp_path
+    return workdir
 
 
 def test_version() -> None:
@@ -62,7 +50,7 @@ def test_bare_invocation_prints_summary_when_not_a_tty() -> None:
     result = runner.invoke(app, [])
 
     assert result.exit_code == 0
-    assert "noqa-comments" in result.output
+    assert "lint-escapes" in result.output
     assert "3" in result.output
     assert "python-files" in result.output
 
@@ -72,7 +60,7 @@ def test_stat_table() -> None:
     result = runner.invoke(app, ["stat"])
 
     assert result.exit_code == 0
-    assert "noqa-comments" in result.output
+    assert "lint-escapes" in result.output
     assert "3" in result.output
 
 
@@ -84,7 +72,7 @@ def test_stat_json_is_values_only() -> None:
     payload = json.loads(result.stdout)
     assert payload["config"].endswith("tingle.toml")
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
-    noqa = metrics["noqa-comments"]
+    noqa = metrics["lint-escapes"]
     assert noqa["value"] == 3
     assert "occurrences" not in noqa
     assert "details" not in noqa
@@ -99,7 +87,7 @@ def test_report_lists_occurrences() -> None:
     # The value is led by how bad it is against its guide, and with none set the
     # guide is derived from the size of the codebase. This fixture is a handful
     # of lines, so three noqa comments really are a dense pile of debt.
-    assert "noqa-comments (regex_count): 🔥 3" in result.output
+    assert "lint-escapes (regex_count): 🔥 3" in result.output
     assert "src/a.py:1" in result.output
     assert "src/a.py:2" in result.output
     assert "src/b.py:1" in result.output
@@ -113,7 +101,7 @@ def test_report_json_includes_occurrences() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
-    noqa = metrics["noqa-comments"]
+    noqa = metrics["lint-escapes"]
     assert noqa["value"] == 3
     assert noqa["details"] == {"src/a.py": 2, "src/b.py": 1}
     assert noqa["occurrences"] == [
@@ -180,7 +168,7 @@ def test_raising_metric_exits_1_but_others_run(monkeypatch: pytest.MonkeyPatch) 
     metrics = {entry["name"]: entry for entry in payload["metrics"]}
     assert metrics["python-files"]["error"] == "RuntimeError: boom"
     assert metrics["python-files"]["value"] is None
-    assert metrics["noqa-comments"]["value"] == 3
+    assert metrics["lint-escapes"]["value"] == 3
     assert "error: python-files: RuntimeError: boom" in result.stderr
 
 
@@ -196,7 +184,7 @@ def test_list_shows_configured_metrics() -> None:
     result = runner.invoke(app, ["list"])
 
     assert result.exit_code == 0
-    assert "noqa-comments" in result.output
+    assert "lint-escapes" in result.output
     assert "regex_count" in result.output
 
 
@@ -210,3 +198,62 @@ def test_list_types_works_without_config(
     assert result.exit_code == 0
     for name in METRIC_TYPES:
         assert name in result.output
+
+
+@pytest.mark.usefixtures("project")
+def test_a_terminal_gets_the_interactive_table(interactive: list[MetricsApp]) -> None:
+    """The only path that builds the TUI, and so the only one that wires it.
+
+    The real app is built, not a stand-in: `browse` is keyword-only and has
+    no default, so reaching this assertion is itself the wiring check.
+    """
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    assert len(interactive) == 1
+    assert isinstance(interactive[0], MetricsApp)
+    assert "python-files" not in result.output  # the table was not printed instead
+
+
+@pytest.mark.usefixtures("repo")
+def test_a_terminal_asking_for_a_diff_gets_one(interactive: list[MetricsApp]) -> None:
+    """What the app was handed, not merely that it was handed something.
+
+    A regression collecting a whole-tree run here would build a
+    `MetricsApp` all the same, so the table is read for the one thing
+    only a branch report can say: what the branch moved.
+    """
+    result = runner.invoke(app, ["--diff"])
+
+    assert result.exit_code == 0
+    assert len(interactive) == 1
+    assert "lint-escapes" not in result.output
+    assert all("net " in cell for cell in _drawn_values(interactive[0]))
+
+
+def _drawn_values(built: MetricsApp) -> list[str]:
+    """Run the app the gate built, and read its value column."""
+
+    async def scenario() -> list[str]:
+        async with built.run_test():
+            return column(built, 2)
+
+    values = asyncio.run(scenario())
+    assert values, "the app drew no rows to read"
+    return values
+
+
+@pytest.mark.usefixtures("project")
+def test_a_pipe_gets_the_summary_table_instead(
+    interactive: list[MetricsApp], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The tty check is the whole switch: without one, nothing interactive runs."""
+    monkeypatch.setattr(
+        typer_gate, "sys", SimpleNamespace(stdout=SimpleNamespace(isatty=lambda: False))
+    )
+
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 0
+    assert not interactive
+    assert "lint-escapes" in result.output

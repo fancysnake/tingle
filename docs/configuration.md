@@ -66,7 +66,8 @@ collects grouped metrics together:
 - `tingle report` prints a `## <name>` heading per group.
 - The summary tables read as an outline: each group name heads its own rows,
   its metrics indented beneath it, one group's block ruled off from the next.
-- The interactive TUI nests each group as its own foldable section.
+- The interactive TUI heads each group with a foldable row, its metrics
+  indented under it.
 - The published [history](history.md) plots one chart per group, a line per
   metric in it.
 

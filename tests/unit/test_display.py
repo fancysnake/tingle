@@ -9,7 +9,10 @@ from tingle.mills.display import (
     effective_guide,
     group_summary,
     loc_guide,
+    outcome_emoji,
+    sections,
     severity_emoji,
+    severity_ratio,
 )
 from tingle.pacts.config import DisplaySpec, MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffResult
@@ -22,6 +25,7 @@ def _outcome(value: int, *, guide: int = 100) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name="m", type="file_count"),
         range_names=(),
+        emoji="",
         result=MetricResult(value=value),
         guide=guide,
     )
@@ -31,6 +35,7 @@ def _failed(*, guide: int = 100) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name="boom", type="file_count"),
         range_names=(),
+        emoji="",
         error="ValueError: boom",
         guide=guide,
     )
@@ -42,6 +47,7 @@ def _diff_outcome(
     return DiffOutcome(
         spec=MetricSpec(name="m", type="file_count"),
         range_names=(),
+        emoji="",
         result=DiffResult(net=net, added=added, removed=removed),
         total=MetricResult(value=total),
         guide=guide,
@@ -244,3 +250,76 @@ def test_a_real_project_keeps_the_worst_metric_alone_at_the_top() -> None:
     assert severity_emoji(483, guide) == "🚨"
     assert severity_emoji(2, guide) == "🦠"
     assert severity_emoji(0, guide) == "🎉"
+
+
+def _grouped(name: str, group: str | None, *, value: int = 1) -> MetricOutcome:
+    return MetricOutcome(
+        spec=MetricSpec(name=name, type="file_count", group=group),
+        range_names=(),
+        emoji="",
+        result=MetricResult(value=value),
+    )
+
+
+def test_sections_keep_first_appearance_order_and_put_the_ungrouped_last() -> None:
+    grouped = sections(
+        (
+            _grouped("a", "typing"),
+            _grouped("b", "lint"),
+            _grouped("c", "typing"),  # scattered member of an earlier group
+            _grouped("d", None),
+        )
+    )
+
+    assert [
+        (section.name, [o.spec.name for o in section.outcomes]) for section in grouped
+    ] == [("typing", ["a", "c"]), ("lint", ["b"]), (None, ["d"])]
+
+
+def test_sections_of_an_ungrouped_run_are_one_section_in_config_order() -> None:
+    grouped = sections((_grouped("a", None), _grouped("b", None)))
+
+    assert len(grouped) == 1
+    assert grouped[0].name is None
+    assert [o.spec.name for o in grouped[0].outcomes] == ["a", "b"]
+
+
+def test_each_section_carries_its_own_sum() -> None:
+    grouped = sections(
+        (_grouped("a", "typing", value=3), _grouped("b", "typing", value=7))
+    )
+
+    assert grouped[0].summary.value == 10
+
+
+def test_a_summary_carries_the_emoji_its_total_earns() -> None:
+    assert group_summary([_outcome(0, guide=100)]).emoji == EMOJI_ZERO
+
+
+def test_a_measured_number_is_ranked_against_the_guide_it_is_given() -> None:
+    assert outcome_emoji(MetricResult(value=0), 100) == EMOJI_ZERO
+    assert outcome_emoji(MetricResult(value=400), 100) == severity_emoji(400, 100)
+    assert outcome_emoji(MetricResult(value=400), 10) == severity_emoji(400, 10)
+
+
+def test_measuring_nothing_earns_no_emoji() -> None:
+    assert outcome_emoji(None, 100) == ""
+
+
+def test_severity_ratio_of_nothing_is_zero_and_never_divides() -> None:
+    """Sorting by score reaches the ratio directly, below the emoji's guard.
+
+    A group whose metrics all errored sums no guides, so the zero case has
+    to be answered before anything is divided.
+    """
+    assert severity_ratio(0, guide=100) == 0.0
+    assert severity_ratio(0, guide=0) == 0.0
+
+
+def test_severity_ratio_climbs_with_the_value() -> None:
+    assert severity_ratio(1, 100) < severity_ratio(50, 100) < severity_ratio(500, 100)
+
+
+def test_severity_ratio_is_one_at_the_guide() -> None:
+    """The anchor the ladder is built on: full-size debt is exactly 1.0."""
+    assert severity_ratio(100, 100) == 1.0

@@ -7,7 +7,13 @@ import pytest
 
 from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, Occurrence
-from tingle.pacts.report import MetricOutcome, RunReport
+from tingle.pacts.report import (
+    GroupSummary,
+    MetricOutcome,
+    ReportSection,
+    RunReport,
+    Stat,
+)
 
 
 def test_config_error_aggregates_messages() -> None:
@@ -44,19 +50,6 @@ def test_occurrence_rendering() -> None:
     assert str(Occurrence(path="src/a.py")) == "src/a.py"
 
 
-def test_occurrence_sort_key_handles_missing_fields() -> None:
-    occurrences = [
-        Occurrence(path="b.py", line=2),
-        Occurrence(path="a.py", note="E501"),
-        Occurrence(path="a.py", line=5),
-        Occurrence(path="a.py"),
-    ]
-
-    ordered = sorted(occurrences, key=lambda o: o.sort_key)
-
-    assert [str(o) for o in ordered] == ["a.py", "a.py: E501", "a.py:5", "b.py:2"]
-
-
 def test_occurrence_is_immutable() -> None:
     occurrence = Occurrence(path="a.py", line=1)
     with pytest.raises(dataclasses.FrozenInstanceError):
@@ -80,12 +73,40 @@ def test_metric_type_holds_function() -> None:
 def test_run_report_construction() -> None:
     spec = MetricSpec(name="noqa", type="regex_count")
     outcome = MetricOutcome(
-        spec=spec, range_names=("python",), result=MetricResult(value=0)
+        spec=spec, range_names=("python",), emoji="🎉", result=MetricResult(value=0)
     )
     report = RunReport(
-        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=(outcome,)
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        sections=(
+            ReportSection(
+                name=None,
+                outcomes=(outcome,),
+                summary=GroupSummary(value=0, guide=100, emoji="🎉"),
+            ),
+        ),
     )
+    # the outcomes a report answers with are the ones its sections hold
+    assert report.outcomes == (outcome,)
     assert report.outcomes[0].error is None
+
+
+def test_a_metric_that_failed_has_nothing_for_a_view_to_show() -> None:
+    """The one question a view asks: is there a number and a rank for it.
+
+    A metric that raised answers no, so the rank it was built with is
+    never read and cannot be mistaken for a judgement of its own.
+    """
+    spec = MetricSpec(name="noqa", type="regex_count")
+    failed = MetricOutcome.errored(
+        spec, range_names=(), guide=100, exc=ValueError("boom")
+    )
+
+    assert failed.stat is None
+    assert failed.error == "ValueError: boom"
+    assert MetricOutcome(
+        spec=spec, range_names=(), emoji="🎉", result=MetricResult(value=3)
+    ).stat == Stat(emoji="🎉", value=3)
 
 
 def test_config_construction() -> None:

@@ -15,6 +15,7 @@ from tingle.gates.cli.render import (
     run_json,
     run_listing,
 )
+from tingle.mills.display import outcome_emoji, sections
 from tingle.pacts.check import CheckVerdict
 from tingle.pacts.config import CheckPolicy, MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
@@ -33,12 +34,14 @@ def _outcome(
     guide: int = 100,
     description: str | None = None,
 ) -> MetricOutcome:
+    result = MetricResult(value=value)
     return MetricOutcome(
         spec=MetricSpec(
             name=name, type="file_count", group=group, description=description
         ),
         range_names=(),
-        result=MetricResult(value=value),
+        emoji=outcome_emoji(result, guide),
+        result=result,
         guide=guide,
     )
 
@@ -47,13 +50,16 @@ def _failed(name: str, group: str | None = None) -> MetricOutcome:
     return MetricOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
+        emoji="",
         error="ValueError: boom",
     )
 
 
 def _report(*outcomes: MetricOutcome) -> RunReport:
     return RunReport(
-        root=Path("/proj"), source=Path("/proj/tingle.toml"), outcomes=outcomes
+        root=Path("/proj"),
+        source=Path("/proj/tingle.toml"),
+        sections=sections(outcomes),
     )
 
 
@@ -65,11 +71,13 @@ def _diff_outcome(
     total: int = 0,
     guide: int = 100,
 ) -> DiffOutcome:
+    standing = MetricResult(value=total)
     return DiffOutcome(
         spec=MetricSpec(name=name, type="file_count", group=group),
         range_names=(),
+        emoji=outcome_emoji(standing, guide),
         result=DiffResult(net=net, added=max(net, 0), removed=max(-net, 0)),
-        total=MetricResult(value=total),
+        total=standing,
         guide=guide,
     )
 
@@ -80,7 +88,7 @@ def _diff_report(*outcomes: DiffOutcome) -> DiffReport:
         source=Path("/proj/tingle.toml"),
         base_ref="main",
         merge_base="abc123",
-        outcomes=outcomes,
+        sections=sections(outcomes),
     )
 
 
@@ -207,6 +215,7 @@ def test_diff_listing_prints_a_description() -> None:
                 name="a", type="file_count", description="Files over 1k lines."
             ),
             range_names=(),
+            emoji="🚧",
             result=DiffResult(net=1, added=1, removed=0),
             total=MetricResult(value=5),
         )
@@ -226,12 +235,27 @@ def test_diff_listing_renders_an_errored_metric_as_a_red_heading() -> None:
     errored = DiffOutcome(
         spec=MetricSpec(name="boom", type="file_count"),
         range_names=(),
+        emoji="",
         error="ValueError: boom",
     )
     text = _plain(diff_listing(_diff_report(errored, _diff_outcome("a"))))
 
     assert "boom (file_count): ERROR" in text
     assert "a (file_count)" in text
+
+
+def test_diff_listing_heads_each_group_with_where_it_stands() -> None:
+    """A grouped diff listing says the group's standing debt, as a run's does."""
+    text = _plain(
+        diff_listing(
+            _diff_report(
+                _diff_outcome("a", "size", net=1, total=150, guide=100),
+                _diff_outcome("b", "size", net=0, total=150, guide=100),
+            )
+        )
+    )
+
+    assert "## size  🔥 300" in text
 
 
 def test_diff_table_group_row_judges_the_standing_total_not_the_net() -> None:
@@ -248,6 +272,34 @@ def test_diff_table_group_row_judges_the_standing_total_not_the_net() -> None:
     # 300 standing against a summed guide of 200 is half again past it
     assert "🔥 300" in text
     assert "🎉" not in text  # which the net alone would have called a triumph
+
+
+def test_diff_table_says_error_where_the_numbers_would_go() -> None:
+    errored = DiffOutcome(
+        spec=MetricSpec(name="boom", type="file_count"),
+        range_names=(),
+        emoji="",
+        error="ValueError: boom",
+    )
+
+    text = _rendered(diff_table(_diff_report(errored, _diff_outcome("a", total=5))))
+
+    assert "ERROR" in text
+    assert "boom" in text  # the row is still there to say which metric it was
+
+
+def test_diff_table_says_unknown_where_a_total_could_not_be_worked_out() -> None:
+    """An unknown total reads as "?", as it does in the heading and the browser."""
+    unknown = DiffOutcome(
+        spec=MetricSpec(name="a", type="file_count"),
+        range_names=(),
+        emoji="",
+        result=DiffResult(net=1, added=1, removed=0),
+    )
+
+    text = _rendered(diff_table(_diff_report(unknown)))
+
+    assert "?" in text
 
 
 def test_run_json_carries_guide_and_description() -> None:

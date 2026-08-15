@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
-from tingle.links.text import decode_text
-
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -28,13 +26,12 @@ class LocalProjectFiles:
             if path.is_file():
                 yield PurePath(path.relative_to(self._root))
 
-    def read(self, path: PurePath) -> str | None:
-        """Return file text, or None if missing, binary, or undecodable."""
+    def read(self, path: PurePath) -> bytes | None:
+        """Return the file's raw bytes, or None if it cannot be read."""
         try:
-            data = (self._root / path).read_bytes()
+            return (self._root / path).read_bytes()
         except OSError:
             return None
-        return decode_text(data)
 
     def exists(self, path: PurePath) -> bool:
         """Return whether the file exists under the root."""
