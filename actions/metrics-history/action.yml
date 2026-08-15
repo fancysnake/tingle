@@ -1,7 +1,7 @@
 name: tingle metrics history
 description: >-
-  Record `tingle stat` on a branch and publish a chart of each metric's
-  history. Expects `tingle` on PATH — run it from the job that already
+  Record `tingle stat` on a branch and publish its history as one chart per
+  metric group. Expects `tingle` on PATH — run it from the job that already
   installed it.
 
 inputs:
@@ -50,7 +50,10 @@ runs:
         status=0
         tingle stat --json ${CONFIG:+--config "$CONFIG"} > stat.json || status=$?
         [ "$status" -le 1 ] || exit "$status"
-        jq '[.metrics[] | select(.error == null) | {name, unit: "count", value}]' \
+        # `extra` is the benchmark format's free field; the chart page reads
+        # the group out of it to know which chart a metric belongs on
+        jq '[.metrics[] | select(.error == null)
+             | {name, unit: "count", value, extra: (.group // "ungrouped")}]' \
           stat.json > points.json
         if [ "$(jq length points.json)" -eq 0 ]; then
           echo "::error::every metric errored; there is nothing to record"
@@ -98,3 +101,35 @@ runs:
         # `tingle check` is the gate; this action only records
         comment-on-alert: false
         fail-on-alert: false
+
+    - name: Publish the chart page
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.data-branch }}
+        DATA_DIR: ${{ inputs.data-dir }}
+        TOKEN: ${{ inputs.github-token }}
+        CHART: ${{ github.action_path }}/chart/index.html
+      run: |
+        # the benchmark action writes its own page — one chart per metric —
+        # and only when none is there, so tingle's page is put in its place
+        # afterwards. In a clone of its own: the recording step leaves the
+        # caller's checkout back on the source branch.
+        remote="https://x-access-token:$TOKEN@${GITHUB_SERVER_URL#https://}/$GITHUB_REPOSITORY.git"
+        author=(-c 'user.name=github-actions[bot]'
+                -c 'user.email=41898282+github-actions[bot]@users.noreply.github.com')
+        for _ in 1 2 3; do
+          work=$(mktemp -d)
+          git clone --quiet --depth 1 --branch "$BRANCH" "$remote" "$work"
+          mkdir -p "$work/$DATA_DIR"
+          cp "$CHART" "$work/$DATA_DIR/index.html"
+          git -C "$work" add "$DATA_DIR/index.html"
+          # the page only changes when tingle does, so most runs stop here
+          if git -C "$work" diff --cached --quiet; then
+            exit 0
+          fi
+          git -C "$work" "${author[@]}" commit --quiet -m "Publish the tingle metrics chart"
+          git -C "$work" push --quiet "$remote" "$BRANCH" && exit 0
+          echo "$BRANCH moved under the push; retrying"
+        done
+        echo "::error::could not publish the chart page to $BRANCH"
+        exit 1

@@ -67,6 +67,8 @@ collects grouped metrics together:
 - The summary tables read as an outline: each group name heads its own rows,
   its metrics indented beneath it, one group's block ruled off from the next.
 - The interactive TUI nests each group as its own foldable section.
+- The published [history](history.md) plots one chart per group, a line per
+  metric in it.
 
 Metrics keep config order within a group, groups appear in first-mention
 order, and anything ungrouped trails last. With no groups configured

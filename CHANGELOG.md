@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A GitHub Actions composite action,
   `fancysnake/tingle/actions/metrics-history`, that records `stat --json` on
-  a branch and publishes a chart of each metric's history.
+  a branch and publishes its history as one chart per metric group — a line
+  per metric, on a logarithmic axis that still has room for a count of 0.
 - `fancysnake/tingle/actions/metrics-history/publish`, the other half: it
   fetches that chart into a site being built, for repositories whose Pages
   source is already a build artifact and so cannot serve the data branch.

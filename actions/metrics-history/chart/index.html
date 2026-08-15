@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Metrics history</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fff;
+    --card: #f6f8fa;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --grid: #d8dee4;
+    --link: #0969da;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+    --series-6: #008300;
+    --series-7: #4a3aa7;
+    --series-8: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface: #0d1117;
+      --card: #161b22;
+      --text-primary: #fff;
+      --text-secondary: #c3c2b7;
+      --grid: #30363d;
+      --link: #6cb6ff;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #008300;
+      --series-7: #9085e9;
+      --series-8: #e66767;
+    }
+  }
+  body {
+    margin: 0 auto;
+    padding: 2rem 1rem 3rem;
+    max-width: 72rem;
+    font: 1rem/1.6 system-ui, sans-serif;
+    color: var(--text-primary);
+    background: var(--surface);
+  }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
+  a { color: var(--link); }
+  .meta { margin: 0 0 2rem; color: var(--text-secondary); font-size: 0.85rem; }
+  .group {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    background: var(--card);
+  }
+  .plot { position: relative; height: 20rem; }
+  details { margin-top: 0.75rem; font-size: 0.85rem; }
+  summary { cursor: pointer; color: var(--text-secondary); }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; margin-top: 0.5rem; font-size: 0.8rem; }
+  th, td { padding: 0.2rem 0.6rem; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { border-bottom: 1px solid var(--grid); }
+  .swatch {
+    display: inline-block;
+    width: 0.6em;
+    height: 0.6em;
+    margin-right: 0.4em;
+    border-radius: 2px;
+  }
+  footer { color: var(--text-secondary); font-size: 0.8rem; }
+</style>
+
+<h1 id="title">Metrics history</h1>
+<p class="meta">
+  <span id="last-update"></span>
+  <a id="repo-link" href="#"></a>
+</p>
+
+<main id="main"></main>
+
+<footer>
+  One chart per metric group, on a logarithmic scale — a count of 0 sits on
+  the bottom rule. Click a point to open its commit.
+  Recorded by <a href="https://tingle.fancysnake.dev/history/">tingle</a>,
+  plotted with
+  <a href="https://github.com/marketplace/actions/continuous-benchmark">github-action-benchmark</a>.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"></script>
+<script src="data.js"></script>
+<script>
+  'use strict';
+  (function () {
+    // the categorical palette has eight slots and none of them is reused: a
+    // group holding more than eight metrics is split across as many charts
+    const SLOTS = 8;
+    const UNGROUPED = 'ungrouped';
+    // ticks are chosen from these, so a log axis reads in round counts
+    const NICE = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100, 200, 300, 500, 1000,
+                  2000, 3000, 5000, 10000];
+
+    const charts = [];
+
+    // metric names, group names and commit ids all come from the recorded
+    // data and land in markup below
+    function esc(text) {
+      return String(text).replace(/[&<>"]/g, character => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[character]
+      ));
+    }
+
+    function css(name) {
+      return getComputedStyle(document.documentElement)
+        .getPropertyValue(name).trim();
+    }
+
+    // Newest point wins: a metric moved to another group is drawn where the
+    // config puts it now, and points recorded before groups were stored at
+    // all carry no `extra` to contradict it.
+    function readSeries(entries) {
+      const groupOf = new Map();
+      const order = [];
+      for (const entry of entries) {
+        for (const bench of entry.benches) {
+          groupOf.set(bench.name, bench.extra || UNGROUPED);
+        }
+      }
+      // the last entry is the current config, so it decides the reading
+      // order; metrics no longer measured follow, oldest first
+      for (const entry of [entries[entries.length - 1], ...entries]) {
+        for (const bench of entry.benches) {
+          if (!order.includes(bench.name)) {
+            order.push(bench.name);
+          }
+        }
+      }
+      const groups = new Map();
+      for (const name of order) {
+        const group = groupOf.get(name);
+        if (!groups.has(group)) {
+          groups.set(group, []);
+        }
+        groups.get(group).push(name);
+      }
+      // an ungrouped metric belongs to no section of the config; it reads
+      // last rather than wherever its first metric happened to land
+      if (groups.has(UNGROUPED)) {
+        const loose = groups.get(UNGROUPED);
+        groups.delete(UNGROUPED);
+        groups.set(UNGROUPED, loose);
+      }
+      return groups;
+    }
+
+    function valuesOf(entries, name) {
+      return entries.map(entry => {
+        const bench = entry.benches.find(b => b.name === name);
+        return bench ? bench.value : null;
+      });
+    }
+
+    function axisTicks(max) {
+      const ticks = NICE.filter(value => value <= max);
+      if (ticks[ticks.length - 1] < max) {
+        ticks.push(NICE.find(value => value > max) || max);
+      }
+      return ticks;
+    }
+
+    function plot(canvas, entries, names) {
+      const labels = entries.map(entry => entry.commit.id.slice(0, 7));
+      const datasets = names.map((name, index) => {
+        const values = valuesOf(entries, name);
+        const color = css(`--series-${index + 1}`);
+        return {
+          label: name,
+          // a log axis cannot place 0, and 0 is the value every metric is
+          // aiming at: the axis plots value + 1, and reads back the count
+          data: values.map(value => (value === null ? null : value + 1)),
+          counts: values,
+          borderColor: color,
+          backgroundColor: color,
+          borderWidth: 2,
+          pointRadius: 2,
+          pointHoverRadius: 6,
+          tension: 0,
+          // a metric that errored on one build is a gap, not a break
+          spanGaps: true,
+        };
+      });
+      const measured = datasets
+        .flatMap(dataset => dataset.counts)
+        .filter(value => value !== null);
+      const ticks = axisTicks(Math.max(1, ...measured));
+
+      charts.push(new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          // the whole commit reads at once, and the hit target is the
+          // column rather than the point
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: {
+              grid: { display: false },
+              border: { color: css('--grid') },
+              ticks: { color: css('--text-secondary'), maxRotation: 0 },
+            },
+            y: {
+              type: 'logarithmic',
+              min: 1,
+              max: ticks[ticks.length - 1] + 1,
+              afterBuildTicks: axis => {
+                axis.ticks = ticks.map(value => ({ value: value + 1 }));
+              },
+              border: { display: false },
+              grid: { color: css('--grid') },
+              title: {
+                display: true,
+                text: 'count (log scale)',
+                color: css('--text-secondary'),
+              },
+              ticks: {
+                autoSkip: false,
+                color: css('--text-secondary'),
+                callback: value => String(Math.round(value) - 1),
+              },
+            },
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                color: css('--text-primary'),
+                boxWidth: 12,
+                boxHeight: 2,
+              },
+            },
+            tooltip: {
+              callbacks: {
+                title: items => {
+                  const entry = entries[items[0].dataIndex];
+                  return `${entry.commit.id.slice(0, 7)} · ` +
+                    new Date(entry.date).toLocaleDateString();
+                },
+                afterTitle: items =>
+                  entries[items[0].dataIndex].commit.message.split('\n')[0],
+                label: item =>
+                  `${item.dataset.label}: ${item.dataset.counts[item.dataIndex]}`,
+              },
+            },
+          },
+          onClick: (_event, elements) => {
+            if (elements.length > 0) {
+              const entry = entries[elements[0].index];
+              window.open(entry.commit.url, '_blank', 'noopener');
+            }
+          },
+        },
+      }));
+    }
+
+    function table(entries, names) {
+      const head = names
+        .map((name, index) =>
+          `<th><span class="swatch" style="background:var(--series-${index + 1})"></span>${esc(name)}</th>`)
+        .join('');
+      const rows = entries.slice().reverse().map(entry => {
+        const cells = names.map(name => {
+          const bench = entry.benches.find(b => b.name === name);
+          return `<td>${bench ? bench.value : '—'}</td>`;
+        }).join('');
+        const commit = esc(entry.commit.id.slice(0, 7));
+        return `<tr><td><a href="${esc(entry.commit.url)}">${commit}</a></td>${cells}</tr>`;
+      }).join('');
+      return '<details><summary>Table</summary><div class="scroll">' +
+        `<table><thead><tr><th>commit</th>${head}</tr></thead>` +
+        `<tbody>${rows}</tbody></table></div></details>`;
+    }
+
+    function render() {
+      const main = document.getElementById('main');
+      while (charts.length > 0) {
+        charts.pop().destroy();
+      }
+      main.textContent = '';
+
+      const data = window.BENCHMARK_DATA;
+      if (!data || Object.keys(data.entries).length === 0) {
+        main.textContent = 'No metrics recorded yet.';
+        return;
+      }
+      document.getElementById('last-update').textContent =
+        `Last updated ${new Date(data.lastUpdate).toLocaleString()} · `;
+      const link = document.getElementById('repo-link');
+      link.href = data.repoUrl;
+      link.textContent = data.repoUrl;
+
+      // one key per chart name: named after the recording repository, so a
+      // page holding one takes its name as the heading
+      const named = Object.keys(data.entries);
+      if (named.length === 1) {
+        document.getElementById('title').textContent = named[0];
+        document.title = `${named[0]} — metrics history`;
+      }
+      for (const [chartName, points] of Object.entries(data.entries)) {
+        if (points.length === 0) {
+          continue;
+        }
+        const entries = points.slice().sort((a, b) => a.date - b.date);
+        for (const [group, names] of readSeries(entries)) {
+          for (let start = 0; start < names.length; start += SLOTS) {
+            const part = names.slice(start, start + SLOTS);
+            const section = document.createElement('section');
+            section.className = 'group';
+            const label = named.length === 1 ? group : `${chartName} · ${group}`;
+            const heading = names.length > SLOTS
+              ? `${label} (${start / SLOTS + 1})`
+              : label;
+            section.innerHTML =
+              `<h2>${esc(heading)}</h2><div class="plot"><canvas></canvas></div>` +
+              table(entries, part);
+            main.appendChild(section);
+            plot(section.querySelector('canvas'), entries, part);
+          }
+        }
+      }
+    }
+
+    render();
+    // the palette is picked per mode, so the charts are rebuilt rather than
+    // left holding the colors of the mode they were drawn in
+    window.matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', render);
+  })();
+</script>

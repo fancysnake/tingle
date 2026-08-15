@@ -90,7 +90,7 @@ $ echo $?
 - [CI gate](https://tingle.fancysnake.dev/check/) — failing the build on new
   debt.
 - [History](https://tingle.fancysnake.dev/history/) — recording a point per
-  commit and publishing a chart of it, like
+  commit and publishing a chart per group, like
   [tingle's own](https://tingle.fancysnake.dev/history/chart/).
 - [CLI reference](https://tingle.fancysnake.dev/cli/) — every command and
   flag.
