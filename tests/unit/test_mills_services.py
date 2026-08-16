@@ -28,7 +28,7 @@ RAW = {
 
 
 def _config_service(store: MagicMock) -> ConfigService:
-    return ConfigService(store=store, metric_types=METRIC_TYPES)
+    return ConfigService(store=store, metric_types=METRIC_TYPES, templates=MagicMock())
 
 
 def test_load_validates_the_raw_config_against_the_resolved_source() -> None:
@@ -100,7 +100,9 @@ def test_list_metric_types_orders_by_name() -> None:
         name: MetricType(name=name, func=lambda _ctx: MetricResult(value=0))
         for name in ("regex_count", "file_count", "line_count")
     }
-    service = ConfigService(store=MagicMock(), metric_types=unordered)
+    service = ConfigService(
+        store=MagicMock(), metric_types=unordered, templates=MagicMock()
+    )
 
     names = [metric_type.name for metric_type in service.list_metric_types()]
 

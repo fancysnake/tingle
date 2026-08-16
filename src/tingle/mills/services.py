@@ -10,14 +10,22 @@ from tingle.mills.check import judge
 from tingle.mills.config import validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
-from tingle.pacts.config import ConfigNotFoundError
+from tingle.mills.templates import resolve, verify
+from tingle.pacts.config import ConfigError, ConfigNotFoundError, LibraryEntry
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping
     from pathlib import Path
 
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.config import CheckPolicy, Config, ConfigStore, MetricDraft
+    from tingle.pacts.config import (
+        CheckPolicy,
+        Config,
+        ConfigStore,
+        MetricDraft,
+        MetricTemplate,
+        TemplateLoader,
+    )
     from tingle.pacts.diff import DiffReport, DiffSourceFactory
     from tingle.pacts.metrics import MetricType, ProjectFilesFactory
     from tingle.pacts.report import RunReport
@@ -29,12 +37,30 @@ class ConfigService:
 
     store: ConfigStore
     metric_types: Mapping[str, MetricType]
+    templates: TemplateLoader
 
     def load(self, cwd: Path, override: Path | None = None) -> Config:
         """Discover, parse, and validate the configuration."""
         source, raw = self.store.load_raw(cwd, override)
         resolved = source.resolve()
-        return validate(raw, self.metric_types, root=resolved.parent, source=resolved)
+        errors: list[str] = []
+        templates = self._templates(raw, errors)
+        try:
+            config = validate(
+                raw,
+                self.metric_types,
+                root=resolved.parent,
+                source=resolved,
+                templates=templates,
+            )
+        except ConfigError as exc:
+            # one pass over the whole file: a broken template and a broken
+            # metric are both problems the reader has, and reporting them a
+            # round apart makes a fix take two runs.
+            raise ConfigError([*errors, *exc.errors]) from None
+        if errors:
+            raise ConfigError(errors)
+        return config
 
     def load_raw(self, cwd: Path) -> dict[str, Any]:
         """Raw config data for editing flows; empty when none exists yet."""
@@ -47,12 +73,46 @@ class ConfigService:
         """Append the drafted metric; return the file written and the name.
 
         The draft is validated against the merged existing config before
-        anything is written.
+        anything is written, base and all -- so a template that does not
+        exist is caught here rather than on the next run.
         """
-        metric = build_metric(self.load_raw(cwd), self.metric_types, draft=draft)
+        raw = self.load_raw(cwd)
+        errors: list[str] = []
+        existing = raw.get("metrics", [])
+        drafted = (
+            [*existing, {"base": draft.base}] if isinstance(existing, list) else []
+        )
+        templates = self._templates({**raw, "metrics": drafted}, errors)
+        if errors:
+            raise ConfigError(errors)
+        metric = build_metric(raw, self.metric_types, draft=draft, templates=templates)
         target = self.store.edit_target(cwd)
         self.store.append_metric(target, metric)
         return target, str(metric["name"])
+
+    def list_library(self, package: str) -> tuple[LibraryEntry, ...]:
+        """Every usable template a package offers, in path order."""
+        errors: list[str] = []
+        entries = tuple(
+            LibraryEntry(path=path, template=template)
+            for path, obj in self.templates.catalogue(package).items()
+            if (
+                template := verify(
+                    obj, path=path, metric_types=self.metric_types, errors=errors
+                )
+            )
+            is not None
+        )
+        if errors:
+            raise ConfigError(errors)
+        return entries
+
+    def _templates(
+        self, raw: Mapping[str, Any], errors: list[str]
+    ) -> dict[str, MetricTemplate]:
+        return resolve(
+            raw, self.templates, metric_types=self.metric_types, errors=errors
+        )
 
     def write_starter(self, cwd: Path) -> Path:
         """Create the starter config; raises FileExistsError if present."""

@@ -31,6 +31,17 @@ group = "lint"               # optional heading to show related metrics under
 pattern = '\bTODO\b'
 ```
 
+A metric may also start from a ready-made definition instead of stating one,
+with `base`:
+
+```toml
+[[metrics]]
+base = "tingle.builtins.ruff.noqa_comment"
+extra_ignore_lines = ['# @generated']
+```
+
+See [Template library](library.md).
+
 ## Ranges
 
 A range is a named file set: `include` globs minus `exclude` globs. The globs
@@ -164,8 +175,10 @@ one from the CLI with `--description`.
 
 ## Counting ignored lint rules
 
-There is no per-linter magic; point the generic types at the config files
-your linters actually use:
+The [template library](library.md) already carries these for the usual
+tools, so the short way is `base = "tingle.builtins.ruff.lint_ignores"`.
+Underneath there is no per-linter magic — the generic types are pointed at
+the config files your linters actually use, and you can do the same:
 
 ```console
 $ tingle add toml_list_length tool.ruff.lint.ignore --name ruff-ignores

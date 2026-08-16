@@ -26,7 +26,9 @@ $ pip install tingle
 
 ```console
 $ tingle init                                    # starter tingle.toml
-$ tingle add regex_count '#\s*noqa'              # add a metric from the CLI
+$ tingle library                                 # ready-made metrics for known tools
+$ tingle add --base tingle.builtins.ruff.noqa_comment
+$ tingle add regex_count '#\s*noqa'              # or state one yourself
 $ tingle add toml_list_length tool.ruff.lint.ignore --name ruff-ignores
 $ tingle                                         # interactive mode (on a terminal)
 $ tingle stat                                    # summary table
@@ -53,6 +55,18 @@ pattern = '#\s*noqa'
 You can count regex matches, uses of a Python symbol, entries in a TOML or
 INI list (this is how you count ignored lint rules), files, and lines.
 See the [metric types](https://tingle.fancysnake.dev/metrics/).
+
+For the tools everyone already runs there are ready-made definitions, so a
+metric can name one and override only what differs:
+
+```toml
+[[metrics]]
+base = "tingle.builtins.ruff.noqa_comment"
+extra_ignore_lines = ['# @generated']
+```
+
+They live in an ordinary Python package, so your team can publish its own.
+See the [template library](https://tingle.fancysnake.dev/library/).
 
 ## What it does
 
@@ -85,6 +99,8 @@ $ echo $?
   `tingle.toml`, ranges, groups.
 - [Metric types](https://tingle.fancysnake.dev/metrics/) — what you can
   count, and the limits of each counter.
+- [Template library](https://tingle.fancysnake.dev/library/) — ready-made
+  metrics for known tools, and publishing your own.
 - [Branch impact](https://tingle.fancysnake.dev/diff/) — how `--diff`
   attributes changes to your branch.
 - [CI gate](https://tingle.fancysnake.dev/check/) — failing the build on new

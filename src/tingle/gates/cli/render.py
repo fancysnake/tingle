@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from tingle.pacts.check import CheckVerdict
+    from tingle.pacts.config import LibraryEntry
     from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
     from tingle.pacts.metrics import MetricResult, Occurrence
     from tingle.pacts.report import MetricOutcome, ReportSection, RunReport
@@ -510,3 +511,47 @@ def _net_cell(net: int) -> str:
     if net < 0:
         return f"[green]{net}[/]"
     return "0"
+
+
+def template_toml(entry: LibraryEntry) -> str:
+    """Render a template as the `[[metrics]]` entry it stands for.
+
+    What a reader pastes in place of `base` to stop following the template
+    -- so the fields are laid out in the order a hand-written metric has
+    them, and the name is the template's own rather than a placeholder.
+    """
+    template = entry.template
+    fields = (
+        ("name", template.name),
+        ("type", template.type),
+        ("group", template.group),
+        ("description", template.description),
+        ("guide", template.guide),
+        ("ranges", list(template.ranges) if template.ranges else None),
+        *template.params.items(),
+    )
+    return "\n".join(
+        [
+            f"# {entry.path}",
+            "[[metrics]]",
+            *(
+                f"{key} = {_toml_value(value)}"
+                for key, value in fields
+                if value is not None
+            ),
+        ]
+    )
+
+
+def _toml_value(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    text = str(value)
+    # a literal string keeps a regex readable, and cannot hold a single quote
+    if "\\" in text and "'" not in text:
+        return f"'{text}'"
+    return json.dumps(text)

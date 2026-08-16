@@ -5,12 +5,16 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, final
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
+
+#: The template pack shipped with tingle, named as a string like any other
+#: so the built-ins travel the same road a third-party package does.
+BUILTIN_TEMPLATE_PACKAGE = "tingle.builtins"
 
 #: Stand-in guide for an outcome built without one. The real fallback, when
 #: neither a metric nor [display] pins a guide, is derived from the size of
@@ -29,6 +33,10 @@ class ConfigError(Exception):
         """Collect every problem found; the message joins them."""
         self.errors = errors
         super().__init__("\n".join(errors))
+
+
+class TemplateNotFoundError(Exception):
+    """Nothing importable sits at a template's dotted path."""
 
 
 @dataclass(frozen=True)
@@ -76,6 +84,56 @@ class MetricSpec:
     description: str | None = None
 
 
+@final
+@dataclass(frozen=True)
+class MetricTemplate:
+    """A reusable metric definition a `[[metrics]]` entry can build on.
+
+    Every field is optional and None means "not stated", so a template may
+    be a whole metric bar its name or a mixin carrying nothing but an
+    `ignore_lines` set. `ranges` is None rather than `()` for the same
+    reason: an empty tuple would be a template insisting on no ranges.
+
+    This is tingle's public plugin format -- a package of these at a dotted
+    import path is all a shared metric library is -- so it is final and
+    plain: whatever declares one needs tingle and nothing else. Templates
+    loaded from a package are verified field by field before use, and their
+    params are copied, since `frozen` does not reach inside a mapping.
+    """
+
+    type: str | None = None
+    name: str | None = None
+    group: str | None = None
+    description: str | None = None
+    guide: int | None = None
+    ranges: tuple[str, ...] | None = None
+    params: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class LibraryEntry:
+    """One template in the library, under the dotted path that names it."""
+
+    path: str
+    template: MetricTemplate
+
+
+class TemplateLoader(Protocol):
+    """Reaches the Python objects a config names as template bases."""
+
+    @abstractmethod
+    def load(self, path: str) -> object:
+        """Return the object at a dotted path, unverified.
+
+        Raises TemplateNotFoundError when nothing sits there. What comes
+        back is whatever the package exported, so the caller verifies it.
+        """
+
+    @abstractmethod
+    def catalogue(self, package: str) -> Mapping[str, object]:
+        """Every template-shaped object under a package, by dotted path."""
+
+
 class CheckPolicy(StrEnum):
     """When `tingle check` calls a branch a regression.
 
@@ -116,9 +174,15 @@ class Config:
 
 @dataclass(frozen=True)
 class MetricDraft:
-    """User input for `tingle add`, before validation."""
+    """User input for `tingle add`, before validation.
 
-    type_name: str
+    Exactly one of `type_name` and `base` says what is being added: a bare
+    metric type, or a template to build on. A template that states its own
+    type leaves `type_name` with nothing left to say.
+    """
+
+    type_name: str | None = None
+    base: str | None = None
     value: str | None = None
     name: str | None = None
     ranges: tuple[str, ...] = ()

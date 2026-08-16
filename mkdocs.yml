@@ -40,6 +40,7 @@ nav:
   - Guide:
       - Configuration: configuration.md
       - Metric types: metrics.md
+      - Template library: library.md
       - Branch impact: diff.md
       - CI gate: check.md
       - History: history.md

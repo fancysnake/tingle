@@ -115,7 +115,9 @@ def test_errors_are_aggregated() -> None:
         'metric "bad name!": invalid name '
         "(allowed: letters, digits, '_', '-', '.')" in errors
     )
-    assert 'metric "no-type": missing type' in errors
+    assert (
+        'metric "no-type": missing type (state one, or a base that has one)' in errors
+    )
 
 
 def test_duplicate_metric_names() -> None:

@@ -235,6 +235,42 @@ forbidden_modules = [
     "tingle.specs",
 ]
 
+# builtins is the published template pack, not a layer: it declares
+# MetricTemplate instances and nothing else. Nothing imports it -- the
+# library loader reaches it by dotted string, exactly as it reaches a
+# third-party pack -- so it is forbidden in both directions.
+[[tool.importlinter.contracts]]
+name = "builtins"
+type = "forbidden"
+source_modules = ["tingle.builtins"]
+forbidden_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.specs",
+    "tingle.edges",
+]
+
+[[tool.importlinter.contracts]]
+name = "nothing-imports-builtins"
+type = "forbidden"
+source_modules = [
+    "tingle.gates",
+    "tingle.links",
+    "tingle.inits",
+    "tingle.mills",
+    "tingle.pacts",
+    "tingle.specs",
+    "tingle.edges",
+]
+forbidden_modules = ["tingle.builtins"]
+
+[[tool.importlinter.contracts]]
+name = "inside-builtins"
+type = "independence"
+modules = ["tingle.builtins.*"]
+
 [[tool.importlinter.contracts]]
 name = "inside-gates"
 type = "independence"

@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A metric can build on a **template** instead of stating everything itself:
+  `base = "tingle.builtins.ruff.noqa_comment"` is a whole metric — type,
+  pattern, name, group, description — and any key the entry states wins
+  over it. `tingle library` lists what is on offer, `tingle library
+  --expand` prints each one as the config it stands for, and `tingle add
+  --base <path>` writes the two-line entry.
+- Ready-made templates for the tools most projects already run: `black`,
+  `codespell`, `import_linter`, `mypy`, `pylint`, `python`, `ruff`,
+  `taplo`, `unittest_mock`.
+- `extra_<param>` extends a template's list rather than replacing it, so
+  `extra_ignore_lines` keeps whatever the template already excused and adds
+  to it. The plain param still replaces.
+- `[templates.<name>]` declares a template in the config file itself. One
+  with no type is a mixin — a shared `ignore_lines` set or pair of ranges —
+  usable by metrics of different types, and it may build on an imported
+  template in turn.
+- Templates are ordinary Python: a package of `MetricTemplate` instances at
+  an import path, needing tingle and nothing else, so a team can publish its
+  own and name it the same way. tingle's own pack is reached by the same
+  loader, not from the inside.
+
 - The interactive TUI is a sortable table. Group headers, metrics and their
   located hits are rows in one outline instead of a three-level accordion,
   so a metric name lines up with its type and value in columns rather than
@@ -48,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `tingle.toml` measures itself through the template library, which changes
+  nothing it counts. `any-uses` now sits under `typing` rather than
+  ungrouped, since a template carries a group and there is no way to take
+  one back.
 - TUI: folding a metric now hides its description, which the accordion kept
   visible at rest. Descriptions became rows so they could live somewhere the
   table has room for.

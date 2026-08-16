@@ -26,10 +26,17 @@ default = true
 # [ranges.js]
 # include = ["frontend/**/*.js", "frontend/**/*.ts"]
 
+# A metric states what it counts...
 [[metrics]]
 name = "noqa-comments"
 type = "regex_count"
 pattern = '#\s*noqa'
+
+# ...or names a ready-made one and overrides what differs.
+# Run `tingle library` to see them all.
+# [[metrics]]
+# base = "tingle.builtins.mypy.type_ignore_comment"
+# extra_ignore_lines = ['# @generated']
 
 # [[metrics]]
 # name = "old-client-uses"
@@ -37,16 +44,10 @@ pattern = '#\s*noqa'
 # symbol = "myapp.legacy.OldClient"
 
 # [[metrics]]
-# name = "ruff-ignores"
-# type = "toml_list_length"
-# key = "tool.ruff.lint.ignore"
+# base = "tingle.builtins.ruff.lint_ignores"
 
 # [[metrics]]
-# name = "pylint-disables"
-# type = "ini_list_length"
-# file = ".pylintrc"
-# section = "MESSAGES CONTROL"
-# option = "disable"
+# base = "tingle.builtins.pylint.rcfile_disables"
 """
 
 
