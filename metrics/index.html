@@ -1,281 +1,406 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes" />
-    <style>
-      html {
-        font-family: BlinkMacSystemFont,-apple-system,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
-        -webkit-font-smoothing: antialiased;
-        background-color: #fff;
-        font-size: 16px;
-      }
-      body {
-        color: #4a4a4a;
-        margin: 8px;
-        font-size: 1em;
-        font-weight: 400;
-      }
-      header {
-        margin-bottom: 8px;
-        display: flex;
-        flex-direction: column;
-      }
-      main {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-      }
-      a {
-        color: #3273dc;
-        cursor: pointer;
-        text-decoration: none;
-      }
-      a:hover {
-        color: #000;
-      }
-      button {
-        color: #fff;
-        background-color: #3298dc;
-        border-color: transparent;
-        cursor: pointer;
-        text-align: center;
-      }
-      button:hover {
-        background-color: #2793da;
-        flex: none;
-      }
-      .spacer {
-        flex: auto;
-      }
-      .small {
-        font-size: 0.75rem;
-      }
-      footer {
-        margin-top: 16px;
-        display: flex;
-        align-items: center;
-      }
-      .header-label {
-        margin-right: 4px;
-      }
-      .benchmark-set {
-        margin: 8px 0;
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-      }
-      .benchmark-title {
-        font-size: 3rem;
-        font-weight: 600;
-        word-break: break-word;
-        text-align: center;
-      }
-      .benchmark-graphs {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-around;
-        align-items: center;
-        flex-wrap: wrap;
-        width: 100%;
-      }
-      .benchmark-chart {
-        max-width: 1000px;
-      }
-    </style>
-    <title>Benchmarks</title>
-  </head>
+<meta charset="utf-8">
+<title>Metrics history</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fff;
+    --card: #f6f8fa;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --grid: #d8dee4;
+    --link: #0969da;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+    --series-6: #008300;
+    --series-7: #4a3aa7;
+    --series-8: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface: #0d1117;
+      --card: #161b22;
+      --text-primary: #fff;
+      --text-secondary: #c3c2b7;
+      --grid: #30363d;
+      --link: #6cb6ff;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #008300;
+      --series-7: #9085e9;
+      --series-8: #e66767;
+    }
+  }
+  body {
+    margin: 0 auto;
+    padding: 2rem 1rem 3rem;
+    max-width: 72rem;
+    font: 1rem/1.6 system-ui, sans-serif;
+    color: var(--text-primary);
+    background: var(--surface);
+  }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
+  a { color: var(--link); }
+  .meta { margin: 0 0 2rem; color: var(--text-secondary); font-size: 0.85rem; }
+  .group {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    background: var(--card);
+  }
+  .plot { position: relative; height: 20rem; }
+  details { margin-top: 0.75rem; font-size: 0.85rem; }
+  summary { cursor: pointer; color: var(--text-secondary); }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; margin-top: 0.5rem; font-size: 0.8rem; }
+  th, td { padding: 0.2rem 0.6rem; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { border-bottom: 1px solid var(--grid); }
+  .swatch {
+    display: inline-block;
+    width: 0.6em;
+    height: 0.6em;
+    margin-right: 0.4em;
+    border-radius: 2px;
+  }
+  footer { color: var(--text-secondary); font-size: 0.8rem; }
+</style>
 
-  <body>
-    <header id="header">
-      <div class="header-item">
-        <strong class="header-label">Last Update:</strong>
-        <span id="last-update"></span>
-      </div>
-      <div class="header-item">
-        <strong class="header-label">Repository:</strong>
-        <a id="repository-link" rel="noopener"></a>
-      </div>
-    </header>
-    <main id="main"></main>
-    <footer>
-      <button id="dl-button">Download data as JSON</button>
-      <div class="spacer"></div>
-      <div class="small">Powered by <a rel="noopener" href="https://github.com/marketplace/actions/continuous-benchmark">github-action-benchmark</a></div>
-    </footer>
+<h1 id="title">Metrics history</h1>
+<p class="meta">
+  <span id="last-update"></span>
+  <a id="repo-link" href="#"></a>
+</p>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.2/dist/Chart.min.js"></script>
-    <script src="data.js"></script>
-    <script id="main-script">
-      'use strict';
-      (function() {
-        // Colors from https://github.com/github/linguist/blob/master/lib/linguist/languages.yml
-        const toolColors = {
-          cargo: '#dea584',
-          go: '#00add8',
-          benchmarkjs: '#f1e05a',
-          benchmarkluau: '#000080',
-          pytest: '#3572a5',
-          googlecpp: '#f34b7d',
-          catch2: '#f34b7d',
-          julia: '#a270ba',
-          jmh: '#b07219',
-          benchmarkdotnet: '#178600',
-          customBiggerIsBetter: '#38ff38',
-          customSmallerIsBetter: '#ff3838',
-          _: '#333333'
-        };
+<main id="main"></main>
 
-        function init() {
-          function collectBenchesPerTestCase(entries) {
-            const map = new Map();
-            for (const entry of entries) {
-              const {commit, date, tool, benches} = entry;
-              for (const bench of benches) {
-                const result = { commit, date, tool, bench };
-                const arr = map.get(bench.name);
-                if (arr === undefined) {
-                  map.set(bench.name, [result]);
-                } else {
-                  arr.push(result);
-                }
-              }
-            }
-            return map;
-          }
+<footer>
+  One chart per metric group, on a logarithmic scale — a count of 0 sits on
+  the bottom rule. Click a point to open its commit.
+  Recorded by <a href="https://tingle.fancysnake.dev/history/">tingle</a>,
+  plotted with
+  <a href="https://github.com/marketplace/actions/continuous-benchmark">github-action-benchmark</a>.
+</footer>
 
-          const data = window.BENCHMARK_DATA;
+<!-- this page is committed onto every consumer's data branch and served from
+     their Pages site, so the CDN is a dependency the action hands to them:
+     pinned by version, and by content through the integrity hash. The two
+     move together — a version bump left with the old hash blocks the script
+     and leaves every consumer's page chartless. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"
+        integrity="sha256-KBLLiCX9xXRp6y97sFXpQpJE5ZmSBRHuR36ChJm2Mss="
+        crossorigin="anonymous"></script>
+<script src="data.js"></script>
+<script>
+  'use strict';
+  (function () {
+    // the categorical palette has eight slots and none of them is reused: a
+    // group holding more than eight metrics is split across as many charts
+    const SLOTS = 8;
+    // a metric with no group belongs to no section of the config. The
+    // recorder leaves `extra` off it entirely, so this is the one place that
+    // names them, and a real group called `ungrouped` stays its own section.
+    const UNGROUPED = 'ungrouped';
 
-          // Render header
-          document.getElementById('last-update').textContent = new Date(data.lastUpdate).toString();
-          const repoLink = document.getElementById('repository-link');
-          repoLink.href = data.repoUrl;
-          repoLink.textContent = data.repoUrl;
+    const charts = [];
 
-          // Render footer
-          document.getElementById('dl-button').onclick = () => {
-            const dataUrl = 'data:,' + JSON.stringify(data, null, 2);
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = 'benchmark_data.json';
-            a.click();
-          };
+    // A log axis cannot place 0, and 0 is the value every metric is aiming
+    // at: the axis carries value + 1 and the count is read back off it.
+    // These two are the only places that know the offset exists.
+    function toAxis(count) {
+      return count === null ? null : count + 1;
+    }
 
-          // Prepare data points for charts
-          return Object.keys(data.entries).map(name => ({
-            name,
-            dataSet: collectBenchesPerTestCase(data.entries[name]),
-          }));
-        }
+    function fromAxis(value) {
+      return Math.round(value) - 1;
+    }
 
-        function renderAllChars(dataSets) {
+    function css(name) {
+      return getComputedStyle(document.documentElement)
+        .getPropertyValue(name).trim();
+    }
 
-          function renderGraph(parent, name, dataset) {
-            const canvas = document.createElement('canvas');
-            canvas.className = 'benchmark-chart';
-            parent.appendChild(canvas);
+    // one node, appended and captioned: the page builds its markup rather
+    // than concatenating it, so no recorded string needs escaping
+    function add(parent, tag, text) {
+      const node = parent.appendChild(document.createElement(tag));
+      if (text !== undefined) {
+        node.textContent = text;
+      }
+      return node;
+    }
 
-            const color = toolColors[dataset.length > 0 ? dataset[0].tool : '_'];
-            const data = {
-              labels: dataset.map(d => d.commit.id.slice(0, 7)),
-              datasets: [
-                {
-                  label: name,
-                  data: dataset.map(d => d.bench.value),
-                  borderColor: color,
-                  backgroundColor: color + '60', // Add alpha for #rrggbbaa
-                }
-              ],
-            };
-            const options = {
-              scales: {
-                xAxes: [
-                  {
-                    scaleLabel: {
-                      display: true,
-                      labelString: 'commit',
-                    },
-                  }
-                ],
-                yAxes: [
-                  {
-                    scaleLabel: {
-                      display: true,
-                      labelString: dataset.length > 0 ? dataset[0].bench.unit : '',
-                    },
-                    ticks: {
-                      beginAtZero: true,
-                    }
-                  }
-                ],
-              },
-              tooltips: {
-                callbacks: {
-                  afterTitle: items => {
-                    const {index} = items[0];
-                    const data = dataset[index];
-                    return '\n' + data.commit.message + '\n\n' + data.commit.timestamp + ' committed by @' + data.commit.committer.username + '\n';
-                  },
-                  label: item => {
-                    let label = item.value;
-                    const { range, unit } = dataset[item.index].bench;
-                    label += ' ' + unit;
-                    if (range) {
-                      label += ' (' + range + ')';
-                    }
-                    return label;
-                  },
-                  afterLabel: item => {
-                    const { extra } = dataset[item.index].bench;
-                    return extra ? '\n' + extra : '';
-                  }
-                }
-              },
-              onClick: (_mouseEvent, activeElems) => {
-                if (activeElems.length === 0) {
-                  return;
-                }
-                // XXX: Undocumented. How can we know the index?
-                const index = activeElems[0]._index;
-                const url = dataset[index].commit.url;
-                window.open(url, '_blank');
-              },
-            };
-
-            new Chart(canvas, {
-              type: 'line',
-              data,
-              options,
+    // One pass over the history: every metric comes back with one value per
+    // entry, null where that build recorded no point for it.
+    //
+    // Newest point wins for the group, so a metric moved to another group is
+    // drawn where the config puts it now, and points recorded before groups
+    // were stored at all carry no `extra` to contradict it.
+    function readSeries(entries) {
+      const series = new Map();
+      entries.forEach((entry, index) => {
+        for (const bench of entry.benches) {
+          if (!series.has(bench.name)) {
+            series.set(bench.name, {
+              name: bench.name,
+              group: null,
+              values: entries.map(() => null),
             });
           }
+          const metric = series.get(bench.name);
+          metric.group = bench.extra || null;
+          metric.values[index] = bench.value;
+        }
+      });
 
-          function renderBenchSet(name, benchSet, main) {
-            const setElem = document.createElement('div');
-            setElem.className = 'benchmark-set';
-            main.appendChild(setElem);
+      // the last entry is the current config, so it decides the reading
+      // order; metrics no longer measured follow, oldest first
+      const current = entries[entries.length - 1].benches.map(bench => bench.name);
+      const order = current.concat(
+        [...series.keys()].filter(name => !current.includes(name))
+      );
 
-            const nameElem = document.createElement('h1');
-            nameElem.className = 'benchmark-title';
-            nameElem.textContent = name;
-            setElem.appendChild(nameElem);
-
-            const graphsElem = document.createElement('div');
-            graphsElem.className = 'benchmark-graphs';
-            setElem.appendChild(graphsElem);
-
-            for (const [benchName, benches] of benchSet.entries()) {
-              renderGraph(graphsElem, benchName, benches)
-            }
+      // groups read in first-mention order; the loose metrics are collected
+      // apart and appended, so they read last however early one appeared
+      const groups = new Map();
+      const loose = [];
+      for (const name of order) {
+        const metric = series.get(name);
+        if (metric.group === null) {
+          loose.push(metric);
+        } else {
+          if (!groups.has(metric.group)) {
+            groups.set(metric.group, []);
           }
+          groups.get(metric.group).push(metric);
+        }
+      }
+      const sections = [...groups]
+        .map(([group, metrics]) => ({ group, metrics }));
+      if (loose.length > 0) {
+        sections.push({ group: UNGROUPED, metrics: loose });
+      }
+      return sections;
+    }
 
-          const main = document.getElementById('main');
-          for (const {name, dataSet} of dataSets) {
-            renderBenchSet(name, dataSet, main);
+    // 0, then 1, 2, 3 and 5 in each decade up to the one holding `max`, so
+    // the axis reads in round counts however large a metric grows
+    function axisTicks(max) {
+      const ticks = [0];
+      for (let decade = 1; ticks[ticks.length - 1] < max; decade *= 10) {
+        for (const step of [1, 2, 3, 5]) {
+          ticks.push(step * decade);
+          if (ticks[ticks.length - 1] >= max) {
+            break;
           }
         }
+      }
+      return ticks;
+    }
 
-        renderAllChars(init()); // Start
-      })();
-    </script>
-  </body>
-</html>
+    function plot(canvas, entries, metrics) {
+      const labels = entries.map(entry => entry.commit.id.slice(0, 7));
+      const datasets = metrics.map((metric, index) => {
+        const color = css(`--series-${index + 1}`);
+        return {
+          label: metric.name,
+          data: metric.values.map(count => toAxis(count)),
+          borderColor: color,
+          backgroundColor: color,
+          borderWidth: 2,
+          pointRadius: 2,
+          pointHoverRadius: 6,
+          tension: 0,
+          // a metric that errored on one build is a gap, not a break
+          spanGaps: true,
+        };
+      });
+      const measured = metrics
+        .flatMap(metric => metric.values)
+        .filter(value => value !== null);
+      const ticks = axisTicks(Math.max(1, ...measured));
+
+      charts.push(new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          // the whole commit reads at once, and the hit target is the
+          // column rather than the point
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: {
+              grid: { display: false },
+              border: { color: css('--grid') },
+              ticks: { color: css('--text-secondary'), maxRotation: 0 },
+            },
+            y: {
+              type: 'logarithmic',
+              min: toAxis(0),
+              max: toAxis(ticks[ticks.length - 1]),
+              afterBuildTicks: axis => {
+                axis.ticks = ticks.map(count => ({ value: toAxis(count) }));
+              },
+              border: { display: false },
+              grid: { color: css('--grid') },
+              title: {
+                display: true,
+                text: 'count (log scale)',
+                color: css('--text-secondary'),
+              },
+              ticks: {
+                autoSkip: false,
+                color: css('--text-secondary'),
+                callback: value => String(fromAxis(value)),
+              },
+            },
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                color: css('--text-primary'),
+                boxWidth: 12,
+                boxHeight: 2,
+              },
+            },
+            tooltip: {
+              callbacks: {
+                title: items => {
+                  const entry = entries[items[0].dataIndex];
+                  return `${entry.commit.id.slice(0, 7)} · ` +
+                    new Date(entry.date).toLocaleDateString();
+                },
+                afterTitle: items =>
+                  entries[items[0].dataIndex].commit.message.split('\n')[0],
+                label: item =>
+                  `${item.dataset.label}: ${fromAxis(item.parsed.y)}`,
+              },
+            },
+          },
+          onClick: (_event, elements) => {
+            if (elements.length > 0) {
+              const entry = entries[elements[0].index];
+              window.open(entry.commit.url, '_blank', 'noopener');
+            }
+          },
+        },
+      }));
+    }
+
+    function table(entries, metrics) {
+      const details = document.createElement('details');
+      add(details, 'summary', 'Table');
+      const scroll = add(details, 'div');
+      scroll.className = 'scroll';
+      const grid = add(scroll, 'table');
+
+      const head = add(add(grid, 'thead'), 'tr');
+      add(head, 'th', 'commit');
+      metrics.forEach((metric, index) => {
+        const cell = add(head, 'th');
+        const swatch = add(cell, 'span');
+        swatch.className = 'swatch';
+        swatch.style.background = `var(--series-${index + 1})`;
+        cell.appendChild(document.createTextNode(metric.name));
+      });
+
+      // newest build first: the table is read for what just moved
+      const body = add(grid, 'tbody');
+      for (let index = entries.length - 1; index >= 0; index -= 1) {
+        const row = add(body, 'tr');
+        const commit = entries[index].commit;
+        add(add(row, 'td'), 'a', commit.id.slice(0, 7)).href = commit.url;
+        for (const metric of metrics) {
+          const value = metric.values[index];
+          // a metric that errored on that build has no number to show
+          add(row, 'td', value === null ? '—' : String(value));
+        }
+      }
+      return details;
+    }
+
+    // one panel per chart: a group, or a slice of one wider than the
+    // palette. Every naming rule is settled here, so rendering a panel is
+    // the same work whichever it is.
+    function panels(byChart) {
+      const named = Object.keys(byChart);
+      const list = [];
+      for (const [chartName, points] of Object.entries(byChart)) {
+        if (points.length === 0) {
+          continue;
+        }
+        const entries = points.slice().sort((a, b) => a.date - b.date);
+        for (const section of readSeries(entries)) {
+          const label = named.length === 1
+            ? section.group
+            : `${chartName} · ${section.group}`;
+          const parts = Math.ceil(section.metrics.length / SLOTS);
+          for (let part = 0; part < parts; part += 1) {
+            list.push({
+              heading: parts > 1 ? `${label} (${part + 1})` : label,
+              entries,
+              metrics: section.metrics.slice(part * SLOTS, (part + 1) * SLOTS),
+            });
+          }
+        }
+      }
+      return list;
+    }
+
+    function render() {
+      const main = document.getElementById('main');
+      while (charts.length > 0) {
+        charts.pop().destroy();
+      }
+      main.textContent = '';
+
+      const data = window.BENCHMARK_DATA;
+      if (!data || Object.keys(data.entries).length === 0) {
+        main.textContent = 'No metrics recorded yet.';
+        return;
+      }
+      document.getElementById('last-update').textContent =
+        `Last updated ${new Date(data.lastUpdate).toLocaleString()} · `;
+      const link = document.getElementById('repo-link');
+      link.href = data.repoUrl;
+      link.textContent = data.repoUrl;
+
+      // one key per chart name: named after the recording repository, so a
+      // page holding one takes its name as the heading
+      const named = Object.keys(data.entries);
+      if (named.length === 1) {
+        document.getElementById('title').textContent = named[0];
+        document.title = `${named[0]} — metrics history`;
+      }
+      for (const panel of panels(data.entries)) {
+        const section = add(main, 'section');
+        section.className = 'group';
+        add(section, 'h2', panel.heading);
+        const plotted = add(section, 'div');
+        plotted.className = 'plot';
+        const canvas = add(plotted, 'canvas');
+        section.appendChild(table(panel.entries, panel.metrics));
+        plot(canvas, panel.entries, panel.metrics);
+      }
+    }
+
+    render();
+    // the palette is picked per mode, so the charts are rebuilt rather than
+    // left holding the colors of the mode they were drawn in
+    window.matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', render);
+  })();
+</script>
