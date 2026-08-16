@@ -18,13 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metric or group carries is a usage error.
 - `tingle list` names each metric's group, so the values `--group` takes can
   be read off the CLI instead of out of the config file.
-
-### Changed
-
-- A `--metric` or `--group` name the config does not carry is reported as
-  `usage error:` rather than `config error:`. The file is valid; the typo is
-  on the command line, and the old wording sent the reader to tingle.toml to
-  look for a problem that was not there.
 - The interactive TUI is a sortable table. Group headers, metrics and their
   located hits are rows in one outline instead of a three-level accordion,
   so a metric name lines up with its type and value in columns rather than
@@ -64,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A `--metric` or `--group` name the config does not carry is reported as
+  `usage error:` rather than `config error:`. The file is valid; the typo is
+  on the command line, and the old wording sent the reader to tingle.toml to
+  look for a problem that was not there.
 - TUI: folding a metric now hides its description, which the accordion kept
   visible at rest. Descriptions became rows so they could live somewhere the
   table has room for.
