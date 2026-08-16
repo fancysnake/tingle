@@ -32,6 +32,7 @@ $ tingle stat --json                             # machine-readable output
 $ tingle stat --diff                             # impact of the current branch
 $ tingle report                                  # every occurrence, file:line
 $ tingle report --diff                           # what the branch added/removed
+$ tingle report --group linting                  # one group, or --metric NAME
 ```
 
 ## What it does

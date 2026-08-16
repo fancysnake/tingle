@@ -18,6 +18,7 @@ from tingle.pacts.config import (
     ConfigError,
     ConfigNotFoundError,
     MetricDraft,
+    Selection,
 )
 from tingle.pacts.diff import DiffReport, DiffSourceError
 
@@ -35,6 +36,12 @@ ConfigOption = Annotated[
 MetricOption = Annotated[
     list[str] | None,
     typer.Option("--metric", help="Run only the named metric (repeatable)."),
+]
+GroupOption = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--group", help="Run only the metrics in the named group (repeatable)."
+    ),
 ]
 JsonOption = Annotated[
     bool, typer.Option("--json", help="Machine-readable JSON output.")
@@ -89,7 +96,25 @@ class _MetricRequest:
     diff: bool
     base: str | None
     config: Path | None
-    metrics: list[str] | None
+    selection: Selection
+
+    @classmethod
+    def of(
+        cls,
+        *,
+        diff: bool,
+        base: str | None,
+        config: Path | None,
+        metric: list[str] | None,
+        group: list[str] | None,
+    ) -> _MetricRequest:
+        """Read one command's options: naming a base is asking for --diff."""
+        return cls(
+            diff=diff or base is not None,
+            base=base,
+            config=config,
+            selection=Selection(metrics=tuple(metric or ()), groups=tuple(group or ())),
+        )
 
 
 class CliGate:
@@ -121,6 +146,7 @@ class CliGate:
         base: BaseOption = None,
         config: ConfigOption = None,
         metric: MetricOption = None,
+        group: GroupOption = None,
     ) -> None:
         """Measure code metrics during constant refactoring.
 
@@ -129,8 +155,8 @@ class CliGate:
         """
         if ctx.invoked_subcommand is not None:
             return
-        request = _MetricRequest(
-            diff=diff or base is not None, base=base, config=config, metrics=metric
+        request = _MetricRequest.of(
+            diff=diff, base=base, config=config, metric=metric, group=group
         )
         if sys.stdout.isatty():
             self._interactive(request)
@@ -145,10 +171,11 @@ class CliGate:
         base: BaseOption = None,
         config: ConfigOption = None,
         metric: MetricOption = None,
+        group: GroupOption = None,
     ) -> None:
         """Print the metric summary (values only)."""
-        request = _MetricRequest(
-            diff=diff or base is not None, base=base, config=config, metrics=metric
+        request = _MetricRequest.of(
+            diff=diff, base=base, config=config, metric=metric, group=group
         )
         self._print_stat(request, json_out=json_out)
 
@@ -159,12 +186,15 @@ class CliGate:
         base: BaseOption = None,
         config: ConfigOption = None,
         metric: MetricOption = None,
+        group: GroupOption = None,
     ) -> None:
         """Fail (exit 1) if the branch worsened the metrics. For CI.
 
         Prints only what the branch added, under the metrics that grew.
         """
-        request = _MetricRequest(diff=True, base=base, config=config, metrics=metric)
+        request = _MetricRequest.of(
+            diff=True, base=base, config=config, metric=metric, group=group
+        )
         loaded = self._load(config)
         report, verdict = self._collect_check(
             loaded, request, policy=self._parse_policy(policy)
@@ -193,6 +223,7 @@ class CliGate:
         base: BaseOption = None,
         config: ConfigOption = None,
         metric: MetricOption = None,
+        group: GroupOption = None,
     ) -> None:
         """Print the full report: every occurrence with file and line."""
         if cobertura and (json_out or diff or base is not None):
@@ -201,8 +232,8 @@ class CliGate:
                 err=True,
             )
             raise typer.Exit(2)
-        request = _MetricRequest(
-            diff=diff or base is not None, base=base, config=config, metrics=metric
+        request = _MetricRequest.of(
+            diff=diff, base=base, config=config, metric=metric, group=group
         )
         if cobertura:
             run_report = self._collect_run(request)
@@ -334,7 +365,7 @@ class CliGate:
     def _collect_run(self, request: _MetricRequest) -> RunReport:
         config = self._load(request.config)
         try:
-            return self._services.metrics.run(config, only=request.metrics)
+            return self._services.metrics.run(config, request.selection)
         except ConfigError as exc:
             self._config_failure(exc)
 
@@ -342,7 +373,7 @@ class CliGate:
         config = self._load(request.config)
         try:
             return self._services.metrics.diff(
-                config, self._base_of(config, request), only=request.metrics
+                config, self._base_of(config, request), selection=request.selection
             )
         except ConfigError as exc:
             self._config_failure(exc)
@@ -356,7 +387,7 @@ class CliGate:
             return self._services.metrics.check(
                 config,
                 self._base_of(config, request),
-                only=request.metrics,
+                selection=request.selection,
                 policy=policy,
             )
         except ConfigError as exc:

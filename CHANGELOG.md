@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--group NAME` narrows `tingle`, `stat`, `check` and `report` to the
+  metrics under one group heading, the way `--metric NAME` narrows them to
+  one metric. Both options repeat and read as a union, so `--group linting
+  --metric loc` measures a group plus one metric from outside it; a name no
+  metric or group carries is a usage error.
 - The interactive TUI is a sortable table. Group headers, metrics and their
   located hits are rows in one outline instead of a three-level accordion,
   so a metric name lines up with its type and value in columns rather than

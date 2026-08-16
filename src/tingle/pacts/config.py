@@ -76,6 +76,32 @@ class MetricSpec:
     description: str | None = None
 
 
+@dataclass(frozen=True)
+class Selection:
+    """Which of the configured metrics a command was asked to measure.
+
+    Empty on both axes means every metric, which is what a command with no
+    selection options asks for. Naming both is read as a union -- a metric
+    is measured when it is named, or when its group is -- because the two
+    options answer the same question and a metric can only satisfy one of
+    them.
+    """
+
+    metrics: tuple[str, ...] = ()
+    groups: tuple[str, ...] = ()
+
+    @property
+    def everything(self) -> bool:
+        """Whether nothing was singled out, so the whole config applies."""
+        return not self.metrics and not self.groups
+
+
+#: What a command with no selection options asks for. Named once so that
+#: every signature defaulting to it says the same thing, and so that no
+#: default has to build one.
+EVERY_METRIC = Selection()
+
+
 class CheckPolicy(StrEnum):
     """When `tingle check` calls a branch a regression.
 
