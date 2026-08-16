@@ -7,9 +7,9 @@ that something is a **branch**, not an artifact.
 !!! tip "See one first"
 
     tingle keeps its own history this way, and publishes it:
-    **[the chart beside this page][own]**. One line per metric, every point
-    linked to the commit that produced it — that is what the rest of this
-    page sets up.
+    **[the charts beside this page][own]**. One chart per metric group, one
+    line per metric in it, every point linked to the commit that produced it
+    — that is what the rest of this page sets up.
 
 !!! warning "Artifacts are not history"
 
@@ -70,11 +70,23 @@ generated file has to commit or discard it first; the action stops with a
 named error rather than a raw git one.
 
 Each run takes `stat --json`, appends the values to the `gh-pages` branch
-under `metrics/`, and commits a page that plots one time-series per metric,
-every point linked to the commit that produced it.
+under `metrics/`, and commits a page that plots them: **one chart per
+[group](configuration.md#groups), one line per metric in it**, every point linked
+to the commit that produced it. A metric with no group is charted with the
+others that have none.
 
 Turn Pages on — *Settings → Pages → Deploy from a branch → `gh-pages`* — and
-the chart is at `https://<owner>.github.io/<repo>/metrics/`.
+the charts are at `https://<owner>.github.io/<repo>/metrics/`.
+
+!!! note "Why the y-axis is logarithmic"
+
+    A group puts metrics of very different sizes on one plot — a count of
+    400 and a count of 2 — and a linear axis flattens the small one into the
+    baseline, which is exactly the line you want to watch. The axis is
+    logarithmic so a move from 2 to 4 reads as loudly as one from 200 to
+    400. Zero has no place on a log axis, and is where every metric is
+    headed, so the axis plots `value + 1` and labels the ticks with the
+    count: 0 sits on the bottom rule rather than falling off the chart.
 
 !!! note "Pin the version"
 
@@ -104,7 +116,7 @@ Nothing to set up before the first run.
 | `config` | auto-discovered | path to `tingle.toml` |
 | `data-branch` | `gh-pages` | branch the history is committed to |
 | `data-dir` | `metrics` | directory in that branch holding the chart |
-| `max-points` | every build | points kept per metric chart |
+| `max-points` | every build | points kept per metric |
 | `github-token` | `github.token` | token used to push to the data branch |
 
 ### A metric that fails does not lose the point
@@ -166,7 +178,7 @@ The history is also a file you own: `metrics/data.js`, a single
 `window.BENCHMARK_DATA = {...}` assignment. Its `entries` are keyed by chart
 name — the `name` input — and each is an array of points, one per recorded
 build, carrying that build's commit metadata and a `benches` list of
-`{name, unit, value}` objects:
+`{name, unit, value, extra}` objects, where `extra` is the metric's group:
 
 ```js
 window.BENCHMARK_DATA = {
@@ -178,7 +190,9 @@ window.BENCHMARK_DATA = {
         commit: { id: "…", timestamp: "…", message: "…", url: "…" },
         date: 1767225600000,
         tool: "customSmallerIsBetter",
-        benches: [{ name: "noqa-comments", unit: "count", value: 3 }]
+        benches: [
+          { name: "noqa-comments", unit: "count", value: 3, extra: "linting" }
+        ]
       }
     ]
   }
@@ -199,7 +213,9 @@ here, so this is the action's own body:
           status=0
           tingle stat --json > stat.json || status=$?
           [ "$status" -le 1 ] || exit "$status"
-          jq '[.metrics[] | select(.error == null) | {name, unit: "count", value}]' \
+          jq '[.metrics[] | select(.error == null)
+               | {name, unit: "count", value}
+                 + (if .group then {extra: .group} else {} end)]' \
             stat.json > points.json
           if [ "$(jq length points.json)" -eq 0 ]; then
             echo "::error::every metric errored; there is nothing to record"
@@ -219,19 +235,31 @@ here, so this is the action's own body:
 
 `customSmallerIsBetter` is that action's generic contract — a list of
 `{name, unit, value}` objects, lower is better — which is exactly the shape
-of a tingle metric. The `jq` drops metrics that errored, since they have no
-value to plot, and the exit-status line keeps a single broken metric from
-killing the run.
+of a tingle metric, and `extra` is its free field, which tingle spends on the
+group. A metric with no group leaves `extra` off rather than setting it null:
+that action validates the field with a coercing string schema, so a null
+would arrive at the page as the string `"null"` and read as a group by that
+name. The `jq` drops metrics that errored, since they have no value to plot,
+and the exit-status line keeps a single broken metric from killing the run.
 
-Inlined this way, the branch is your problem: the benchmark action fetches
-it and fails on a raw git error if it is missing. Create it once —
+Inlined this way you get the benchmark action's own page — a chart per
+metric, ignoring `extra`. It writes that page only when the data directory
+has no `index.html`, so putting tingle's chart —
+[`actions/metrics-history/chart/index.html`][page] — there first is enough to
+keep it: the action pushes the page to the branch *before* recording, and the
+benchmark step then finds one in place and leaves it alone.
+
+  [page]: https://github.com/fancysnake/tingle/blob/main/actions/metrics-history/chart/index.html
+
+The branch is your problem too: the benchmark action fetches it and fails on
+a raw git error if it is missing. Create it once —
 
 ```sh
 git checkout --orphan gh-pages && git commit --allow-empty -m "Start gh-pages"
 git push origin gh-pages
 ```
 
-— or use the action, which does it for you.
+— or use the action, which creates it and seeds the page in the same step.
 
 !!! note "Leave the alerts off"
 

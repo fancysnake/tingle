@@ -68,6 +68,8 @@ collects grouped metrics together:
   its metrics indented beneath it, one group's block ruled off from the next.
 - The interactive TUI heads each group with a foldable row, its metrics
   indented under it.
+- The published [history](history.md) plots one chart per group, a line per
+  metric in it.
 
 Metrics keep config order within a group, groups appear in first-mention
 order, and anything ungrouped trails last. With no groups configured

@@ -1,7 +1,7 @@
 name: tingle metrics history
 description: >-
-  Record `tingle stat` on a branch and publish a chart of each metric's
-  history. Expects `tingle` on PATH — run it from the job that already
+  Record `tingle stat` on a branch and publish its history as one chart per
+  metric group. Expects `tingle` on PATH — run it from the job that already
   installed it.
 
 inputs:
@@ -50,39 +50,73 @@ runs:
         status=0
         tingle stat --json ${CONFIG:+--config "$CONFIG"} > stat.json || status=$?
         [ "$status" -le 1 ] || exit "$status"
-        jq '[.metrics[] | select(.error == null) | {name, unit: "count", value}]' \
+        # `extra` is the benchmark format's free field; the chart page reads
+        # the group out of it to know which chart a metric belongs on. An
+        # ungrouped metric leaves the key out rather than setting it null:
+        # the recorder validates `extra` with a coercing string schema, so a
+        # null arrives at the page as the string "null" and reads as a group
+        # by that name. Absent, it reaches the page as undefined, and the
+        # page's own fallback is the single place that names the loose group.
+        jq '[.metrics[] | select(.error == null)
+             | {name, unit: "count", value}
+               + (if .group then {extra: .group} else {} end)]' \
           stat.json > points.json
         if [ "$(jq length points.json)" -eq 0 ]; then
           echo "::error::every metric errored; there is nothing to record"
           exit 1
         fi
 
-    - name: Create the data branch when missing
+    - name: Prepare the data branch
       shell: bash
       env:
         BRANCH: ${{ inputs.data-branch }}
+        DATA_DIR: ${{ inputs.data-dir }}
         TOKEN: ${{ inputs.github-token }}
+        CHART: ${{ github.action_path }}/chart/index.html
       run: |
-        # the benchmark action fetches this branch and dies on a raw git
-        # error if it is absent — which is every repository's first run
+        # Two things the benchmark step needs settled before it runs. It
+        # fetches this branch and dies on a raw git error if it is absent —
+        # which is every repository's first run. And it writes its own page,
+        # one chart per metric, when the data directory holds none: putting
+        # tingle's page there first means it finds one and leaves it alone,
+        # so the branch is never published holding the wrong chart.
+        #
+        # In a scratch repository throughout: the data branch shares no
+        # history with the source, and the caller's checkout is untouched.
         remote="https://x-access-token:$TOKEN@${GITHUB_SERVER_URL#https://}/$GITHUB_REPOSITORY.git"
-        if git ls-remote --exit-code --heads "$remote" "$BRANCH" > /dev/null; then
-          exit 0
-        fi
-        echo "creating $BRANCH: history has to live somewhere"
-        # orphan, in a scratch repository: the data branch shares no history
-        # with the source, and the caller's checkout is left untouched
-        empty=$(mktemp -d)
-        git init --quiet --initial-branch "$BRANCH" "$empty"
-        git -C "$empty" \
-          -c user.name=github-actions[bot] \
-          -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
-          commit --quiet --allow-empty -m "Start $BRANCH"
-        git -C "$empty" push --quiet "$remote" "$BRANCH" && exit 0
-        # a concurrent first run got there between the check and the push:
-        # the branch existing is all this step wanted, so confirm and go on
-        echo "$BRANCH was created by another run"
-        git ls-remote --exit-code --heads "$remote" "$BRANCH" > /dev/null
+        author=(-c 'user.name=github-actions[bot]'
+                -c 'user.email=41898282+github-actions[bot]@users.noreply.github.com')
+        for attempt in 1 2 3; do
+          work=$(mktemp -d)
+          # `ls-remote --exit-code` says 2 for "no such ref"; anything else
+          # is the remote being broken rather than empty — a network blip, a
+          # rate limit, a revoked token — and must fail here
+          status=0
+          git ls-remote --exit-code --heads "$remote" "$BRANCH" > /dev/null || status=$?
+          if [ "$status" -eq 0 ]; then
+            git clone --quiet --depth 1 --branch "$BRANCH" "$remote" "$work"
+          elif [ "$status" -eq 2 ]; then
+            echo "creating $BRANCH: history has to live somewhere"
+            git init --quiet --initial-branch "$BRANCH" "$work"
+          else
+            exit "$status"
+          fi
+          mkdir -p "$work/$DATA_DIR"
+          cp "$CHART" "$work/$DATA_DIR/index.html"
+          git -C "$work" add "$DATA_DIR/index.html"
+          # the page only changes when tingle does, so most runs stop here
+          if git -C "$work" diff --cached --quiet; then
+            exit 0
+          fi
+          git -C "$work" "${author[@]}" commit --quiet -m "Publish the tingle metrics chart"
+          git -C "$work" push --quiet "$remote" "$BRANCH" && exit 0
+          # git has already said why on stderr — `--quiet` drops the ref
+          # listing, not errors. Retrying only helps when the branch moved
+          # under the push, and the next attempt re-reads it to find out.
+          echo "pushing to $BRANCH failed on attempt $attempt; retrying"
+        done
+        echo "::error::could not publish the chart page to $BRANCH"
+        exit 1
 
     - uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
       with:
