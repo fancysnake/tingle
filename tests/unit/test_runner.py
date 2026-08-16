@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import pytest
 from support import PROJECT, FakeProject, make_config
 
 from tingle.mills.runner import run
-from tingle.pacts.config import ConfigError, DisplaySpec, MetricSpec, RangeSpec
+from tingle.pacts.config import DisplaySpec, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
 
 
@@ -92,26 +91,6 @@ def test_empty_explicit_ranges_warn() -> None:
     assert outcome.result is not None
     assert outcome.result.value == 0
     assert "ranges matched no files" in outcome.result.warnings
-
-
-def test_only_filter_selects_metrics() -> None:
-    config = make_config(
-        MetricSpec(name="first", type="file_count"),
-        MetricSpec(name="second", type="file_count"),
-    )
-
-    report = run(config, PROJECT, metric_types=METRIC_TYPES, only=["second"])
-
-    assert [outcome.spec.name for outcome in report.outcomes] == ["second"]
-
-
-def test_only_filter_rejects_unknown_names() -> None:
-    config = make_config(MetricSpec(name="files", type="file_count"))
-
-    with pytest.raises(ConfigError) as excinfo:
-        run(config, PROJECT, metric_types=METRIC_TYPES, only=["nope"])
-
-    assert 'unknown metric "nope"' in excinfo.value.errors
 
 
 def test_outcome_carries_the_global_guide_when_the_metric_sets_none() -> None:

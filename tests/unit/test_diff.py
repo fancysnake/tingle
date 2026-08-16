@@ -3,11 +3,10 @@ from __future__ import annotations
 from pathlib import PurePath
 from typing import TYPE_CHECKING
 
-import pytest
 from support import PROJECT, make_config
 
 from tingle.mills.diff import DiffRunner
-from tingle.pacts.config import ConfigError, MetricSpec, RangeSpec
+from tingle.pacts.config import MetricSpec, RangeSpec
 from tingle.pacts.diff import (
     BranchDiff,
     DiffMetricContext,
@@ -169,25 +168,14 @@ def test_type_without_diff_func_is_skipped() -> None:
     assert [outcome.spec.name for outcome in report.outcomes] == ["files"]
 
 
-def test_only_filter() -> None:
+def test_runs_every_metric_the_config_it_was_handed_carries() -> None:
     config = make_config(
         MetricSpec(name="first", type="touched"),
         MetricSpec(name="second", type="touched"),
     )
 
     report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
-        "main", only=["second"]
+        "main"
     )
 
-    assert [outcome.spec.name for outcome in report.outcomes] == ["second"]
-
-
-def test_only_filter_rejects_unknown() -> None:
-    config = make_config(MetricSpec(name="files", type="touched"))
-
-    with pytest.raises(ConfigError) as excinfo:
-        DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
-            "main", only=["nope"]
-        )
-
-    assert 'unknown metric "nope"' in excinfo.value.errors
+    assert [outcome.spec.name for outcome in report.outcomes] == ["first", "second"]

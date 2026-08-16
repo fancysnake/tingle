@@ -24,6 +24,32 @@ runner = CliRunner()
 app = CliGate(Services()).app
 
 
+#: Two groups over three metrics, so that selecting one group is neither
+#: every metric nor a single one.
+GROUPED_CONFIG = """
+[ranges.python]
+include = ["src/**/*.py"]
+default = true
+
+[[metrics]]
+name = "lint-escapes"
+type = "regex_count"
+pattern = '#\\s*noqa'
+group = "lint"
+
+[[metrics]]
+name = "debug-comments"
+type = "regex_count"
+pattern = '#\\s*debug'
+group = "lint"
+
+[[metrics]]
+name = "python-files"
+type = "file_count"
+group = "size"
+"""
+
+
 @pytest.fixture
 def project(workdir: Path, counting_config_text: str) -> Path:
     (workdir / "tingle.toml").write_text(counting_config_text)
@@ -31,6 +57,15 @@ def project(workdir: Path, counting_config_text: str) -> Path:
     src.mkdir()
     (src / "a.py").write_text("x = 1  # noqa\ny = 2  # noqa\n")
     (src / "b.py").write_text("z = 3  # noqa\n")
+    return workdir
+
+
+@pytest.fixture
+def grouped_project(workdir: Path) -> Path:
+    (workdir / "tingle.toml").write_text(GROUPED_CONFIG)
+    src = workdir / "src"
+    src.mkdir()
+    (src / "a.py").write_text("x = 1  # noqa\ny = 2  # debug\n")
     return workdir
 
 
@@ -125,7 +160,45 @@ def test_unknown_metric_filter_exits_2() -> None:
     result = runner.invoke(app, ["stat", "--metric", "nope"])
 
     assert result.exit_code == 2
-    assert 'unknown metric "nope"' in result.stderr
+    # the config is valid; the typo is on the command line, so the user
+    # must not be sent to tingle.toml to look for it
+    assert 'usage error: unknown metric "nope"' in result.stderr
+    assert "config error" not in result.stderr
+
+
+@pytest.mark.usefixtures("grouped_project")
+def test_group_filter_takes_every_metric_under_the_group() -> None:
+    result = runner.invoke(app, ["report", "--json", "--group", "lint"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert [entry["name"] for entry in payload["metrics"]] == [
+        "lint-escapes",
+        "debug-comments",
+    ]
+
+
+@pytest.mark.usefixtures("grouped_project")
+def test_group_and_metric_filters_are_a_union() -> None:
+    result = runner.invoke(
+        app, ["stat", "--json", "--group", "size", "--metric", "lint-escapes"]
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert [entry["name"] for entry in payload["metrics"]] == [
+        "lint-escapes",
+        "python-files",
+    ]
+
+
+@pytest.mark.usefixtures("grouped_project")
+def test_unknown_group_filter_exits_2() -> None:
+    result = runner.invoke(app, ["report", "--group", "nope"])
+
+    assert result.exit_code == 2
+    assert 'usage error: unknown group "nope"' in result.stderr
+    assert "config error" not in result.stderr
 
 
 def test_missing_config_exits_2(
@@ -186,6 +259,17 @@ def test_list_shows_configured_metrics() -> None:
     assert result.exit_code == 0
     assert "lint-escapes" in result.output
     assert "regex_count" in result.output
+
+
+@pytest.mark.usefixtures("grouped_project")
+def test_list_names_the_groups_that_group_takes() -> None:
+    """Otherwise the only way to learn a valid --group value is the config file."""
+    result = runner.invoke(app, ["list"])
+
+    assert result.exit_code == 0
+    assert "Group" in result.output
+    assert "lint" in result.output
+    assert "size" in result.output
 
 
 def test_list_types_works_without_config(

@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import fields, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from support import make_config
 
-from tingle.mills.config import validate
-from tingle.pacts.config import CheckPolicy, CheckSpec, Config, ConfigError, DisplaySpec
+from tingle.mills.config import narrowed, validate
+from tingle.pacts.config import (
+    CheckPolicy,
+    CheckSpec,
+    Config,
+    ConfigError,
+    DisplaySpec,
+    MetricSpec,
+    Selection,
+    SelectionError,
+)
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType, ParamSchema
 from tingle.specs.config import IMPLICIT_RANGE_INCLUDE, IMPLICIT_RANGE_NAME
 
@@ -460,3 +471,70 @@ def test_guide_and_description_are_not_passed_to_the_metric_as_params() -> None:
     )
 
     assert not config.metrics[0].params
+
+
+def test_narrowing_by_name_keeps_only_the_named_metrics() -> None:
+    config = make_config(
+        MetricSpec(name="first", type="file_count"),
+        MetricSpec(name="second", type="file_count"),
+    )
+
+    narrow = narrowed(config, Selection(metrics=("second",)))
+
+    assert [spec.name for spec in narrow.metrics] == ["second"]
+
+
+def test_narrowing_by_group_keeps_every_metric_under_it() -> None:
+    config = make_config(
+        MetricSpec(name="first", type="file_count", group="lint"),
+        MetricSpec(name="second", type="file_count", group="size"),
+        MetricSpec(name="third", type="file_count", group="lint"),
+    )
+
+    narrow = narrowed(config, Selection(groups=("lint",)))
+
+    assert [spec.name for spec in narrow.metrics] == ["first", "third"]
+
+
+def test_narrowing_unions_names_and_groups_without_repeating_a_metric() -> None:
+    config = make_config(
+        MetricSpec(name="first", type="file_count", group="lint"),
+        MetricSpec(name="second", type="file_count"),
+    )
+
+    narrow = narrowed(config, Selection(metrics=("first", "second"), groups=("lint",)))
+
+    assert [spec.name for spec in narrow.metrics] == ["first", "second"]
+
+
+def test_narrowing_by_nothing_returns_the_config_untouched() -> None:
+    config = make_config(MetricSpec(name="files", type="file_count"))
+
+    assert narrowed(config, Selection()) is config
+
+
+def test_narrowing_keeps_everything_but_the_metrics() -> None:
+    config = replace(
+        make_config(
+            MetricSpec(name="first", type="file_count", group="lint"),
+            MetricSpec(name="second", type="file_count"),
+        ),
+        diff_base="origin/main",
+    )
+
+    narrow = narrowed(config, Selection(groups=("lint",)))
+
+    # every field rather than a list of them, so one added later is covered
+    kept = [spec.name for spec in fields(Config) if spec.name != "metrics"]
+    assert {name: getattr(narrow, name) for name in kept} == {
+        name: getattr(config, name) for name in kept
+    }
+
+
+def test_narrowing_rejects_unknown_names_and_groups_together() -> None:
+    config = make_config(MetricSpec(name="files", type="file_count", group="size"))
+
+    with pytest.raises(SelectionError) as excinfo:
+        narrowed(config, Selection(metrics=("nope",), groups=("nogroup",)))
+
+    assert excinfo.value.errors == ['unknown metric "nope"', 'unknown group "nogroup"']

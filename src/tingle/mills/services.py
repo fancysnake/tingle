@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, Any
 
 from tingle.mills.add import build_metric
 from tingle.mills.check import judge
-from tingle.mills.config import validate
+from tingle.mills.config import narrowed, validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
-from tingle.pacts.config import ConfigNotFoundError
+from tingle.pacts.config import EVERY_METRIC, ConfigNotFoundError, Selection
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Mapping
+    from collections.abc import Mapping
     from pathlib import Path
 
     from tingle.pacts.check import CheckVerdict
@@ -71,36 +71,35 @@ class MetricsService:
     diff_source: DiffSourceFactory
     metric_types: Mapping[str, MetricType]
 
-    def run(self, config: Config, only: Collection[str] | None = None) -> RunReport:
+    def run(self, config: Config, selection: Selection = EVERY_METRIC) -> RunReport:
         """Measure every selected metric over the whole project."""
         return run(
-            config,
+            narrowed(config, selection),
             self.project_files(config.root),
             metric_types=self.metric_types,
-            only=only,
         )
 
     def diff(
-        self, config: Config, base: str, *, only: Collection[str] | None = None
+        self, config: Config, base: str, *, selection: Selection = EVERY_METRIC
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
         runner = DiffRunner(
-            config=config,
+            config=narrowed(config, selection),
             project=self.project_files(config.root),
             diff_source=self.diff_source(config.root),
             metric_types=self.metric_types,
         )
-        return runner.run(base, only=only)
+        return runner.run(base)
 
     def check(
         self,
         config: Config,
         base: str,
         *,
-        only: Collection[str] | None = None,
+        selection: Selection = EVERY_METRIC,
         policy: CheckPolicy | None = None,
     ) -> tuple[DiffReport, CheckVerdict]:
         """Measure the branch, then judge it; `policy` overrides the config."""
-        report = self.diff(config, base, only=only)
+        report = self.diff(config, base, selection=selection)
         spec = config.check if policy is None else replace(config.check, policy=policy)
         return report, judge(report, spec)

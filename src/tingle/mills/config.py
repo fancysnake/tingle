@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from tingle.pacts.config import (
@@ -13,6 +14,8 @@ from tingle.pacts.config import (
     DisplaySpec,
     MetricSpec,
     RangeSpec,
+    Selection,
+    SelectionError,
 )
 from tingle.specs.config import (
     IMPLICIT_RANGE_INCLUDE,
@@ -71,6 +74,36 @@ def validate(
         diff_base=diff_base,
         check=check,
         display=display,
+    )
+
+
+def narrowed(config: Config, selection: Selection) -> Config:
+    """Return the config holding only the metrics a selection asks for.
+
+    A selection is a narrower config, not a filter the run has to carry:
+    once this has been applied, everything downstream measures whatever
+    `config.metrics` holds and never learns a selection existed.
+
+    Every name is checked before anything runs, and both axes report at
+    once: a command line that misspelled a metric and a group is told
+    about both rather than about whichever was looked at first.
+    """
+    if selection.everything:
+        return config
+    names = {spec.name for spec in config.metrics}
+    groups = {spec.group for spec in config.metrics if spec.group is not None}
+    errors = [
+        f'unknown metric "{name}"' for name in sorted(set(selection.metrics) - names)
+    ] + [f'unknown group "{name}"' for name in sorted(set(selection.groups) - groups)]
+    if errors:
+        raise SelectionError(errors)
+    return replace(
+        config,
+        metrics=tuple(
+            spec
+            for spec in config.metrics
+            if spec.name in selection.metrics or spec.group in selection.groups
+        ),
     )
 
 

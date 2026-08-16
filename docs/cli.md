@@ -3,6 +3,24 @@
 Reports go to stdout; warnings and per-metric errors go to stderr, so
 `tingle stat --json | jq .` stays clean.
 
+## Selecting what to measure
+
+`--metric NAME` and `--group NAME` narrow `tingle`, [`stat`](#tingle-stat),
+[`check`](#tingle-check) and [`report`](#tingle-report) to part of the
+config — the metric you are working on, or the group you are working
+through:
+
+```console
+$ tingle report --group linting
+$ tingle report --metric noqa-comments
+```
+
+Both repeat, and naming both is a union: `--group linting --metric loc`
+measures the linting group plus one metric from outside it. A name no
+metric or group in the config carries is a usage error (exit 2), so a typo
+cannot pass for a clean report. [`tingle list`](#tingle-list) names the
+groups a config carries.
+
 ## `tingle`
 
 Interactive mode on a terminal; the static summary table otherwise (CI,
@@ -91,7 +109,7 @@ outline exactly as it was.
 `tingle --diff [--base REF]` opens the [branch-impact](diff.md) view.
 
 Options: `--version`, `--diff`, `--base REF`, `--config PATH`, `--metric
-NAME`.
+NAME`, `--group NAME`.
 
 ## `tingle stat`
 
@@ -104,6 +122,7 @@ The compact summary — values only.
 | `--base REF` | base branch for `--diff` (implies `--diff`) |
 | `--config PATH` | path to the config file |
 | `--metric NAME` | run only the named metric (repeatable) |
+| `--group NAME` | run only the metrics in the named group (repeatable) |
 
 ## `tingle check`
 
@@ -124,6 +143,7 @@ $ tingle check
 | `--base REF` | base branch to compare against |
 | `--config PATH` | path to the config file |
 | `--metric NAME` | run only the named metric (repeatable) |
+| `--group NAME` | run only the metrics in the named group (repeatable) |
 
 ## `tingle report`
 
@@ -142,6 +162,7 @@ for list metrics you see *which* rules changed.
 | `--base REF` | base branch for `--diff` (implies `--diff`) |
 | `--config PATH` | path to the config file |
 | `--metric NAME` | run only the named metric (repeatable) |
+| `--group NAME` | run only the metrics in the named group (repeatable) |
 
 `--cobertura` reports the whole tree, so it cannot be combined with `--json`,
 `--diff`, or `--base`; doing so is a usage error.
@@ -191,7 +212,8 @@ to overwrite an existing one. No options.
 
 ## `tingle list`
 
-List the configured metrics.
+List the configured metrics with their group, type and ranges — the groups
+are the names [`--group`](#selecting-what-to-measure) takes.
 
 | Option | Meaning |
 |---|---|

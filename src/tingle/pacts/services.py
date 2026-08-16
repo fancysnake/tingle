@@ -5,8 +5,10 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
+from tingle.pacts.config import EVERY_METRIC, Selection
+
 if TYPE_CHECKING:
-    from collections.abc import Collection, Sequence
+    from collections.abc import Sequence
     from pathlib import Path
 
     from tingle.pacts.browse import BrowseState, Row, SortKey
@@ -46,12 +48,12 @@ class MetricsServiceProtocol(Protocol):
     """Running the configured metrics, whole-tree or against a branch base."""
 
     @abstractmethod
-    def run(self, config: Config, only: Collection[str] | None = None) -> RunReport:
+    def run(self, config: Config, selection: Selection = EVERY_METRIC) -> RunReport:
         """Measure every selected metric over the whole project."""
 
     @abstractmethod
     def diff(
-        self, config: Config, base: str, *, only: Collection[str] | None = None
+        self, config: Config, base: str, *, selection: Selection = EVERY_METRIC
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
 
@@ -61,7 +63,7 @@ class MetricsServiceProtocol(Protocol):
         config: Config,
         base: str,
         *,
-        only: Collection[str] | None = None,
+        selection: Selection = EVERY_METRIC,
         policy: CheckPolicy | None = None,
     ) -> tuple[DiffReport, CheckVerdict]:
         """Measure the branch, then judge it; `policy` overrides the config."""

@@ -9,12 +9,13 @@ from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.mills.text import TextReader, text_reader
-from tingle.pacts.config import Config, ConfigError, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 from tingle.pacts.report import MetricOutcome, RunReport
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Mapping
+    from collections.abc import Mapping
+
+    from tingle.pacts.config import Config, MetricSpec, RangeSpec
 
 
 @dataclass(frozen=True)
@@ -33,18 +34,9 @@ class _RunContext:
 
 
 def run(
-    config: Config,
-    project: ProjectFiles,
-    *,
-    metric_types: Mapping[str, MetricType],
-    only: Collection[str] | None = None,
+    config: Config, project: ProjectFiles, *, metric_types: Mapping[str, MetricType]
 ) -> RunReport:
     """Run every configured metric, isolating failures per metric."""
-    if only is not None:
-        known = {spec.name for spec in config.metrics}
-        if unknown := sorted(set(only) - known):
-            raise ConfigError([f'unknown metric "{name}"' for name in unknown])
-
     walked = tuple(project.walk())
     # the port hands over bytes; what counts as readable text is decided
     # here, once, and every metric is given the same reader
@@ -56,11 +48,7 @@ def run(
         metric_types=metric_types,
         loc=ProjectLoc(config, read=read, walked=walked),
     )
-    outcomes = tuple(
-        _outcome(spec, context)
-        for spec in config.metrics
-        if only is None or spec.name in only
-    )
+    outcomes = tuple(_outcome(spec, context) for spec in config.metrics)
     return RunReport(
         root=config.root, source=config.source, sections=sections(outcomes)
     )

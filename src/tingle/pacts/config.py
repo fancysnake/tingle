@@ -31,6 +31,20 @@ class ConfigError(Exception):
         super().__init__("\n".join(errors))
 
 
+class SelectionError(Exception):
+    """A selection names something the configuration does not carry.
+
+    Separate from `ConfigError` because the fault is in the command line,
+    not in the file: the config is valid, and sending the user to look at
+    it would send them somewhere there is nothing to find.
+    """
+
+    def __init__(self, errors: list[str]) -> None:
+        """Collect every unknown name; the message joins them."""
+        self.errors = errors
+        super().__init__("\n".join(errors))
+
+
 @dataclass(frozen=True)
 class RangeSpec:
     """A named file set defined by include/exclude glob patterns."""
@@ -74,6 +88,32 @@ class MetricSpec:
     group: str | None = None
     guide: int | None = None
     description: str | None = None
+
+
+@dataclass(frozen=True)
+class Selection:
+    """Which of the configured metrics a command was asked to measure.
+
+    Empty on both axes means every metric, which is what a command with no
+    selection options asks for. Naming both is read as a union -- a metric
+    is measured when it is named, or when its group is -- because the two
+    options answer the same question and a metric can only satisfy one of
+    them.
+    """
+
+    metrics: tuple[str, ...] = ()
+    groups: tuple[str, ...] = ()
+
+    @property
+    def everything(self) -> bool:
+        """Whether nothing was singled out, so the whole config applies."""
+        return not self.metrics and not self.groups
+
+
+#: What a command with no selection options asks for. A module-level
+#: singleton rather than a `Selection()` default because ruff's B008
+#: forbids calling anything in a signature default.
+EVERY_METRIC = Selection()
 
 
 class CheckPolicy(StrEnum):
