@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from tingle.mills.add import build_metric
 from tingle.mills.check import judge
-from tingle.mills.config import validate
+from tingle.mills.config import narrowed, validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
 from tingle.pacts.config import EVERY_METRIC, ConfigNotFoundError, Selection
@@ -74,10 +74,9 @@ class MetricsService:
     def run(self, config: Config, selection: Selection = EVERY_METRIC) -> RunReport:
         """Measure every selected metric over the whole project."""
         return run(
-            config,
+            narrowed(config, selection),
             self.project_files(config.root),
             metric_types=self.metric_types,
-            selection=selection,
         )
 
     def diff(
@@ -85,12 +84,12 @@ class MetricsService:
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
         runner = DiffRunner(
-            config=config,
+            config=narrowed(config, selection),
             project=self.project_files(config.root),
             diff_source=self.diff_source(config.root),
             metric_types=self.metric_types,
         )
-        return runner.run(base, selection=selection)
+        return runner.run(base)
 
     def check(
         self,

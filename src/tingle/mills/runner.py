@@ -9,19 +9,13 @@ from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
 from tingle.mills.text import TextReader, text_reader
-from tingle.pacts.config import (
-    EVERY_METRIC,
-    Config,
-    ConfigError,
-    MetricSpec,
-    RangeSpec,
-    Selection,
-)
 from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 from tingle.pacts.report import MetricOutcome, RunReport
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from tingle.pacts.config import Config, MetricSpec, RangeSpec
 
 
 @dataclass(frozen=True)
@@ -39,39 +33,10 @@ class _RunContext:
     loc: ProjectLoc
 
 
-def selected(config: Config, selection: Selection) -> tuple[MetricSpec, ...]:
-    """Narrow the config's metrics to the ones a selection asks for.
-
-    Every name is checked before anything runs, and both axes report at
-    once: a command line that misspelled a metric and a group is told
-    about both rather than about whichever was looked at first.
-    """
-    if selection.everything:
-        return config.metrics
-    names = {spec.name for spec in config.metrics}
-    groups = {spec.group for spec in config.metrics if spec.group is not None}
-    errors = [
-        f'unknown metric "{name}"' for name in sorted(set(selection.metrics) - names)
-    ] + [f'unknown group "{name}"' for name in sorted(set(selection.groups) - groups)]
-    if errors:
-        raise ConfigError(errors)
-    return tuple(
-        spec
-        for spec in config.metrics
-        if spec.name in selection.metrics or spec.group in selection.groups
-    )
-
-
 def run(
-    config: Config,
-    project: ProjectFiles,
-    *,
-    metric_types: Mapping[str, MetricType],
-    selection: Selection = EVERY_METRIC,
+    config: Config, project: ProjectFiles, *, metric_types: Mapping[str, MetricType]
 ) -> RunReport:
-    """Run every selected metric, isolating failures per metric."""
-    specs = selected(config, selection)
-
+    """Run every configured metric, isolating failures per metric."""
     walked = tuple(project.walk())
     # the port hands over bytes; what counts as readable text is decided
     # here, once, and every metric is given the same reader
@@ -83,7 +48,7 @@ def run(
         metric_types=metric_types,
         loc=ProjectLoc(config, read=read, walked=walked),
     )
-    outcomes = tuple(_outcome(spec, context) for spec in specs)
+    outcomes = tuple(_outcome(spec, context) for spec in config.metrics)
     return RunReport(
         root=config.root, source=config.source, sections=sections(outcomes)
     )

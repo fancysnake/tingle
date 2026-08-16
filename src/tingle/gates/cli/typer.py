@@ -19,6 +19,7 @@ from tingle.pacts.config import (
     ConfigNotFoundError,
     MetricDraft,
     Selection,
+    SelectionError,
 )
 from tingle.pacts.diff import DiffReport, DiffSourceError
 
@@ -366,8 +367,8 @@ class CliGate:
         config = self._load(request.config)
         try:
             return self._services.metrics.run(config, request.selection)
-        except ConfigError as exc:
-            self._config_failure(exc)
+        except SelectionError as exc:
+            self._selection_failure(exc)
 
     def _collect_diff(self, request: _MetricRequest) -> DiffReport:
         config = self._load(request.config)
@@ -375,8 +376,8 @@ class CliGate:
             return self._services.metrics.diff(
                 config, self._base_of(config, request), selection=request.selection
             )
-        except ConfigError as exc:
-            self._config_failure(exc)
+        except SelectionError as exc:
+            self._selection_failure(exc)
         except DiffSourceError as exc:
             self._diff_failure(exc)
 
@@ -390,8 +391,8 @@ class CliGate:
                 selection=request.selection,
                 policy=policy,
             )
-        except ConfigError as exc:
-            self._config_failure(exc)
+        except SelectionError as exc:
+            self._selection_failure(exc)
         except DiffSourceError as exc:
             self._diff_failure(exc)
 
@@ -402,6 +403,14 @@ class CliGate:
     @staticmethod
     def _diff_failure(exc: DiffSourceError) -> NoReturn:
         typer.echo(f"diff error: {exc}", err=True)
+        raise typer.Exit(2) from None
+
+    @staticmethod
+    def _selection_failure(exc: SelectionError) -> NoReturn:
+        # the config is fine; what is wrong is on the command line, so the
+        # message must not send the user off to read tingle.toml
+        for line in exc.errors:
+            typer.echo(f"usage error: {line}", err=True)
         raise typer.Exit(2) from None
 
     def _load(self, config_path: Path | None) -> Config:
@@ -489,8 +498,10 @@ def _types_table(metric_types: Sequence[MetricType]) -> Table:
 
 
 def _metrics_table(config: Config) -> Table:
-    table = Table("Metric", "Type", "Ranges")
+    # Group is here because it is what --group takes: without it the only
+    # way to learn a valid group name is to open the config by hand
+    table = Table("Metric", "Group", "Type", "Ranges")
     for spec in config.metrics:
         ranges = ", ".join(spec.ranges) if spec.ranges else config.default_range.name
-        table.add_row(spec.name, spec.type, ranges)
+        table.add_row(spec.name, spec.group or "", spec.type, ranges)
     return table

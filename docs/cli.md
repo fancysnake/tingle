@@ -18,7 +18,8 @@ $ tingle report --metric noqa-comments
 Both repeat, and naming both is a union: `--group linting --metric loc`
 measures the linting group plus one metric from outside it. A name no
 metric or group in the config carries is a usage error (exit 2), so a typo
-cannot pass for a clean report.
+cannot pass for a clean report. [`tingle list`](#tingle-list) names the
+groups a config carries.
 
 ## `tingle`
 
@@ -211,7 +212,8 @@ to overwrite an existing one. No options.
 
 ## `tingle list`
 
-List the configured metrics.
+List the configured metrics with their group, type and ranges — the groups
+are the names [`--group`](#selecting-what-to-measure) takes.
 
 | Option | Meaning |
 |---|---|

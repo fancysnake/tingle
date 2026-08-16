@@ -160,7 +160,10 @@ def test_unknown_metric_filter_exits_2() -> None:
     result = runner.invoke(app, ["stat", "--metric", "nope"])
 
     assert result.exit_code == 2
-    assert 'unknown metric "nope"' in result.stderr
+    # the config is valid; the typo is on the command line, so the user
+    # must not be sent to tingle.toml to look for it
+    assert 'usage error: unknown metric "nope"' in result.stderr
+    assert "config error" not in result.stderr
 
 
 @pytest.mark.usefixtures("grouped_project")
@@ -194,7 +197,8 @@ def test_unknown_group_filter_exits_2() -> None:
     result = runner.invoke(app, ["report", "--group", "nope"])
 
     assert result.exit_code == 2
-    assert 'unknown group "nope"' in result.stderr
+    assert 'usage error: unknown group "nope"' in result.stderr
+    assert "config error" not in result.stderr
 
 
 def test_missing_config_exits_2(
@@ -255,6 +259,17 @@ def test_list_shows_configured_metrics() -> None:
     assert result.exit_code == 0
     assert "lint-escapes" in result.output
     assert "regex_count" in result.output
+
+
+@pytest.mark.usefixtures("grouped_project")
+def test_list_names_the_groups_that_group_takes() -> None:
+    """Otherwise the only way to learn a valid --group value is the config file."""
+    result = runner.invoke(app, ["list"])
+
+    assert result.exit_code == 0
+    assert "Group" in result.output
+    assert "lint" in result.output
+    assert "size" in result.output
 
 
 def test_list_types_works_without_config(

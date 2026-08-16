@@ -8,9 +8,8 @@ from typing import TYPE_CHECKING
 from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import resolve
-from tingle.mills.runner import ranges_for, selected
+from tingle.mills.runner import ranges_for
 from tingle.mills.text import TextReader, text_reader
-from tingle.pacts.config import EVERY_METRIC, Config, MetricSpec, Selection
 from tingle.pacts.diff import (
     BranchDiff,
     DiffMetricContext,
@@ -24,7 +23,7 @@ from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
-    from tingle.pacts.config import RangeSpec
+    from tingle.pacts.config import Config, MetricSpec, RangeSpec
     from tingle.pacts.diff import DiffMetricFunction
 
 
@@ -45,10 +44,8 @@ class DiffRunner:
     diff_source: DiffSource
     metric_types: Mapping[str, MetricType]
 
-    def run(self, base: str, selection: Selection = EVERY_METRIC) -> DiffReport:
+    def run(self, base: str) -> DiffReport:
         """Measure the branch impact against merge-base(base, HEAD)."""
-        specs = selected(self.config, selection)
-
         branch_diff = self.diff_source.branch_diff(base)
         # both ports hand over bytes; what counts as readable text is
         # decided here, once per side, and never at a call site
@@ -62,7 +59,7 @@ class DiffRunner:
 
         outcomes: list[DiffOutcome] = []
         skipped: list[str] = []
-        for spec in specs:
+        for spec in self.config.metrics:
             if (diff_func := self.metric_types[spec.type].diff_func) is None:
                 skipped.append(spec.name)
                 continue

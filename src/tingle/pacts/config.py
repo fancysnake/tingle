@@ -31,6 +31,20 @@ class ConfigError(Exception):
         super().__init__("\n".join(errors))
 
 
+class SelectionError(Exception):
+    """A selection names something the configuration does not carry.
+
+    Separate from `ConfigError` because the fault is in the command line,
+    not in the file: the config is valid, and sending the user to look at
+    it would send them somewhere there is nothing to find.
+    """
+
+    def __init__(self, errors: list[str]) -> None:
+        """Collect every unknown name; the message joins them."""
+        self.errors = errors
+        super().__init__("\n".join(errors))
+
+
 @dataclass(frozen=True)
 class RangeSpec:
     """A named file set defined by include/exclude glob patterns."""
@@ -96,9 +110,9 @@ class Selection:
         return not self.metrics and not self.groups
 
 
-#: What a command with no selection options asks for. Named once so that
-#: every signature defaulting to it says the same thing, and so that no
-#: default has to build one.
+#: What a command with no selection options asks for. A module-level
+#: singleton rather than a `Selection()` default because ruff's B008
+#: forbids calling anything in a signature default.
 EVERY_METRIC = Selection()
 
 
