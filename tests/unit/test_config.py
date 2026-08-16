@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import fields, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -513,18 +514,21 @@ def test_narrowing_by_nothing_returns_the_config_untouched() -> None:
 
 
 def test_narrowing_keeps_everything_but_the_metrics() -> None:
-    config = make_config(
-        MetricSpec(name="first", type="file_count", group="lint"),
-        MetricSpec(name="second", type="file_count"),
+    config = replace(
+        make_config(
+            MetricSpec(name="first", type="file_count", group="lint"),
+            MetricSpec(name="second", type="file_count"),
+        ),
+        diff_base="origin/main",
     )
 
     narrow = narrowed(config, Selection(groups=("lint",)))
 
-    assert narrow.root == config.root
-    assert narrow.ranges == config.ranges
-    assert narrow.default_range == config.default_range
-    assert narrow.display == config.display
-    assert narrow.check == config.check
+    # every field rather than a list of them, so one added later is covered
+    kept = [spec.name for spec in fields(Config) if spec.name != "metrics"]
+    assert {name: getattr(narrow, name) for name in kept} == {
+        name: getattr(config, name) for name in kept
+    }
 
 
 def test_narrowing_rejects_unknown_names_and_groups_together() -> None:
