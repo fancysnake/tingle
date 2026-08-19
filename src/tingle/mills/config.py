@@ -27,7 +27,6 @@ from tingle.specs.config import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from tingle.pacts.config import MetricTemplate
     from tingle.pacts.metrics import MetricType
 
 _TOP_LEVEL_KEYS = frozenset(
@@ -53,7 +52,7 @@ def validate(
     *,
     root: Path,
     source: Path,
-    templates: Mapping[str, MetricTemplate] | None = None,
+    templates: Mapping[str, Mapping[str, Any] | None] | None = None,
 ) -> Config:
     """Turn raw config data into a Config, or raise ConfigError with every problem."""
     errors: list[str] = []
@@ -166,7 +165,7 @@ def _validate_metrics(
     metric_types: Mapping[str, MetricType],
     *,
     ranges: Mapping[str, RangeSpec],
-    templates: Mapping[str, MetricTemplate],
+    templates: Mapping[str, Mapping[str, Any] | None],
     errors: list[str],
 ) -> tuple[MetricSpec, ...]:
     if not isinstance(raw_metrics, list):
@@ -195,17 +194,18 @@ def _validate_metrics(
 
 def _based(
     table: Mapping[str, Any],
-    templates: Mapping[str, MetricTemplate],
+    templates: Mapping[str, Mapping[str, Any] | None],
     *,
     index: int,
     errors: list[str],
 ) -> Mapping[str, Any] | None:
     """Merge the named template under the entry; None when the base is unusable.
 
-    A base that failed to load has already been reported by the resolver,
-    so nothing is said twice: the entry is simply dropped, and the errors
-    the reader sees are about the template rather than about every metric
-    that reached for it.
+    A base that broke has already been reported by the resolver, so
+    nothing is said twice: the entry is simply dropped, and the errors the
+    reader sees are about the template rather than about every metric that
+    reached for it. That is what the resolver's `None` says outright --
+    which is why "broken" is not inferred from the shape of a name here.
     """
     if (base := table.get("base")) is None:
         return apply_template(
@@ -214,11 +214,12 @@ def _based(
     if not isinstance(base, str):
         errors.append(f"metrics[{index}]: base must be a string")
         return None
-    if (template := templates.get(base)) is None:
-        if "." not in base:
-            errors.append(f'metrics[{index}]: unknown base "{base}"')
+    if base not in templates:
+        errors.append(f'metrics[{index}]: unknown base "{base}"')
         return None
-    label = _label(table, index=index, fallback=template.name)
+    if (template := templates[base]) is None:
+        return None
+    label = _label(table, index=index, fallback=template.get("name"))
     return apply_template(template, table, label=label, errors=errors)
 
 

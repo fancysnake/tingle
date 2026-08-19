@@ -19,34 +19,48 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-#: A template package the way somebody else would write one: templates at
-#: module level and inside a namespace, plus things that are not templates.
+#: A template package the way somebody else would write one: a module that
+#: states what it publishes, and things that are not templates at all.
 PACK = textwrap.dedent("""
-    from types import SimpleNamespace
-
     from tingle.pacts.config import MetricTemplate
 
+    __all__ = ["noqa"]
+
     noqa = MetricTemplate(type="regex_count", name="noqa", params={"pattern": "x"})
-    grouped = SimpleNamespace(
-        inner=MetricTemplate(type="regex_count", name="inner", params={"pattern": "y"})
-    )
+    undeclared = MetricTemplate(type="regex_count", name="undeclared")
     _private = MetricTemplate(type="regex_count", name="hidden")
     NOT_A_TEMPLATE = "just a string"
     """)
 
-#: A pack that imports and declares real templates, but declares a bad one.
+#: The same pack, one subpackage deeper: reachable, and so listable too.
+NESTED = textwrap.dedent("""
+    from tingle.pacts.config import MetricTemplate
+
+    inner = MetricTemplate(type="regex_count", name="inner", params={"pattern": "y"})
+    """)
+
+#: A pack that declares a real template and a bad one, so listing it has
+#: both something to show and something to complain about.
 BROKEN_PACK = textwrap.dedent("""
     from tingle.pacts.config import MetricTemplate
 
+    usable = MetricTemplate(type="regex_count", name="usable", params={"pattern": "x"})
     wrong_type = MetricTemplate(type="no_such_type", name="wrong")
     """)
 
 
-def _installed(tmp_path: Path, name: str, *, body: str) -> Iterator[str]:
+def _installed(
+    tmp_path: Path, name: str, *, body: str, nested: str = ""
+) -> Iterator[str]:
     package = tmp_path / name
     package.mkdir()
     (package / "__init__.py").write_text("", encoding="utf-8")
     (package / "tools.py").write_text(body, encoding="utf-8")
+    if nested:
+        deeper = package / "deeper"
+        deeper.mkdir()
+        (deeper / "__init__.py").write_text("", encoding="utf-8")
+        (deeper / "extra.py").write_text(nested, encoding="utf-8")
     yield name
     for loaded in [key for key in sys.modules if key.startswith(name)]:
         del sys.modules[loaded]
@@ -56,7 +70,7 @@ def _installed(tmp_path: Path, name: str, *, body: str) -> Iterator[str]:
 def pack(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     """Write a throwaway template package and put it on the import path."""
     monkeypatch.syspath_prepend(str(tmp_path))
-    yield from _installed(tmp_path, "demo_pack", body=PACK)
+    yield from _installed(tmp_path, "demo_pack", body=PACK, nested=NESTED)
 
 
 @pytest.fixture

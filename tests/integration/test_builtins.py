@@ -16,7 +16,8 @@ from tingle.links.library.python import PythonTemplateLoader
 from tingle.mills.config import validate
 from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.mills.templates import resolve
-from tingle.pacts.config import BUILTIN_TEMPLATE_PACKAGE, ConfigError
+from tingle.pacts.config import BUILTIN_TEMPLATE_PACKAGE, ConfigError, MetricTemplate
+from tingle.pacts.metrics import MetricContext
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -112,3 +113,46 @@ def test_a_template_used_twice_without_a_name_is_a_duplicate(tmp_path: Path) -> 
             " duplicate name"
         )
     ]
+
+
+#: The keys the TOML-reading templates point at, as the tools write them.
+REAL_CONFIG = """
+[tool.ruff.format]
+exclude = ["generated/*.py", "vendor/*.py"]
+
+[[tool.importlinter.contracts]]
+name = "layers"
+ignore_imports = ["a -> b", "c -> d"]
+
+[[tool.importlinter.contracts]]
+name = "clean"
+"""
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    (
+        pytest.param("ruff.format_excludes", 2, id="ruff-format-excludes"),
+        pytest.param("import_linter.ignored_imports", 2, id="import-linter-ignores"),
+    ),
+)
+def test_a_toml_template_points_at_the_key_the_tool_actually_writes(
+    path: str, expected: int
+) -> None:
+    """A key no tool writes reads as 0 with a warning, for every project."""
+    template = PythonTemplateLoader().load(f"{BUILTIN_TEMPLATE_PACKAGE}.{path}")
+    assert isinstance(template, MetricTemplate)
+    assert template.type is not None
+    metric_type = METRIC_TYPES[template.type]
+
+    result = metric_type.func(
+        MetricContext(
+            files=(),
+            read=lambda _: REAL_CONFIG,
+            exists=lambda _: True,
+            params=template.params,
+        )
+    )
+
+    assert not result.warnings
+    assert result.value == expected

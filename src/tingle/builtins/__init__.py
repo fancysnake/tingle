@@ -11,8 +11,9 @@ One module per tool, and no module imports another: a pack stands alone,
 because the config naming one is not asking for the rest.
 
 Templates never state a range. Range names belong to the project that
-defines them, so the entry using a template says where it applies. What a
-template does carry -- type, group, description, params -- can all be
-overridden by the entry, and a list param can be extended rather than
-replaced with `extra_`.
+defines them, so the entry using a template says where it applies. Of what
+a template does carry, `group`, `description` and its params are the
+entry's to override, and a list param can be extended rather than replaced
+with `extra_`. `type` is not: a template that states one owns it, because
+its params were written for that type.
 """

@@ -11,8 +11,10 @@ from tingle.mills.config import validate
 from tingle.pacts.config import ConfigError, MetricDraft
 
 if TYPE_CHECKING:
-    from tingle.pacts.config import MetricTemplate
     from tingle.pacts.metrics import MetricType
+
+#: The base table of a metric that builds on nothing.
+_NO_BASE: Mapping[str, Any] = {}
 
 
 def build_metric(
@@ -20,7 +22,7 @@ def build_metric(
     metric_types: Mapping[str, MetricType],
     *,
     draft: MetricDraft,
-    templates: Mapping[str, MetricTemplate] | None = None,
+    templates: Mapping[str, Mapping[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     """Return the metric table to append, or raise ConfigError.
 
@@ -29,20 +31,20 @@ def build_metric(
     as its expansion: the point of naming a template is that the config
     keeps following it.
     """
-    template = _drafted_template(
-        draft, metric_types=metric_types, templates=templates or {}
-    )
     existing_metrics = raw.get("metrics", [])
     if not isinstance(existing_metrics, list):
         raise ConfigError(["[[metrics]] must be an array of tables"])
 
-    all_params = _merge_params(draft, metric_types, template=template)
+    type_name, base = _drafted(
+        draft, metric_types=metric_types, templates=templates or {}
+    )
+    all_params = _merge_params(draft, metric_types, type_name=type_name)
 
     metric: dict[str, Any] = {}
     if draft.base is not None:
         metric["base"] = draft.base
     metric["name"] = draft.name or _drafted_name(
-        existing_metrics, draft, template=template
+        existing_metrics, draft, type_name=type_name, base=base
     )
     if draft.type_name is not None:
         metric["type"] = draft.type_name
@@ -61,47 +63,67 @@ def build_metric(
     return metric
 
 
-def _drafted_template(
+def _drafted(
     draft: MetricDraft,
     *,
     metric_types: Mapping[str, MetricType],
-    templates: Mapping[str, MetricTemplate],
-) -> MetricTemplate | None:
-    """Resolve what the draft says it is building on, or raise ConfigError."""
-    if draft.type_name is not None and draft.base is not None:
-        raise ConfigError(["give either a metric type or --base, not both"])
-    if draft.type_name is None and draft.base is None:
-        raise ConfigError(["give a metric type, or --base to build on a template"])
-    if draft.base is not None:
-        if (template := templates.get(draft.base)) is None:
-            raise ConfigError([f"unknown template {draft.base!r}"])
-        return template
-    if draft.type_name not in metric_types:
-        known = ", ".join(sorted(metric_types))
+    templates: Mapping[str, Mapping[str, Any] | None],
+) -> tuple[str, Mapping[str, Any] | None]:
+    """Resolve the type the draft means, and the template it builds on.
+
+    Answering both at once is what lets everything downstream stop asking
+    which of the two ways round a draft was written: a metric has a type
+    whichever of the draft and the template supplied it.
+    """
+    if draft.base is None:
+        if draft.type_name is None:
+            msg = "give a metric type, or --base to build on a template"
+            raise ConfigError([msg])
+        return _known_type(draft.type_name, metric_types), None
+
+    if draft.base not in templates:
+        raise ConfigError([f"unknown template {draft.base!r}"])
+    # a base that is present but broke was reported by the resolver, and
+    # `tingle add` refuses before reaching here; treating it as stating
+    # nothing keeps that from needing a branch that cannot be taken
+    base = templates[draft.base] or _NO_BASE
+
+    if isinstance(stated := base.get("type"), str):
+        if draft.type_name is not None:
+            raise ConfigError(
+                [f'the base fixes the metric type ("{stated}"); drop the type argument']
+            )
+        return stated, base
+    # a mixin states no type, so the entry has to -- which is the one case
+    # where naming a base and a type together is not a contradiction
+    if draft.type_name is None:
         raise ConfigError(
-            [f"unknown metric type {draft.type_name!r} (available: {known})"]
+            [f"template {draft.base!r} states no type; give one alongside --base"]
         )
-    return None
+    return _known_type(draft.type_name, metric_types), base
+
+
+def _known_type(type_name: str, metric_types: Mapping[str, MetricType]) -> str:
+    if type_name not in metric_types:
+        known = ", ".join(sorted(metric_types))
+        raise ConfigError([f"unknown metric type {type_name!r} (available: {known})"])
+    return type_name
 
 
 def _merge_params(
-    draft: MetricDraft,
-    metric_types: Mapping[str, MetricType],
-    *,
-    template: MetricTemplate | None,
+    draft: MetricDraft, metric_types: Mapping[str, MetricType], *, type_name: str
 ) -> dict[str, Any]:
     all_params: dict[str, Any] = dict(draft.params)
     if draft.value is None:
         return all_params
 
-    type_name = draft.type_name if template is None else template.type
-    known = metric_types.get(type_name) if type_name is not None else None
-    primary = known.params.primary if known is not None else None
+    primary = metric_types[type_name].params.primary
     if primary is None:
-        subject = f'metric type "{draft.type_name}"' if template is None else "the base"
-        raise ConfigError(
-            [f"{subject} takes no positional value; use --param key=value"]
+        msg = (
+            f'metric type "{type_name}" takes no positional value;'
+            " use --param key=value"
         )
+        raise ConfigError([msg])
     if primary in all_params:
         raise ConfigError(
             [f'param "{primary}" given both positionally and via --param']
@@ -111,7 +133,11 @@ def _merge_params(
 
 
 def _drafted_name(
-    existing_metrics: list[Any], draft: MetricDraft, *, template: MetricTemplate | None
+    existing_metrics: list[Any],
+    draft: MetricDraft,
+    *,
+    type_name: str,
+    base: Mapping[str, Any] | None,
 ) -> str:
     """Name the metric when the draft did not.
 
@@ -119,9 +145,10 @@ def _drafted_name(
     name is free -- and when it is not, the counter that keeps two
     `regex_count` metrics apart keeps two uses of one template apart too.
     """
-    if template is not None:
-        return _free(existing_metrics, template.name or draft.base or "metric")
-    return _auto_name(existing_metrics, draft.type_name or "metric", value=draft.value)
+    if draft.base is not None:
+        named = (base or _NO_BASE).get("name")
+        return _free(existing_metrics, named if isinstance(named, str) else draft.base)
+    return _auto_name(existing_metrics, type_name, value=draft.value)
 
 
 def _auto_name(

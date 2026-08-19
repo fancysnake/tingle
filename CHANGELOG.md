@@ -28,7 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Templates are ordinary Python: a package of `MetricTemplate` instances at
   an import path, needing tingle and nothing else, so a team can publish its
   own and name it the same way. tingle's own pack is reached by the same
-  loader, not from the inside.
+  loader, not from the inside. A pack may nest as deeply as it likes, and
+  where a module declares `__all__` that is what it publishes.
+- A `toml_list_length` key that carries on past an array of tables means it
+  once per entry: `tool.importlinter.contracts.ignore_imports` counts the
+  excused imports across every contract.
 
 ### Changed
 
@@ -36,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing it counts. `any-uses` now sits under `typing` rather than
   ungrouped, since a template carries a group and there is no way to take
   one back.
+- `tingle library` lists the templates a pack offers that verify, and
+  reports the rest, rather than refusing to list anything when one is
+  broken.
 
 ## [0.5.0] - 2026-08-16
 

@@ -11,13 +11,13 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from dataclasses import dataclass
-from types import ModuleType, SimpleNamespace
 from typing import TYPE_CHECKING
 
 from tingle.pacts.config import MetricTemplate, TemplateLoader, TemplateNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from types import ModuleType
 
 
 @dataclass(frozen=True)
@@ -35,8 +35,8 @@ class PythonTemplateLoader(TemplateLoader):
 
         The path is split at the longest prefix that imports, and the rest
         is walked as attributes -- so a template may sit in a module
-        (`pack.ruff.noqa`) or in a namespace inside one, and a package
-        deciding which is free to change its mind.
+        (`pack.ruff.noqa`), in a subpackage below it, or behind whatever
+        the module exposes it as, and moving it need not move the path.
         """
         parts = path.split(".")
         for cut in range(len(parts), 0, -1):
@@ -46,17 +46,30 @@ class PythonTemplateLoader(TemplateLoader):
         raise TemplateNotFoundError(msg)
 
     def catalogue(self, package: str) -> dict[str, object]:
-        """Every template-shaped object under a package, by dotted path."""
+        """Every template-shaped object under a package, by dotted path.
+
+        The walk goes as deep as the package nests, because `load` walks a
+        dotted path of any length: a pack that groups its templates into
+        subpackages would otherwise be fully usable and entirely invisible.
+        """
         if (root := self._imported(package)) is None:
             msg = f"no importable package {package!r}"
             raise TemplateNotFoundError(msg)
         found = dict(_exported(root, prefix=package))
-        for info in pkgutil.iter_modules(
-            getattr(root, "__path__", []), prefix=f"{package}."
-        ):
-            if (module := self._imported(info.name)) is not None:
-                found.update(_exported(module, prefix=info.name))
+        self._descend(root, prefix=package, found=found)
         return dict(sorted(found.items()))
+
+    def _descend(
+        self, module: ModuleType, *, prefix: str, found: dict[str, object]
+    ) -> None:
+        for info in pkgutil.iter_modules(
+            getattr(module, "__path__", []), prefix=f"{prefix}."
+        ):
+            if (child := self._imported(info.name)) is None:
+                continue
+            found.update(_exported(child, prefix=info.name))
+            if info.ispkg:
+                self._descend(child, prefix=info.name, found=found)
 
     def _imported(self, name: str) -> ModuleType | None:
         """Import a module, or None when there is no such module.
@@ -94,23 +107,24 @@ def _walk(module: ModuleType, attributes: list[str]) -> object:
 
 
 def _exported(module: ModuleType, *, prefix: str) -> Iterator[tuple[str, object]]:
-    """Yield the templates a module offers, descending one level of grouping.
+    """Yield the templates a module offers under the names it offers them by.
 
-    A pack may name its templates at module level or gather them into a
-    `SimpleNamespace`, and a config naming one should not have to know
-    which -- so both are walked, and the dotted path reads the same.
+    `__all__` is the pack's own statement of what it exports, so it wins
+    where a module makes one -- without it, a template re-exported by two
+    modules is catalogued twice under two paths. It is still only a list
+    of names from untrusted code, so what it names is filtered the same.
     """
-    for name, value in vars(module).items():
-        if name.startswith("_"):
-            continue
+    for name in _public(module):
+        value = getattr(module, name, None)
         if _templated(value):
             yield f"{prefix}.{name}", value
-        elif isinstance(value, SimpleNamespace):
-            yield from (
-                (f"{prefix}.{name}.{inner}", template)
-                for inner, template in vars(value).items()
-                if not inner.startswith("_") and _templated(template)
-            )
+
+
+def _public(module: ModuleType) -> Iterator[str]:
+    listed = getattr(module, "__all__", None)
+    if isinstance(listed, (list, tuple)):
+        return (name for name in listed if isinstance(name, str))
+    return (name for name in vars(module) if not name.startswith("_"))
 
 
 def _templated(value: object) -> bool:

@@ -10,17 +10,18 @@ from tingle.mills.check import judge
 from tingle.mills.config import narrowed, validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
-from tingle.mills.templates import resolve, verify
+from tingle.mills.templates import as_table, resolve, verify
 from tingle.pacts.config import (
     EVERY_METRIC,
     ConfigError,
     ConfigNotFoundError,
+    Library,
     LibraryEntry,
     Selection,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
     from pathlib import Path
 
     from tingle.pacts.check import CheckVerdict
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
         Config,
         ConfigStore,
         MetricDraft,
-        MetricTemplate,
         TemplateLoader,
     )
     from tingle.pacts.diff import DiffReport, DiffSourceFactory
@@ -84,11 +84,9 @@ class ConfigService:
         """
         raw = self.load_raw(cwd)
         errors: list[str] = []
-        existing = raw.get("metrics", [])
-        drafted = (
-            [*existing, {"base": draft.base}] if isinstance(existing, list) else []
+        templates = self._templates(
+            raw, errors, extra_bases=() if draft.base is None else (draft.base,)
         )
-        templates = self._templates({**raw, "metrics": drafted}, errors)
         if errors:
             raise ConfigError(errors)
         metric = build_metric(raw, self.metric_types, draft=draft, templates=templates)
@@ -96,28 +94,42 @@ class ConfigService:
         self.store.append_metric(target, metric)
         return target, str(metric["name"])
 
-    def list_library(self, package: str) -> tuple[LibraryEntry, ...]:
-        """Every usable template a package offers, in path order."""
-        errors: list[str] = []
-        entries = tuple(
-            LibraryEntry(path=path, template=template)
-            for path, obj in self.templates.catalogue(package).items()
-            if (
-                template := verify(
-                    obj, path=path, metric_types=self.metric_types, errors=errors
+    def list_library(self, package: str) -> Library:
+        """Every usable template a package offers, and why the rest are not.
+
+        A pack is somebody else's code: one template that does not verify
+        is worth saying out loud, but it is not a reason to answer "what
+        is in this pack?" with nothing.
+        """
+        problems: list[str] = []
+        entries: list[LibraryEntry] = []
+        for path, obj in self.templates.catalogue(package).items():
+            template = verify(
+                obj, path=path, metric_types=self.metric_types, errors=problems
+            )
+            if template is None:
+                continue
+            table = as_table(template)
+            entries.append(
+                LibraryEntry(
+                    path=path, table=table, toml=self.store.render_metric(table)
                 )
             )
-            is not None
-        )
-        if errors:
-            raise ConfigError(errors)
-        return entries
+        return Library(entries=tuple(entries), problems=tuple(problems))
 
     def _templates(
-        self, raw: Mapping[str, Any], errors: list[str]
-    ) -> dict[str, MetricTemplate]:
+        self,
+        raw: Mapping[str, Any],
+        errors: list[str],
+        *,
+        extra_bases: Iterable[str] = (),
+    ) -> dict[str, Mapping[str, Any] | None]:
         return resolve(
-            raw, self.templates, metric_types=self.metric_types, errors=errors
+            raw,
+            self.templates,
+            metric_types=self.metric_types,
+            errors=errors,
+            extra_bases=extra_bases,
         )
 
     def write_starter(self, cwd: Path) -> Path:

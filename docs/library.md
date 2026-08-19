@@ -23,6 +23,13 @@ $ tingle library --expand        # each one as the config it stands for
 $ tingle add --base tingle.builtins.mypy.type_ignore_comment
 ```
 
+`tingle add` takes a metric type or a `--base`, and both together only when
+the base is a mixin — which states no type, so the entry has to:
+
+```console
+$ tingle add regex_count '#\s*noqa:' --base generated
+```
+
 ## What `base` may name
 
 A **dotted** base is a Python import path, its last component the attribute:
@@ -108,6 +115,11 @@ extra_ignore_lines = ['# @generated']
 
 A base that leads back to itself is a config error, not a hang.
 
+A local template's fields are checked at the metric that uses them, by the
+same validator every metric goes through — and the complaint names the base
+the field came from. A template nothing uses is not checked, because there
+is nothing yet for it to be wrong about.
+
 ## Publishing your own
 
 A template pack is a Python package holding `MetricTemplate` instances. It
@@ -126,9 +138,11 @@ legacy_orm = MetricTemplate(
 )
 ```
 
-Used as `base = "mycorp_metrics.django.legacy_orm"`. Templates may also be
-gathered into a `SimpleNamespace`; a config naming one cannot tell the
-difference.
+Used as `base = "mycorp_metrics.django.legacy_orm"`. A pack may nest as
+deeply as it likes — `base = "mycorp_metrics.django.orm.legacy"` — and
+`tingle library` lists what it finds all the way down. Where a module
+declares `__all__`, that is taken as the list of templates it publishes;
+without one, every public name holding a `MetricTemplate` is published.
 
 Compose in Python rather than with `base` — a packaged template has no base
 of its own:
@@ -136,14 +150,20 @@ of its own:
 ```python
 from dataclasses import replace
 
-strict_legacy_orm = replace(legacy_orm, name="legacy-orm-strict", params={})
+strict_legacy_orm = replace(
+    legacy_orm,
+    name="legacy-orm-strict",
+    params={"symbol": "mycorp.legacy.orm.raw_query"},
+)
 ```
 
 Every loaded template is verified before use: it must be a `MetricTemplate`
 exactly (not a subclass), its fields must hold what they claim, its type
 must be one tingle knows, and its params must be strings, numbers, booleans
 or lists of those. Its params are copied on load, so a pack cannot change a
-metric's definition after the config has read it.
+metric's definition after the config has read it. `tingle library` lists
+the ones that pass and reports the rest, so one bad template in somebody
+else's pack does not hide the good ones.
 
 Templates should not state a range. Range names belong to the project using
 them.

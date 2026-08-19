@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING
 
 import pytest
@@ -25,9 +26,9 @@ def test_a_module_level_template_is_loaded_by_its_path(pack: str) -> None:
     assert loaded.name == "noqa"
 
 
-def test_a_template_inside_a_namespace_is_reached_the_same_way(pack: str) -> None:
-    """The path does not say whether the last step crossed a module."""
-    loaded = PythonTemplateLoader().load(f"{pack}.tools.grouped.inner")
+def test_a_template_in_a_subpackage_is_reached_the_same_way(pack: str) -> None:
+    """The path does not say how many modules the walk crossed to get there."""
+    loaded = PythonTemplateLoader().load(f"{pack}.deeper.extra.inner")
 
     assert isinstance(loaded, MetricTemplate)
     assert loaded.name == "inner"
@@ -74,10 +75,18 @@ def test_a_broken_package_raises_rather_than_reading_as_absent(
         PythonTemplateLoader().load("broken_pack.thing")
 
 
-def test_the_catalogue_finds_templates_at_both_levels(pack: str) -> None:
+def test_the_catalogue_reaches_as_deep_as_load_does(pack: str) -> None:
+    """Anything less lists a pack as smaller than a config may name."""
     found = PythonTemplateLoader().catalogue(pack)
 
-    assert sorted(found) == [f"{pack}.tools.grouped.inner", f"{pack}.tools.noqa"]
+    assert sorted(found) == [f"{pack}.deeper.extra.inner", f"{pack}.tools.noqa"]
+
+
+def test_a_module_declaring_all_decides_what_it_publishes(pack: str) -> None:
+    """`undeclared` is a template, and the pack did not offer it."""
+    found = PythonTemplateLoader().catalogue(pack)
+
+    assert f"{pack}.tools.undeclared" not in found
 
 
 def test_the_catalogue_skips_private_names_and_other_objects(pack: str) -> None:
@@ -92,3 +101,17 @@ def test_the_builtins_are_reachable_as_a_pack_like_any_other() -> None:
 
     assert f"{BUILTIN_TEMPLATE_PACKAGE}.ruff.noqa_comment" in found
     assert all(isinstance(template, MetricTemplate) for template in found.values())
+
+
+def test_a_child_that_will_not_import_is_left_out_rather_than_raising(
+    pack: str,
+) -> None:
+    """`iter_modules` lists what is on disk; importing it is a separate answer."""
+    root = importlib.import_module(pack)
+
+    def importer(name: str) -> ModuleType:
+        if name == pack:
+            return root
+        raise ModuleNotFoundError(name=name)
+
+    assert not PythonTemplateLoader(importer=importer).catalogue(pack)

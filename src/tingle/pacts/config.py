@@ -126,10 +126,29 @@ class MetricTemplate:
 
 @dataclass(frozen=True)
 class LibraryEntry:
-    """One template in the library, under the dotted path that names it."""
+    """One template in the library, under the dotted path that names it.
+
+    Flattened to the `[[metrics]]` table it stands for, and to that table
+    written out as TOML -- so what is listed and what `--expand` prints
+    are one thing said once, by the layers that own each half.
+    """
 
     path: str
-    template: MetricTemplate
+    table: Mapping[str, Any]
+    toml: str
+
+
+@dataclass(frozen=True)
+class Library:
+    """What a package offers, and why the rest of it is unusable.
+
+    A pack nobody in this project wrote is listed for what works in it:
+    one broken template is a problem to report, not a reason to show
+    nothing.
+    """
+
+    entries: tuple[LibraryEntry, ...] = ()
+    problems: tuple[str, ...] = ()
 
 
 class TemplateLoader(Protocol):
@@ -247,6 +266,10 @@ class ConfigStore(Protocol):
     @abstractmethod
     def append_metric(self, path: Path, metric: Mapping[str, Any]) -> None:
         """Append a metric entry, preserving existing formatting."""
+
+    @abstractmethod
+    def render_metric(self, metric: Mapping[str, Any]) -> str:
+        """Write a metric entry out as the text a reader could paste."""
 
     @abstractmethod
     def write_starter(self, root: Path) -> Path:

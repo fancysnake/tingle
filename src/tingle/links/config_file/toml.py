@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
+    from tomlkit.items import Table
+
 TINGLE_FILE = "tingle.toml"
 PYPROJECT_FILE = "pyproject.toml"
 
@@ -112,14 +114,19 @@ class TomlConfigStore(ConfigStore):
         if path.name == PYPROJECT_FILE:
             container = document["tool"]["tingle"]  # guaranteed by edit_target
 
-        table = tomlkit.table()
-        for key, value in metric.items():
-            table[key] = value
         if "metrics" not in container:
             container["metrics"] = tomlkit.aot()
-        container["metrics"].append(table)
+        container["metrics"].append(_metric_table(metric))
 
         path.write_text(tomlkit.dumps(document), encoding="utf-8")
+
+    def render_metric(self, metric: Mapping[str, Any]) -> str:
+        """Write a metric entry out as the `[[metrics]]` TOML it is."""
+        document = tomlkit.document()
+        metrics = tomlkit.aot()
+        metrics.append(_metric_table(metric))
+        document["metrics"] = metrics
+        return tomlkit.dumps(document).strip()
 
     def write_starter(self, root: Path) -> Path:
         """Create a commented starter tingle.toml; refuse to overwrite."""
@@ -128,6 +135,30 @@ class TomlConfigStore(ConfigStore):
             raise FileExistsError(path)
         path.write_text(STARTER, encoding="utf-8")
         return path
+
+
+def _metric_table(metric: Mapping[str, Any]) -> Table:
+    """Build one `[[metrics]]` table, however it is about to be used."""
+    table = tomlkit.table()
+    for key, value in metric.items():
+        table[key] = _value(value)
+    return table
+
+
+def _value(value: object) -> object:
+    """Quote a value the way that leaves a regex readable.
+
+    Most params of the built-in templates are patterns, and a basic string
+    doubles every backslash in one. A literal string cannot hold a single
+    quote or a newline, so tomlkit is asked and takes the basic form back
+    when it says no.
+    """
+    if isinstance(value, str) and "\\" in value:
+        try:
+            return tomlkit.string(value, literal=True)
+        except ValueError:
+            return tomlkit.string(value)
+    return value
 
 
 def _parse(path: Path) -> dict[str, Any]:

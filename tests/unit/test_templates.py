@@ -7,7 +7,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from tingle.mills.metrics.registry import METRIC_TYPES
-from tingle.mills.templates import apply, resolve, verify
+from tingle.mills.templates import apply, as_table, resolve, verify
 from tingle.pacts.config import MetricTemplate, TemplateNotFoundError
 
 NOQA = MetricTemplate(
@@ -42,13 +42,18 @@ def _resolve(
     return resolved, errors
 
 
+def _base(template: MetricTemplate | None) -> dict[str, Any] | None:
+    """Flatten a template into what `apply` merges: the table it stands for."""
+    return None if template is None else as_table(template)
+
+
 def _applied(template: MetricTemplate | None, table: dict[str, Any]) -> dict[str, Any]:
-    return apply(template, table, label="metric", errors=[])
+    return apply(_base(template), table, label="metric", errors=[])
 
 
 def _errors(template: MetricTemplate | None, table: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    apply(template, table, label="metric", errors=errors)
+    apply(_base(template), table, label="metric", errors=errors)
     return errors
 
 
@@ -182,6 +187,7 @@ def test_field_types_are_checked_because_annotations_are_not() -> None:
     _, errors = _verified(MetricTemplate(**wrong))
 
     assert errors == [
+        'template "pack.one": name must be a non-empty string',
         'template "pack.one": guide must be a positive integer',
         'template "pack.one": ranges must be a tuple of strings',
     ]
@@ -247,8 +253,8 @@ def test_a_local_template_may_build_on_an_imported_one() -> None:
     resolved, errors = _resolve(raw, **{"pack.noqa": NOQA})
 
     assert not errors
-    assert resolved["ours"].params["ignore_lines"] == ["# legacy", "# ours"]
-    assert resolved["ours"].type == "regex_count"
+    assert resolved["ours"]["ignore_lines"] == ["# legacy", "# ours"]
+    assert resolved["ours"]["type"] == "regex_count"
 
 
 def test_a_local_template_may_build_on_another_declared_after_it() -> None:
@@ -261,8 +267,8 @@ def test_a_local_template_may_build_on_another_declared_after_it() -> None:
     resolved, errors = _resolve(raw)
 
     assert not errors
-    assert resolved["outer"].group == "ours"
-    assert resolved["outer"].params["pattern"] == "x"
+    assert resolved["outer"]["group"] == "ours"
+    assert resolved["outer"]["pattern"] == "x"
 
 
 def test_a_base_cycle_is_reported_rather_than_followed() -> None:
@@ -284,14 +290,14 @@ def test_a_local_name_may_not_look_like_an_import_path() -> None:
     ]
 
 
-def test_a_template_in_a_namespace_is_reached_by_the_same_path() -> None:
-    """A pack may group with SimpleNamespace; the config cannot tell."""
+def test_a_template_in_a_subpackage_is_reached_by_the_same_path() -> None:
+    """How deep a pack nests is the pack's business; the config sees a path."""
     raw = {"metrics": [{"base": "pack.group.noqa", "name": "a"}]}
 
     resolved, errors = _resolve(raw, **{"pack.group.noqa": NOQA})
 
     assert not errors
-    assert resolved["pack.group.noqa"].name == "noqa-comment"
+    assert resolved["pack.group.noqa"]["name"] == "noqa-comment"
 
 
 def test_templates_must_be_a_table_of_tables() -> None:
@@ -311,51 +317,19 @@ def test_a_local_template_may_not_name_a_base_that_is_not_there() -> None:
     assert errors == ['template "a": unknown base "nope"']
 
 
-def test_a_local_template_states_one_range_key_or_the_other() -> None:
-    raw = {"templates": {"a": {"range": "python", "ranges": ["js"]}}}
+def test_a_local_template_is_carried_through_as_the_table_it_was_written_as() -> None:
+    """No round trip through a template object, so no second validator either.
 
-    assert _resolve(raw)[1] == [
-        'template "a": give either "range" or "ranges", not both'
-    ]
-
-
-def test_a_local_templates_range_is_read_the_way_a_metrics_is() -> None:
-    single, errors = _resolve({"templates": {"a": {"range": "python"}}})
-    several, more = _resolve({"templates": {"a": {"ranges": ["python", "js"]}}})
+    Its fields are checked where a metric uses them, by the validator that
+    already owns those rules -- which is also the one that says which
+    metric, and which base, a complaint is about.
+    """
+    resolved, errors = _resolve(
+        {"templates": {"a": {"range": "python", "group": "", "guide": -1}}}
+    )
 
     assert not errors
-    assert not more
-    assert single["a"].ranges == ("python",)
-    assert several["a"].ranges == ("python", "js")
-
-
-def test_a_local_templates_ranges_must_be_a_non_empty_list_of_strings() -> None:
-    assert _resolve({"templates": {"a": {"range": 1}}})[1] == [
-        'template "a": range must be a string'
-    ]
-    assert _resolve({"templates": {"a": {"ranges": [1]}}})[1] == [
-        'template "a": ranges must be a list of strings'
-    ]
-    assert _resolve({"templates": {"a": {"ranges": []}}})[1] == [
-        'template "a": ranges must not be empty'
-    ]
-
-
-def test_a_local_templates_prose_fields_must_not_be_empty() -> None:
-    _, errors = _resolve({"templates": {"a": {"group": "", "description": ""}}})
-
-    assert errors == [
-        'template "a": group must be a non-empty string',
-        'template "a": description must be a non-empty string',
-    ]
-
-
-def test_a_local_templates_name_is_held_to_the_metric_name_rule() -> None:
-    _, errors = _resolve({"templates": {"a": {"name": "bad name!"}}})
-
-    assert errors == [
-        "template \"a\": invalid name (allowed: letters, digits, '_', '-', '.')"
-    ]
+    assert resolved["a"] == {"range": "python", "group": "", "guide": -1}
 
 
 def test_an_empty_ranges_tuple_is_a_template_insisting_on_none() -> None:

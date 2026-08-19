@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated, NoReturn
 import typer
 from rich.console import Console
 from rich.table import Column, Table
+from rich.text import Text
 
 from tingle.gates.cli import render
 from tingle.pacts.config import (
@@ -303,18 +304,20 @@ class CliGate:
     ) -> None:
         """List the metric templates a package offers."""
         try:
-            entries = self._services.config.list_library(package)
+            library = self._services.config.list_library(package)
         except TemplateNotFoundError as exc:
             typer.echo(f"library error: {exc.args[0]}", err=True)
             raise typer.Exit(2) from None
-        except ConfigError as exc:
-            self._config_failure(exc)
+        for problem in library.problems:
+            typer.echo(f"config error: {problem}", err=True)
         if expand:
             # plain echo: this is TOML to paste, and rich would read
             # `[[metrics]]` as markup and swallow it
-            typer.echo("\n\n".join(render.template_toml(entry) for entry in entries))
+            typer.echo(
+                "\n\n".join(render.template_toml(entry) for entry in library.entries)
+            )
             return
-        self._stdout.print(_library_table(entries, package=package))
+        self._stdout.print(_library_table(library.entries, package=package))
 
     def add(
         self,
@@ -545,7 +548,12 @@ def _types_table(metric_types: Sequence[MetricType]) -> Table:
 
 
 def _library_table(entries: Sequence[LibraryEntry], *, package: str) -> Table:
-    """Templates under the package, with the prefix every row shares dropped."""
+    """Templates under the package, with the prefix every row shares dropped.
+
+    Every cell a template supplies is `Text`, not markup: a description
+    mentioning `[tool.ruff]` is prose, and rich would read the brackets as
+    a tag and swallow it -- or, unbalanced, refuse to draw the table.
+    """
     table = Table(
         Column("Template", no_wrap=True),
         "Type",
@@ -554,12 +562,11 @@ def _library_table(entries: Sequence[LibraryEntry], *, package: str) -> Table:
         caption=f'use one with base = "{package}.<template>"',
     )
     for entry in entries:
-        template = entry.template
         table.add_row(
             entry.path.removeprefix(f"{package}."),
-            template.type or "(mixin)",
-            template.group or "",
-            template.description or "",
+            Text(str(entry.table.get("type", "(mixin)"))),
+            Text(str(entry.table.get("group", ""))),
+            Text(str(entry.table.get("description", ""))),
         )
     return table
 

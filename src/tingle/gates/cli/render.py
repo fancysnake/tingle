@@ -514,44 +514,14 @@ def _net_cell(net: int) -> str:
 
 
 def template_toml(entry: LibraryEntry) -> str:
-    """Render a template as the `[[metrics]]` entry it stands for.
+    """Head a template's `[[metrics]]` entry with where it came from.
 
-    What a reader pastes in place of `base` to stop following the template
-    -- so the fields are laid out in the order a hand-written metric has
-    them, and the name is the template's own rather than a placeholder.
+    The entry is what a reader pastes in place of `base` to stop following
+    the template -- so a mixin, which is not a whole metric, says what is
+    still missing rather than being printed as if it were ready to use.
     """
-    template = entry.template
-    fields = (
-        ("name", template.name),
-        ("type", template.type),
-        ("group", template.group),
-        ("description", template.description),
-        ("guide", template.guide),
-        ("ranges", list(template.ranges) if template.ranges else None),
-        *template.params.items(),
-    )
-    return "\n".join(
-        [
-            f"# {entry.path}",
-            "[[metrics]]",
-            *(
-                f"{key} = {_toml_value(value)}"
-                for key, value in fields
-                if value is not None
-            ),
-        ]
-    )
-
-
-def _toml_value(value: object) -> str:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float)):
-        return str(value)
-    if isinstance(value, list):
-        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
-    text = str(value)
-    # a literal string keeps a regex readable, and cannot hold a single quote
-    if "\\" in text and "'" not in text:
-        return f"'{text}'"
-    return json.dumps(text)
+    missing = [key for key in ("name", "type") if key not in entry.table]
+    notes = [f"# {entry.path}"]
+    if missing:
+        notes.append(f"# a mixin: add {' and '.join(missing)} of your own")
+    return "\n".join([*notes, entry.toml])

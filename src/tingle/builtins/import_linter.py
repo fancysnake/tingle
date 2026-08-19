@@ -18,9 +18,12 @@ deferred_contracts = MetricTemplate(
 )
 
 ignored_imports = MetricTemplate(
-    type="regex_count",
+    type="toml_list_length",
     name="import-linter-ignores",
     group="architecture",
     description="`ignore_imports` entries excusing an import from a contract.",
-    params={"pattern": r"^\s*ignore_imports\s*=", "flags": ["MULTILINE"]},
+    # the key carries on past the contracts array, so it means one entry
+    # per contract: what is counted is the excused imports, not the
+    # contracts that excuse any
+    params={"key": "tool.importlinter.contracts.ignore_imports"},
 )

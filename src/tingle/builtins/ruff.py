@@ -46,8 +46,8 @@ per_file_ignores = MetricTemplate(
 
 format_excludes = MetricTemplate(
     type="toml_list_length",
-    name="ruff-format-ignore",
+    name="ruff-format-excludes",
     group="formatting",
     description="Files excluded from ruff formatting.",
-    params={"key": "tool.ruff.format.ignore"},
+    params={"key": "tool.ruff.format.exclude"},
 )

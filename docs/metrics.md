@@ -215,6 +215,16 @@ file = "pyproject.toml"      # the default
 If the key holds a *table of lists* (ruff's `per-file-ignores`, say), the
 lengths are summed.
 
+A key that carries on past an *array of tables* means it once per entry,
+and the entries' values are counted together — so one key reaches
+`ignore_imports` in every import-linter contract at once:
+
+```toml
+key = "tool.importlinter.contracts.ignore_imports"
+```
+
+A contract stating none contributes nothing, rather than one.
+
 A missing file, a missing key, or malformed content is a warning plus a
 value of 0 — not an error. The file may legitimately not exist yet.
 
