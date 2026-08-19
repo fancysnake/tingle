@@ -105,6 +105,15 @@ def test_diff_metric_filter() -> None:
 
 
 @pytest.mark.usefixtures("repo")
+def test_unknown_diff_selection_is_a_usage_error() -> None:
+    result = runner.invoke(app, ["stat", "--diff", "--group", "nope"])
+
+    assert result.exit_code == 2
+    assert 'usage error: unknown group "nope"' in result.stderr
+    assert "config error" not in result.stderr
+
+
+@pytest.mark.usefixtures("repo")
 def test_missing_base_exits_2() -> None:
     result = runner.invoke(app, ["stat", "--diff", "--base", "nope"])
 

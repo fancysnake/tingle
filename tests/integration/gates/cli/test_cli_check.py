@@ -150,6 +150,17 @@ def test_metric_filter_narrows_the_verdict() -> None:
 
 
 @pytest.mark.usefixtures("repo")
+def test_unknown_check_selection_is_a_usage_error() -> None:
+    result = runner.invoke(app, ["check", "--group", "nope"])
+
+    assert result.exit_code == 2
+    assert 'usage error: unknown group "nope"' in result.stderr
+    # the neighbouring test proves an unknown name in [check] ignore still
+    # reads as a config error: the file is where that one really is wrong
+    assert "config error" not in result.stderr
+
+
+@pytest.mark.usefixtures("repo")
 def test_unknown_policy_exits_2() -> None:
     result = runner.invoke(app, ["check", "--policy", "every"])
 

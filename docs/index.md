@@ -11,8 +11,9 @@ codebase: ignored lint rules, inline `# noqa` / `# type: ignore` comments,
 uses of a legacy class during a strangler-fig migration, lines of code in a
 package that should disappear.
 
-It runs once, prints the numbers, and stores nothing — pipe the JSON into
-whatever tracks history for you (CI artifacts, dashboards, a spreadsheet).
+It runs once, prints the numbers, and stores nothing. To watch a number over
+months, the [metrics-history action](history.md) records a point per commit
+that lands and publishes a chart of them.
 
 ## Install
 
@@ -32,6 +33,7 @@ $ tingle stat --json                             # machine-readable output
 $ tingle stat --diff                             # impact of the current branch
 $ tingle report                                  # every occurrence, file:line
 $ tingle report --diff                           # what the branch added/removed
+$ tingle report --group linting                  # one group, or --metric NAME
 ```
 
 ## What it does
