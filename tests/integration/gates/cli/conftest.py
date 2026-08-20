@@ -7,6 +7,7 @@ of the same name — pytest requires the parameter to match the fixture.
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -52,6 +53,11 @@ pattern = '#\\s*noqa'
 name = "python-files"
 type = "file_count"
 """
+
+#: How many times, and how often, a headless run is asked whether it has
+#: finished before the test gives up on it.
+SETTLE_TRIES = 500
+SETTLE_STEP = 0.01
 
 BASE_PYPROJECT = '[tool.ruff.lint]\nignore = ["E501"]\n'
 BRANCH_PYPROJECT = '[tool.ruff.lint]\nignore = ["E501", "D203"]\n'
@@ -119,3 +125,30 @@ def interactive(monkeypatch: pytest.MonkeyPatch) -> list[MetricsApp]:
     )
     monkeypatch.setattr(MetricsApp, "run", record)
     return built
+
+
+@pytest.fixture
+def headless(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make stdout a terminal, and drive the real TUI without one.
+
+    `interactive` stops the app before it starts, which is what a test
+    about *which* app the gate built wants. This one lets the app run for
+    real -- worker, messages and all -- and only skips the terminal, so
+    that what it carries back out reaches the command line's own error
+    and exit paths.
+    """
+
+    def run(self: MetricsApp) -> None:
+        async def drive() -> None:
+            async with self.run_test() as pilot:
+                for _ in range(SETTLE_TRIES):
+                    if self.measured.over:
+                        return
+                    await pilot.pause(SETTLE_STEP)
+
+        asyncio.run(drive())
+
+    monkeypatch.setattr(
+        typer_gate, "sys", SimpleNamespace(stdout=SimpleNamespace(isatty=lambda: True))
+    )
+    monkeypatch.setattr(MetricsApp, "run", run)
