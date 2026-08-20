@@ -11,7 +11,7 @@ from textual_support import column
 from typer.testing import CliRunner
 
 from tingle.gates.cli import typer as typer_gate
-from tingle.gates.cli.textual import MetricsApp
+from tingle.gates.cli.textual.browse import MetricsApp
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 from tingle.mills.metrics.registry import METRIC_TYPES

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from tingle.gates.cli import typer as typer_gate
-from tingle.gates.cli.textual import MetricsApp
+from tingle.gates.cli.textual.browse import MetricsApp
 
 if TYPE_CHECKING:
     from pathlib import Path
