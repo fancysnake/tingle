@@ -3,6 +3,9 @@ loc_range = "python"
 
 [ranges.python]
 include = ["src/**/*.py", "tests/**/*.py"]
+# The template pack states the patterns these metrics search for, so
+# measuring it measures the ruler: every `# noqa:` in it is a definition.
+exclude = ["src/tingle/builtins/**"]
 default = true
 
 [ranges.config]
@@ -15,115 +18,58 @@ policy = "sum"
 # Formatting
 
 [[metrics]]
-name = "fmt-comment"
-type = "regex_count"
-group = "formatting"
-pattern = '#\s*fmt'
-description = "`# fmt` comments that switch off the formatter."
+base = "tingle.builtins.black.fmt_comment"
 
 [[metrics]]
-name = "taplo-comment"
-type = "regex_count"
-group = "formatting"
-pattern = '#\s*taplo:'
-description = "`# taplo:` comments that switch off TOML formatting."
+base = "tingle.builtins.taplo.ignore_comment"
 
 [[metrics]]
-name = "codespell-comment"
-type = "regex_count"
-group = "formatting"
-pattern = '#\s*codespell:ignore'
-description = "`# codespell:ignore` comments that skip the spellchecker."
+base = "tingle.builtins.codespell.ignore_comment"
 
 [[metrics]]
-name = "ruff-format-ignore"
-type = "toml_list_length"
-group = "formatting"
-key = "tool.ruff.format.ignore"
-description = "Files excluded from ruff formatting."
+base = "tingle.builtins.ruff.format_excludes"
 
 [[metrics]]
-name = "noqa-comment"
-type = "regex_count"
-group = "linting"
-pattern = '#\s*noqa:'
-description = "`# noqa:` comments that silence a ruff rule on one line."
+base = "tingle.builtins.ruff.noqa_comment"
+# `_source(...)` writes sample code for a test to measure; the markers in
+# it are the subject, not something silenced.
+extra_ignore_lines = ['_source\(']
 
 [[metrics]]
-name = "ruff-ignores"
-type = "toml_list_length"
-group = "linting"
-key = "tool.ruff.lint.ignore"
-description = "Ruff lint rules disabled project-wide."
+base = "tingle.builtins.ruff.lint_ignores"
 
 [[metrics]]
-name = "ruff-per-file-ignores"
-type = "toml_list_length"
-group = "linting"
-key = "tool.ruff.lint.per-file-ignores"
-description = "Ruff lint rules disabled for specific files."
+base = "tingle.builtins.ruff.per_file_ignores"
 
 [[metrics]]
-name = "pylint-comment"
-type = "regex_count"
-group = "linting"
-pattern = '#\s*pylint:'
-description = "`# pylint:` comments that silence a check inline."
+base = "tingle.builtins.pylint.disable_comment"
 
 [[metrics]]
-name = "pylint-disables"
-type = "ini_list_length"
-group = "linting"
-file = ".pylintrc"
-section = "MESSAGES CONTROL"
-option = "disable"
-description = "Pylint checks disabled project-wide."
+base = "tingle.builtins.pylint.rcfile_disables"
 
 # typing
 
 [[metrics]]
-name = "type-ignores"
-type = "regex_count"
-group = "typing"
-pattern = '#\s*type:\s*ignore'
-description = "`# type: ignore` comments that silence the type checker."
+base = "tingle.builtins.mypy.type_ignore_comment"
 
 [[metrics]]
-name = "type-ignore-spread"
-type = "regex_spread"
-group = "typing"
-pattern = '#\s*type:\s*ignore'
-description = "Files carrying a `# type: ignore`, however many each holds."
+base = "tingle.builtins.mypy.type_ignore_spread"
 
 [[metrics]]
-name = "mypy-overrides"
-type = "toml_table_array"
-group = "typing"
-key = "tool.mypy.overrides"
-label = "module"
-description = "Modules given relaxed mypy strictness."
+base = "tingle.builtins.mypy.overrides"
 
 # architecture
 
 [[metrics]]
-name = "deferred-import-contracts"
-type = "regex_count"
-group = "architecture"
+base = "tingle.builtins.import_linter.deferred_contracts"
 range = "config"
-pattern = '^#\s*\[\[tool\.importlinter\.contracts\]\]'
-flags = ["MULTILINE"]
-description = "Import-linter contracts commented out instead of enforced."
 
 [[metrics]]
-name = "long-files"
-type = "file_count"
-group = "linting"
-over_lines = 1000
-description = "Files over 1000 lines."
+base = "tingle.builtins.python.long_files"
 
 [[metrics]]
+base = "tingle.builtins.unittest_mock.any_used"
 name = "any-uses"
-type = "symbol_uses"
-symbol = "ANY"
-ignore_lines = ['CheckPolicy.ANY']
+group = "typing"
 description = "`ANY` placeholders, excluding the CheckPolicy.ANY enum."
+ignore_lines = ['CheckPolicy.ANY']

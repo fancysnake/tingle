@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
+from tingle.mills.templates import apply as apply_template
 from tingle.pacts.config import (
     CheckPolicy,
     CheckSpec,
@@ -28,16 +29,20 @@ if TYPE_CHECKING:
 
     from tingle.pacts.metrics import MetricType
 
-_TOP_LEVEL_KEYS = frozenset({"ranges", "metrics", "diff", "check", "display"})
+_TOP_LEVEL_KEYS = frozenset(
+    {"ranges", "metrics", "templates", "diff", "check", "display"}
+)
 _DIFF_KEYS = frozenset({"base"})
 _CHECK_KEYS = frozenset({"policy", "ignore"})
 _DISPLAY_KEYS = frozenset({"guide", "loc_range"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
 # `guide` and `description` are tingle's own, so they must not reach a
 # metric function as params; `ignore_lines` is a real param of the types
-# that support it, and is deliberately absent here.
+# that support it, and is deliberately absent here. `base` stays on the
+# table after the template is merged in, so an error can name where a
+# field the reader never wrote came from.
 _METRIC_RESERVED_KEYS = frozenset(
-    {"name", "type", "range", "ranges", "group", "guide", "description"}
+    {"name", "type", "range", "ranges", "group", "guide", "description", "base"}
 )
 
 
@@ -45,18 +50,34 @@ def validate(
     raw: Mapping[str, Any],
     metric_types: Mapping[str, MetricType],
     *,
-    root: Path,
     source: Path,
+    templates: Mapping[str, Mapping[str, Any] | None] | None = None,
+    errors: list[str] | None = None,
 ) -> Config:
-    """Turn raw config data into a Config, or raise ConfigError with every problem."""
-    errors: list[str] = []
+    """Turn raw config data into a Config, or raise ConfigError with every problem.
+
+    The project root is the directory the config file sits in, so `source`
+    says both -- there is no arrangement where one is given and the other
+    has to be worked out.
+
+    A caller that has already found problems -- resolving the templates
+    this config names, say -- passes them in, and they are raised together
+    with whatever the config itself holds. Reporting them a round apart
+    would make one fix take two runs.
+    """
+    if errors is None:
+        errors = []
     errors.extend(
         f'unknown top-level key "{key}"' for key in sorted(set(raw) - _TOP_LEVEL_KEYS)
     )
 
     ranges = _validate_ranges(raw.get("ranges", {}), errors)
     metrics = _validate_metrics(
-        raw.get("metrics", []), metric_types, ranges=ranges, errors=errors
+        raw.get("metrics", []),
+        metric_types,
+        ranges=ranges,
+        templates=templates or {},
+        errors=errors,
     )
     default_range = _resolve_default_range(ranges, errors)
     diff_base = _validate_diff(raw.get("diff", {}), errors)
@@ -66,7 +87,7 @@ def validate(
     if errors:
         raise ConfigError(errors)
     return Config(
-        root=root,
+        root=source.parent,
         source=source,
         ranges=ranges,
         metrics=metrics,
@@ -155,6 +176,7 @@ def _validate_metrics(
     metric_types: Mapping[str, MetricType],
     *,
     ranges: Mapping[str, RangeSpec],
+    templates: Mapping[str, Mapping[str, Any] | None],
     errors: list[str],
 ) -> tuple[MetricSpec, ...]:
     if not isinstance(raw_metrics, list):
@@ -168,13 +190,60 @@ def _validate_metrics(
             errors.append(f"metrics[{index}]: must be a table")
             continue
 
-        named = _metric_name(table, index=index, seen_names=seen_names, errors=errors)
+        if (effective := _based(table, templates, index=index, errors=errors)) is None:
+            continue
+        named = _metric_name(
+            effective, index=index, seen_names=seen_names, errors=errors
+        )
         spec = _metric_spec(
-            table, metric_types, named=named, ranges=ranges, errors=errors
+            effective, metric_types, named=named, ranges=ranges, errors=errors
         )
         if spec is not None:
             metrics.append(spec)
     return tuple(metrics)
+
+
+def _based(
+    table: Mapping[str, Any],
+    templates: Mapping[str, Mapping[str, Any] | None],
+    *,
+    index: int,
+    errors: list[str],
+) -> Mapping[str, Any] | None:
+    """Merge the named template under the entry; None when the base is unusable.
+
+    A base that broke has already been reported by the resolver, so
+    nothing is said twice: the entry is simply dropped, and the errors the
+    reader sees are about the template rather than about every metric that
+    reached for it. That is what the resolver's `None` says outright --
+    which is why "broken" is not inferred from the shape of a name here.
+    """
+    if (base := table.get("base")) is None:
+        return apply_template(
+            None, table, label=_label(table, index=index), errors=errors
+        )
+    if not isinstance(base, str):
+        errors.append(f"metrics[{index}]: base must be a string")
+        return None
+    if base not in templates:
+        errors.append(f'metrics[{index}]: unknown base "{base}"')
+        return None
+    if (template := templates[base]) is None:
+        return None
+    label = _label(table, index=index, fallback=template.get("name"))
+    return apply_template(template, table, label=label, errors=errors)
+
+
+def _label(table: Mapping[str, Any], *, index: int, fallback: str | None = None) -> str:
+    """How a metric is named in its errors: its name, else its position.
+
+    A metric built on a template names the template too, so a complaint
+    about a field the reader never wrote says where the field came from.
+    """
+    name = table.get("name", fallback)
+    label = f'metric "{name}"' if isinstance(name, str) else f"metrics[{index}]"
+    base = table.get("base")
+    return f'{label} (base "{base}")' if isinstance(base, str) else label
 
 
 def _metric_spec(
@@ -204,7 +273,7 @@ def _metric_spec(
     }
 
     if (type_name := table.get("type")) is None:
-        errors.append(f"{label}: missing type")
+        errors.append(f"{label}: missing type (state one, or a base that has one)")
         return None
     if not isinstance(type_name, str) or type_name not in metric_types:
         errors.append(f"{label}: unknown type {type_name!r}")
@@ -268,7 +337,7 @@ def _metric_name(
 ) -> tuple[str | None, str]:
     """Validate a metric's name; return it (or None) plus the error label."""
     name = table.get("name")
-    label = f'metric "{name}"' if isinstance(name, str) else f"metrics[{index}]"
+    label = _label(table, index=index)
     if name is None:
         errors.append(f"{label}: missing name")
         return None, label

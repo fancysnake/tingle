@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING, Annotated, NoReturn
 
 import typer
 from rich.console import Console
-from rich.table import Table
+from rich.table import Column, Table
+from rich.text import Text
 
 from tingle.gates.cli import render
 from tingle.pacts.config import (
+    BUILTIN_TEMPLATE_PACKAGE,
     CheckPolicy,
     Config,
     ConfigError,
@@ -20,6 +22,7 @@ from tingle.pacts.config import (
     MetricDraft,
     Selection,
     SelectionError,
+    TemplateNotFoundError,
 )
 from tingle.pacts.diff import DiffReport, DiffSourceError
 
@@ -30,6 +33,8 @@ if TYPE_CHECKING:
     from tingle.gates.cli.textual.browse import Collect
     from tingle.pacts.check import CheckVerdict
     from tingle.pacts.metrics import MetricType, ProgressSink
+    from tingle.pacts.config import LibraryEntry
+    from tingle.pacts.metrics import MetricType
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ServicesProtocol
 
@@ -133,6 +138,7 @@ class CliGate:
         self.app.command("check")(self.check)
         self.app.command("report")(self.report)
         self.app.command("list")(self.list_metrics)
+        self.app.command("library")(self.library)
         self.app.command("add")(self.add)
         self.app.command("init")(self.init)
 
@@ -280,11 +286,55 @@ class CliGate:
             return
         self._stdout.print(_metrics_table(self._load(config)))
 
+    def library(
+        self,
+        package: Annotated[
+            str,
+            typer.Argument(
+                metavar="[PACKAGE]",
+                help="Template package to list (default: tingle's own).",
+            ),
+        ] = BUILTIN_TEMPLATE_PACKAGE,
+        *,
+        expand: Annotated[
+            bool,
+            typer.Option(
+                "--expand",
+                help="Print each template as the config it stands for, to paste"
+                " in place of a base and stop following it.",
+            ),
+        ] = False,
+    ) -> None:
+        """List the metric templates a package offers."""
+        try:
+            library = self._services.config.list_library(package)
+        except TemplateNotFoundError as exc:
+            typer.echo(f"library error: {exc.args[0]}", err=True)
+            raise typer.Exit(2) from None
+        for problem in library.problems:
+            typer.echo(f"config error: {problem}", err=True)
+        if expand:
+            # plain echo: this is TOML to paste, and rich would read
+            # `[[metrics]]` as markup and swallow it
+            typer.echo(
+                "\n\n".join(render.template_toml(entry) for entry in library.entries)
+            )
+            return
+        self._stdout.print(_library_table(library.entries, package=package))
+
     def add(
         self,
-        type_name: Annotated[str, typer.Argument(metavar="TYPE")],
+        type_name: Annotated[str | None, typer.Argument(metavar="[TYPE]")] = None,
         value: Annotated[str | None, typer.Argument(metavar="[VALUE]")] = None,
         *,
+        base: Annotated[
+            str | None,
+            typer.Option(
+                "--base",
+                help="Template to build on instead of naming a type, e.g."
+                " tingle.builtins.ruff.noqa_comment.",
+            ),
+        ] = None,
         name: Annotated[
             str | None,
             typer.Option("--name", help="Metric name (auto-generated if omitted)."),
@@ -310,6 +360,7 @@ class CliGate:
         r"""Add a metric to the config, e.g.: tingle add regex_count '#\\s*noqa'."""
         draft = MetricDraft(
             type_name=type_name,
+            base=base,
             value=value,
             name=name,
             ranges=tuple(range_names or ()),
@@ -548,6 +599,30 @@ def _types_table(metric_types: Sequence[MetricType]) -> Table:
             ", ".join(metric_type.params.required),
             ", ".join(metric_type.params.optional),
             metric_type.description,
+        )
+    return table
+
+
+def _library_table(entries: Sequence[LibraryEntry], *, package: str) -> Table:
+    """Templates under the package, with the prefix every row shares dropped.
+
+    Every cell a template supplies is `Text`, not markup: a description
+    mentioning `[tool.ruff]` is prose, and rich would read the brackets as
+    a tag and swallow it -- or, unbalanced, refuse to draw the table.
+    """
+    table = Table(
+        Column("Template", no_wrap=True),
+        "Type",
+        "Group",
+        "Description",
+        caption=f'use one with base = "{package}.<template>"',
+    )
+    for entry in entries:
+        table.add_row(
+            entry.path.removeprefix(f"{package}."),
+            Text(str(entry.table.get("type", "(mixin)"))),
+            Text(str(entry.table.get("group", ""))),
+            Text(str(entry.table.get("description", ""))),
         )
     return table
 

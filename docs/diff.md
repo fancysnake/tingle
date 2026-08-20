@@ -48,7 +48,7 @@ base = "origin/main"
 Each metric type means something specific in diff mode:
 
 | Type | Diff meaning |
-|---|---|
+| --- | --- |
 | `regex_count` | matches on lines you added (+) vs lines you removed (−) |
 | `symbol_uses` | references starting on added vs removed lines |
 | `regex_spread` / `symbol_spread` | files that started matching (+) vs stopped (−) |

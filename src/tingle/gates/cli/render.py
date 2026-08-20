@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from tingle.pacts.check import CheckVerdict
+    from tingle.pacts.config import LibraryEntry
     from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
     from tingle.pacts.metrics import MetricResult, Occurrence
     from tingle.pacts.report import MetricOutcome, ReportSection, RunReport
@@ -510,3 +511,17 @@ def _net_cell(net: int) -> str:
     if net < 0:
         return f"[green]{net}[/]"
     return "0"
+
+
+def template_toml(entry: LibraryEntry) -> str:
+    """Head a template's `[[metrics]]` entry with where it came from.
+
+    The entry is what a reader pastes in place of `base` to stop following
+    the template -- so a mixin, which is not a whole metric, says what is
+    still missing rather than being printed as if it were ready to use.
+    """
+    missing = [key for key in ("name", "type") if key not in entry.table]
+    notes = [f"# {entry.path}"]
+    if missing:
+        notes.append(f"# a mixin: add {' and '.join(missing)} of your own")
+    return "\n".join([*notes, entry.toml])

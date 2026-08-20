@@ -27,7 +27,7 @@ A branch that worsens nothing prints nothing and exits 0.
 Two policies decide what "worse" means:
 
 | Policy | Fails when |
-|---|---|
+| --- | --- |
 | `sum` (default) | the metrics grow **in total** — paying off debt in one metric offsets taking it on in another |
 | `any` | **any single** metric grows, whatever else improved |
 
@@ -67,7 +67,7 @@ only the second can be gated on without failing every bug fix.
 ## Exit codes
 
 | Code | Meaning |
-|---|---|
+| --- | --- |
 | `0` | the branch worsened nothing |
 | `1` | the branch is a regression under the active policy (or a metric function failed) |
 | `2` | config or usage error |
