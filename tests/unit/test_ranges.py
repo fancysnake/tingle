@@ -55,3 +55,23 @@ def test_no_matches_returns_empty() -> None:
     spec = RangeSpec(name="python", include=("**/*.py",))
 
     assert not resolve(_paths("readme.md"), [spec])
+
+
+def test_an_anchored_default_exclude_spares_the_same_name_nested() -> None:
+    """`.venv/**` is the project's own venv, not every directory so named.
+
+    The tree walk prunes on these names, so what the glob does and what
+    the walk skips have to agree at every depth or a run measures files
+    it never read.
+    """
+    walked = (
+        PurePath(".venv/lib/v.py"),
+        PurePath("sub/.venv/lib/n.py"),
+        PurePath("__pycache__/r.py"),
+        PurePath("sub/__pycache__/n.py"),
+        PurePath("src/a.py"),
+    )
+
+    resolved = resolve(walked, [RangeSpec(name="python", include=("**/*.py",))])
+
+    assert resolved == (PurePath("src/a.py"), PurePath("sub/.venv/lib/n.py"))

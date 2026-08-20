@@ -7,19 +7,31 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterable, Iterator, Sequence
+
+    from tingle.pacts.metrics import UnreachableDir
 
 
 class LocalProjectFiles:
     """Read-only view of a local directory tree.
 
-    walk() returns the full tree; which files matter is range logic and
-    stays in mills.
+    walk() returns the whole tree bar the directories it is told to skip;
+    which files matter is range logic and stays in mills. Those two are
+    not the same thing: a skipped directory is one whose contents no range
+    could have matched anyway, so the caller is naming work to avoid
+    rather than a filter to apply.
     """
 
-    def __init__(self, root: Path) -> None:
-        """Anchor the view at the project root directory."""
+    def __init__(self, root: Path, *, prune: Sequence[UnreachableDir] = ()) -> None:
+        """Anchor the view at the root, declining to descend into `prune`.
+
+        The two kinds are split apart once here rather than asked about
+        per directory: which names are unreachable anywhere, and which
+        only as a child of the root.
+        """
         self._root = root
+        self._anywhere = frozenset(d.name for d in prune if not d.anchored)
+        self._at_root = frozenset(d.name for d in prune if d.anchored)
 
     def walk(self) -> Iterable[PurePath]:
         """Yield every file under the root as a sorted relative path."""
@@ -39,15 +51,25 @@ class LocalProjectFiles:
         walk; a link to a file is followed, so it counts as the file it
         points at; and a broken one is neither, so it is skipped.
         """
-        stack = [(str(self._root), PurePath())]
+        root = PurePath()
+        stack = [(str(self._root), root)]
         while stack:
             directory, relative = stack.pop()
+            at_root = relative == root
             for entry in _listing(directory):
                 child = relative / entry.name
-                if _is_directory(entry):
-                    stack.append((entry.path, child))
-                elif _is_file(entry):
+                if _is_file(entry):
                     yield child
+                elif self._descends(entry, at_root=at_root):
+                    stack.append((entry.path, child))
+
+    def _descends(self, entry: os.DirEntry[str], *, at_root: bool) -> bool:
+        """Whether the walk goes into this entry: a directory it may reach."""
+        return _is_directory(entry) and not self._prunes(entry.name, at_root=at_root)
+
+    def _prunes(self, name: str, *, at_root: bool) -> bool:
+        """Whether a directory of this name, at this depth, is unreachable."""
+        return name in self._anywhere or (at_root and name in self._at_root)
 
     def read(self, path: PurePath) -> bytes | None:
         """Return the file's raw bytes, or None if it cannot be read."""

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
@@ -27,6 +27,32 @@ def sniffed_binary(data: bytes) -> bool:
     read the same on both sides of `read()`.
     """
     return b"\0" in data[:BINARY_SNIFF_BYTES]
+
+
+@dataclass(frozen=True)
+class UnreachableDir:
+    """A directory whose contents no range can ever match.
+
+    Three layers hold a piece of this: `specs` names which directories
+    they are, `mills` excludes them from every range, and the tree adapter
+    declines to descend into them at all. That makes it a contract rather
+    than either layer's own rule -- the exclusion and the skipping have to
+    mean the same thing, or a run would measure what it says it does not.
+
+    `anchored` is the difference between a directory that is unreachable
+    only as a child of the project root and one that is unreachable
+    wherever it appears. It is not decoration: a `.venv` nested inside a
+    package is measured, and skipping it would quietly change what a run
+    reports.
+    """
+
+    name: str
+    anchored: bool
+
+    @property
+    def glob(self) -> str:
+        """The exclude pattern that says the same thing to range matching."""
+        return f"{self.name}/**" if self.anchored else f"**/{self.name}/**"
 
 
 class ProjectFiles(Protocol):
@@ -53,8 +79,15 @@ class ProjectFilesFactory(Protocol):
     """Builds the project-tree view anchored at a root directory."""
 
     @abstractmethod
-    def __call__(self, root: Path) -> ProjectFiles:
-        """Return a ProjectFiles rooted at `root`."""
+    def __call__(
+        self, root: Path, *, prune: Sequence[UnreachableDir] = ()
+    ) -> ProjectFiles:
+        """Return a ProjectFiles rooted at `root`, skipping `prune`.
+
+        Pruning is an optimisation and never a filter: only directories
+        nothing could match belong in it, so a view built without one
+        measures the same files, slower.
+        """
 
 
 @dataclass(frozen=True)

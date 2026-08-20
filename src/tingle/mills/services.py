@@ -11,6 +11,7 @@ from tingle.mills.config import narrowed, validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
 from tingle.pacts.config import EVERY_METRIC, ConfigNotFoundError, Selection
+from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from tingle.pacts.check import CheckVerdict
     from tingle.pacts.config import CheckPolicy, Config, ConfigStore, MetricDraft
     from tingle.pacts.diff import DiffReport, DiffSourceFactory
-    from tingle.pacts.metrics import MetricType, ProjectFilesFactory
+    from tingle.pacts.metrics import MetricType, ProjectFiles, ProjectFilesFactory
     from tingle.pacts.report import RunReport
 
 
@@ -71,11 +72,20 @@ class MetricsService:
     diff_source: DiffSourceFactory
     metric_types: Mapping[str, MetricType]
 
+    def _files_of(self, config: Config) -> ProjectFiles:
+        """Build the project tree, leaving what no range reaches unwalked.
+
+        Deciding that stays here: the adapter is told which directories to
+        skip rather than knowing any, so the exclusion and the skipping
+        are the same list read twice.
+        """
+        return self.project_files(config.root, prune=UNREACHABLE_DIRS)
+
     def run(self, config: Config, selection: Selection = EVERY_METRIC) -> RunReport:
         """Measure every selected metric over the whole project."""
         return run(
             narrowed(config, selection),
-            self.project_files(config.root),
+            self._files_of(config),
             metric_types=self.metric_types,
         )
 
@@ -85,7 +95,7 @@ class MetricsService:
         """Measure the branch's impact on every selected metric."""
         runner = DiffRunner(
             config=narrowed(config, selection),
-            project=self.project_files(config.root),
+            project=self._files_of(config),
             diff_source=self.diff_source(config.root),
             metric_types=self.metric_types,
         )

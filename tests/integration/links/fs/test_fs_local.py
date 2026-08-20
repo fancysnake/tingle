@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path, PurePath
 
 from tingle.links.fs.local import LocalProjectFiles
+from tingle.pacts.metrics import UnreachableDir
 
 
 def test_walk_yields_relative_files_sorted(tmp_path: Path) -> None:
@@ -82,3 +83,60 @@ def test_walk_skips_a_broken_link(tmp_path: Path) -> None:
     (tmp_path / "real.py").write_text("x")
 
     assert list(LocalProjectFiles(tmp_path).walk()) == [PurePath("real.py")]
+
+
+def test_walk_skips_a_pruned_directory_at_the_root(tmp_path: Path) -> None:
+    (tmp_path / ".venv" / "lib").mkdir(parents=True)
+    (tmp_path / ".venv" / "lib" / "v.py").write_text("v")
+    (tmp_path / "a.py").write_text("a")
+
+    files = list(
+        LocalProjectFiles(
+            tmp_path, prune=(UnreachableDir(".venv", anchored=True),)
+        ).walk()
+    )
+
+    assert files == [PurePath("a.py")]
+
+
+def test_an_anchored_prune_spares_the_same_name_nested(tmp_path: Path) -> None:
+    """A `.venv` inside a package is a directory like any other."""
+    (tmp_path / "sub" / ".venv").mkdir(parents=True)
+    (tmp_path / "sub" / ".venv" / "n.py").write_text("n")
+
+    files = list(
+        LocalProjectFiles(
+            tmp_path, prune=(UnreachableDir(".venv", anchored=True),)
+        ).walk()
+    )
+
+    assert files == [PurePath("sub/.venv/n.py")]
+
+
+def test_an_unanchored_prune_skips_the_name_at_every_depth(tmp_path: Path) -> None:
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__" / "r.pyc").write_text("r")
+    (tmp_path / "sub" / "__pycache__").mkdir(parents=True)
+    (tmp_path / "sub" / "__pycache__" / "n.pyc").write_text("n")
+    (tmp_path / "sub" / "keep.py").write_text("k")
+
+    files = list(
+        LocalProjectFiles(
+            tmp_path, prune=(UnreachableDir("__pycache__", anchored=False),)
+        ).walk()
+    )
+
+    assert files == [PurePath("sub/keep.py")]
+
+
+def test_pruning_never_touches_files(tmp_path: Path) -> None:
+    """Only directories are skipped; a file of the same name is walked."""
+    (tmp_path / "dist").write_text("a file, not a directory")
+
+    files = list(
+        LocalProjectFiles(
+            tmp_path, prune=(UnreachableDir("dist", anchored=True),)
+        ).walk()
+    )
+
+    assert files == [PurePath("dist")]
