@@ -11,8 +11,8 @@ config — the metric you are working on, or the group you are working
 through:
 
 ```console
-$ tingle report --group linting
-$ tingle report --metric noqa-comments
+tingle report --group linting
+tingle report --metric noqa-comments
 ```
 
 Both repeat, and naming both is a union: `--group linting --metric loc`
@@ -42,7 +42,7 @@ rows in it, indented into an outline:
 ```
 
 | Key | Action |
-|---|---|
+| --- | --- |
 | `↑` / `↓` (`k` / `j`) | move the cursor between rows |
 | `→` / `←` (`l` / `h`) | unfold / fold — from a hit, `←` folds the metric above it |
 | ++space++ / ++enter++ | fold or unfold the row — or, on a located hit, open it |
@@ -116,7 +116,7 @@ NAME`, `--group NAME`.
 The compact summary — values only.
 
 | Option | Meaning |
-|---|---|
+| --- | --- |
 | `--json` | machine-readable output; values only, no occurrences or per-file details (use [`report --json`](#tingle-report) for those); diff JSON includes the resolved base ref and merge-base sha |
 | `--diff` | measure the current branch's impact instead |
 | `--base REF` | base branch for `--diff` (implies `--diff`) |
@@ -138,7 +138,7 @@ $ tingle check
 ```
 
 | Option | Meaning |
-|---|---|
+| --- | --- |
 | `--policy sum\|any` | override the configured `[check]` policy for this run |
 | `--base REF` | base branch to compare against |
 | `--config PATH` | path to the config file |
@@ -155,7 +155,7 @@ In diff mode occurrences are signed and colored (`+` added, `-` removed);
 for list metrics you see *which* rules changed.
 
 | Option | Meaning |
-|---|---|
+| --- | --- |
 | `--json` | machine-readable output, occurrences and per-file details included |
 | `--cobertura` | Cobertura XML, each occurrence line marked uncovered — GitLab MR widgets, Jenkins, and diff-cover consume it directly (line-scoped metrics only; others are noted on stderr) |
 | `--diff` | measure the current branch's impact instead |
@@ -174,7 +174,7 @@ name with `base` instead of stating a type, a pattern and the rest itself.
 See [Template library](library.md).
 
 ```console
-$ tingle library [PACKAGE]
+tingle library [PACKAGE]
 ```
 
 `PACKAGE` defaults to `tingle.builtins`, the bundled pack. Any importable
@@ -182,7 +182,7 @@ package of `MetricTemplate` instances can be named instead, nested modules
 included.
 
 | Option | Meaning |
-|---|---|
+| --- | --- |
 | `--expand` | print each template as the config it stands for, to paste in place of a `base` line and stop following it |
 
 Templates that do not verify are reported on stderr as `config error:`, and
@@ -194,8 +194,8 @@ the rest are still listed. A package that cannot be imported is a
 Append a metric to the config.
 
 ```console
-$ tingle add TYPE [VALUE]
-$ tingle add --base TEMPLATE
+tingle add TYPE [VALUE]
+tingle add --base TEMPLATE
 ```
 
 The positional `VALUE` binds to the type's primary param — the pattern for
@@ -203,7 +203,7 @@ The positional `VALUE` binds to the type's primary param — the pattern for
 types](metrics.md).
 
 | Option | Meaning |
-|---|---|
+| --- | --- |
 | `--base TEMPLATE` | build on a [template](library.md) instead of naming a type |
 | `--name NAME` | metric name (auto-generated and de-duplicated if omitted) |
 | `--range NAME` | target range (repeatable) |
@@ -220,8 +220,8 @@ Give a `TYPE` or a `--base`. Both together only when the base is a mixin: it
 states no type, so the entry supplies one.
 
 ```console
-$ tingle add --base tingle.builtins.mypy.type_ignore_comment
-$ tingle add regex_count '#\s*noqa:' --base generated   # a local mixin
+tingle add --base tingle.builtins.mypy.type_ignore_comment
+tingle add regex_count '#\s*noqa:' --base generated   # a local mixin
 ```
 
 The base is written to the config as the base it is, not as its expansion —
@@ -253,14 +253,14 @@ List the configured metrics with their group, type and ranges — the groups
 are the names [`--group`](#selecting-what-to-measure) takes.
 
 | Option | Meaning |
-|---|---|
+| --- | --- |
 | `--types` | list the available metric types and their params instead (works without a config) |
 | `--config PATH` | path to the config file |
 
 ## Exit codes
 
 | Code | Meaning |
-|---|---|
+| --- | --- |
 | `0` | metrics ran (warnings allowed) |
 | `1` | a metric function failed (the others still run and report), or `tingle check` judged the branch a regression |
 | `2` | config error, usage error, or a diff that could not be produced (unknown base ref, no merge-base) |
