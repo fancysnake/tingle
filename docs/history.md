@@ -91,7 +91,7 @@ the charts are at `https://<owner>.github.io/<repo>/metrics/`.
 !!! note "Pin the version"
 
     `@main` tracks the tip. Once it ships in a release, pin the tag —
-    `@v0.5.0` — or a commit sha, like any other action.
+    `@v0.6.0` — or a commit sha, like any other action.
 
 ### Permissions
 

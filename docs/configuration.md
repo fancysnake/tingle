@@ -40,7 +40,9 @@ base = "tingle.builtins.ruff.noqa_comment"
 extra_ignore_lines = ['# @generated']
 ```
 
-See [Template library](library.md).
+A `base` is either an import path, as above, or the name of a
+`[templates.<name>]` table the config file declares itself. See [Template
+library](library.md).
 
 ## Ranges
 

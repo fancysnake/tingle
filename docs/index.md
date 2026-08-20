@@ -25,7 +25,9 @@ $ pip install tingle
 
 ```console
 $ tingle init                                    # starter tingle.toml
-$ tingle add regex_count '#\s*noqa'              # add a metric from the CLI
+$ tingle library                                 # ready-made metrics for known tools
+$ tingle add --base tingle.builtins.ruff.noqa_comment
+$ tingle add regex_count '#\s*noqa'              # or state one yourself
 $ tingle add toml_list_length tool.ruff.lint.ignore --name ruff-ignores
 $ tingle                                         # interactive mode (on a terminal)
 $ tingle stat                                    # summary table
@@ -56,6 +58,8 @@ Three things, in rising order of opinion:
 - **[Configuration](configuration.md)** — `tingle.toml`, ranges, groups.
 - **[Metric types](metrics.md)** — what you can count, and the limits of
   each counter.
+- **[Template library](library.md)** — ready-made metrics for the tools you
+  already run, and publishing your own.
 - **[Branch impact](diff.md)** — how `--diff` attributes changes to your
   branch.
 - **[CI gate](check.md)** — failing the build on new debt.

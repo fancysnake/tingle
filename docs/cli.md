@@ -167,12 +167,35 @@ for list metrics you see *which* rules changed.
 `--cobertura` reports the whole tree, so it cannot be combined with `--json`,
 `--diff`, or `--base`; doing so is a usage error.
 
+## `tingle library`
+
+List the metric templates a package offers — ready-made metrics a config can
+name with `base` instead of stating a type, a pattern and the rest itself.
+See [Template library](library.md).
+
+```console
+$ tingle library [PACKAGE]
+```
+
+`PACKAGE` defaults to `tingle.builtins`, the bundled pack. Any importable
+package of `MetricTemplate` instances can be named instead, nested modules
+included.
+
+| Option | Meaning |
+|---|---|
+| `--expand` | print each template as the config it stands for, to paste in place of a `base` line and stop following it |
+
+Templates that do not verify are reported on stderr as `config error:`, and
+the rest are still listed. A package that cannot be imported is a
+`library error:` and exit code 2.
+
 ## `tingle add`
 
 Append a metric to the config.
 
 ```console
 $ tingle add TYPE [VALUE]
+$ tingle add --base TEMPLATE
 ```
 
 The positional `VALUE` binds to the type's primary param — the pattern for
@@ -181,6 +204,7 @@ types](metrics.md).
 
 | Option | Meaning |
 |---|---|
+| `--base TEMPLATE` | build on a [template](library.md) instead of naming a type |
 | `--name NAME` | metric name (auto-generated and de-duplicated if omitted) |
 | `--range NAME` | target range (repeatable) |
 | `--group NAME` | group heading to show this metric under |
@@ -188,7 +212,20 @@ types](metrics.md).
 | `--param key=value` | extra metric param (repeatable) |
 
 Without `--name`, the metric is named after its type and value
-(`regex_count-noqa`), with a `-2`, `-3`, … suffix if that name is taken.
+(`regex_count-noqa`), with a `-2`, `-3`, … suffix if that name is taken. A
+metric built on a `--base` takes the template's name instead, suffixed the
+same way, so one template can be used twice.
+
+Give a `TYPE` or a `--base`. Both together only when the base is a mixin: it
+states no type, so the entry supplies one.
+
+```console
+$ tingle add --base tingle.builtins.mypy.type_ignore_comment
+$ tingle add regex_count '#\s*noqa:' --base generated   # a local mixin
+```
+
+The base is written to the config as the base it is, not as its expansion —
+naming a template means the config keeps following it.
 
 The new metric is validated against the merged config before anything is
 written. It targets `tingle.toml` (created if needed), or `[tool.tingle]` in
