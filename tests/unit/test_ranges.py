@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import PurePath
 
-from tingle.mills.ranges import resolve
+from tingle.mills.ranges import ResolvedRanges, resolve
 from tingle.pacts.config import RangeSpec
 from tingle.specs.config import IMPLICIT_RANGE_INCLUDE, IMPLICIT_RANGE_NAME
 
@@ -75,3 +75,25 @@ def test_an_anchored_default_exclude_spares_the_same_name_nested() -> None:
     resolved = resolve(walked, [RangeSpec(name="python", include=("**/*.py",))])
 
     assert resolved == (PurePath("src/a.py"), PurePath("sub/.venv/lib/n.py"))
+
+
+def test_a_range_set_is_resolved_once_however_many_ask() -> None:
+    """The second ask gets the first answer back, not an equal one."""
+    ranges = ResolvedRanges(tuple(_paths("a.py", "b.py", "notes.md")))
+    spec = RangeSpec(name="python", include=("**/*.py",))
+
+    first = ranges.files(("python",), [spec])
+    second = ranges.files(("python",), [spec])
+
+    assert first == (PurePath("a.py"), PurePath("b.py"))
+    assert first is second
+
+
+def test_different_range_sets_are_resolved_separately() -> None:
+    ranges = ResolvedRanges(tuple(_paths("a.py", "notes.md")))
+
+    python = ranges.files(("python",), [RangeSpec(name="python", include=("**/*.py",))])
+    docs = ranges.files(("docs",), [RangeSpec(name="docs", include=("**/*.md",))])
+
+    assert python == (PurePath("a.py"),)
+    assert docs == (PurePath("notes.md"),)

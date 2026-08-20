@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
-from tingle.mills.ranges import resolve
+from tingle.mills.ranges import ResolvedRanges
 from tingle.mills.text import TextReader, text_reader
 from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
 from tingle.pacts.report import MetricOutcome, RunReport
@@ -31,6 +31,7 @@ class _RunContext:
     read: TextReader
     metric_types: Mapping[str, MetricType]
     loc: ProjectLoc
+    ranges: ResolvedRanges
 
 
 def run(
@@ -41,12 +42,14 @@ def run(
     # the port hands over bytes; what counts as readable text is decided
     # here, once, and every metric is given the same reader
     read = text_reader(project.read)
+    ranges = ResolvedRanges(walked)
     context = _RunContext(
         config=config,
         project=project,
         read=read,
         metric_types=metric_types,
-        loc=ProjectLoc(config, read=read, walked=walked),
+        loc=ProjectLoc(config, read=read, ranges=ranges),
+        ranges=ranges,
     )
     outcomes = tuple(_outcome(spec, context) for spec in config.metrics)
     return RunReport(
@@ -57,7 +60,7 @@ def run(
 def _outcome(spec: MetricSpec, context: _RunContext) -> MetricOutcome:
     """Measure one metric, turning a failure into an errored outcome."""
     range_specs, range_names = ranges_for(spec, context.config)
-    files = resolve(context.loc.walked, range_specs)
+    files = context.ranges.files(range_names, range_specs)
     guide = effective_guide(spec, context.config.display, loc=context.loc.lines)
     metric_context = MetricContext(
         files=files,

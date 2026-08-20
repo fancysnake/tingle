@@ -32,6 +32,34 @@ def resolve(
     )
 
 
+class ResolvedRanges:
+    """What each range set of one walk comes to, resolved once.
+
+    Resolving is a scan of the whole walk, and metrics share ranges --
+    most measure the default one and say nothing. A run that resolved per
+    metric would therefore rescan the tree once per metric to arrive at
+    the same tuple, which is the cost that grows with the codebase and
+    the config together.
+
+    Keyed by range names rather than by the specs themselves: names are
+    what a metric asks for, they identify a spec uniquely within one
+    config, and a `RangeSpec` is not hashable.
+    """
+
+    def __init__(self, walked: tuple[PurePath, ...]) -> None:
+        """Hold the walk every range set will be resolved against."""
+        self.walked = walked
+        self._resolved: dict[tuple[str, ...], tuple[PurePath, ...]] = {}
+
+    def files(
+        self, names: tuple[str, ...], specs: Iterable[RangeSpec]
+    ) -> tuple[PurePath, ...]:
+        """Return the files of the set `names`, resolving it on first ask."""
+        if names not in self._resolved:
+            self._resolved[names] = resolve(self.walked, specs)
+        return self._resolved[names]
+
+
 def _matches(path: PurePath, spec: RangeSpec) -> bool:
     name = path.as_posix()
     if not any(_pattern(glob).match(name) for glob in spec.include):
