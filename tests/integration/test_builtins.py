@@ -49,7 +49,7 @@ def test_every_template_makes_a_valid_metric_on_its_own(
 
     assert not errors
     config = validate(
-        raw, METRIC_TYPES, root=tmp_path, source=tmp_path, templates=templates
+        raw, METRIC_TYPES, source=tmp_path / "tingle.toml", templates=templates
     )
 
     assert len(config.metrics) == 1
@@ -85,7 +85,7 @@ def test_two_templates_may_share_a_metric_name_across_packs(tmp_path: Path) -> N
         raw, PythonTemplateLoader(), metric_types=METRIC_TYPES, errors=errors
     )
     config = validate(
-        raw, METRIC_TYPES, root=tmp_path, source=tmp_path, templates=templates
+        raw, METRIC_TYPES, source=tmp_path / "tingle.toml", templates=templates
     )
 
     assert [spec.name for spec in config.metrics] == ["any-uses", "mock-any-uses"]
@@ -105,7 +105,9 @@ def test_a_template_used_twice_without_a_name_is_a_duplicate(tmp_path: Path) -> 
     )
 
     with pytest.raises(ConfigError) as caught:
-        validate(raw, METRIC_TYPES, root=tmp_path, source=tmp_path, templates=templates)
+        validate(
+            raw, METRIC_TYPES, source=tmp_path / "tingle.toml", templates=templates
+        )
 
     assert caught.value.errors == [
         (

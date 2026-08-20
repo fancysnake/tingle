@@ -50,12 +50,23 @@ def validate(
     raw: Mapping[str, Any],
     metric_types: Mapping[str, MetricType],
     *,
-    root: Path,
     source: Path,
     templates: Mapping[str, Mapping[str, Any] | None] | None = None,
+    errors: list[str] | None = None,
 ) -> Config:
-    """Turn raw config data into a Config, or raise ConfigError with every problem."""
-    errors: list[str] = []
+    """Turn raw config data into a Config, or raise ConfigError with every problem.
+
+    The project root is the directory the config file sits in, so `source`
+    says both -- there is no arrangement where one is given and the other
+    has to be worked out.
+
+    A caller that has already found problems -- resolving the templates
+    this config names, say -- passes them in, and they are raised together
+    with whatever the config itself holds. Reporting them a round apart
+    would make one fix take two runs.
+    """
+    if errors is None:
+        errors = []
     errors.extend(
         f'unknown top-level key "{key}"' for key in sorted(set(raw) - _TOP_LEVEL_KEYS)
     )
@@ -76,7 +87,7 @@ def validate(
     if errors:
         raise ConfigError(errors)
     return Config(
-        root=root,
+        root=source.parent,
         source=source,
         ranges=ranges,
         metrics=metrics,

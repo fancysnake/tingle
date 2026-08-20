@@ -51,22 +51,9 @@ class ConfigService:
         resolved = source.resolve()
         errors: list[str] = []
         templates = self._templates(raw, errors)
-        try:
-            config = validate(
-                raw,
-                self.metric_types,
-                root=resolved.parent,
-                source=resolved,
-                templates=templates,
-            )
-        except ConfigError as exc:
-            # one pass over the whole file: a broken template and a broken
-            # metric are both problems the reader has, and reporting them a
-            # round apart makes a fix take two runs.
-            raise ConfigError([*errors, *exc.errors]) from None
-        if errors:
-            raise ConfigError(errors)
-        return config
+        return validate(
+            raw, self.metric_types, source=resolved, templates=templates, errors=errors
+        )
 
     def load_raw(self, cwd: Path) -> dict[str, Any]:
         """Raw config data for editing flows; empty when none exists yet."""

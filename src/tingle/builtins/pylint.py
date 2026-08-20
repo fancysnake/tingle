@@ -16,15 +16,15 @@ disable_comment = MetricTemplate(
 
 pyproject_disables = MetricTemplate(
     type="toml_list_length",
-    name="pylint-disables",
+    name="pylint-pyproject-disables",
     group="linting",
-    description="Pylint checks disabled project-wide.",
+    description="Pylint checks disabled project-wide in `pyproject.toml`.",
     params={"key": "tool.pylint.messages control.disable"},
 )
 
 rcfile_disables = MetricTemplate(
     type="ini_list_length",
-    name="pylint-disables",
+    name="pylint-rcfile-disables",
     group="linting",
     description="Pylint checks disabled project-wide in `.pylintrc`.",
     params={"file": ".pylintrc", "section": "MESSAGES CONTROL", "option": "disable"},

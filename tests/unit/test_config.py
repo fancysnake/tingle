@@ -51,7 +51,7 @@ METRIC_TYPES = {
 
 
 def _validate(raw: Mapping[str, Any]) -> Config:
-    return validate(raw, METRIC_TYPES, root=ROOT, source=SOURCE)
+    return validate(raw, METRIC_TYPES, source=SOURCE)
 
 
 def _errors_of(raw: Mapping[str, Any]) -> list[str]:
@@ -548,7 +548,7 @@ def _based(base: str, templates: Mapping[str, Mapping[str, Any] | None]) -> list
         "metrics": [{"base": base, "name": "files", "type": "file_count"}],
     }
     try:
-        validate(raw, METRIC_TYPES, root=ROOT, source=SOURCE, templates=templates)
+        validate(raw, METRIC_TYPES, source=SOURCE, templates=templates)
     except ConfigError as exc:
         return exc.errors
     return []

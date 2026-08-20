@@ -59,7 +59,7 @@ def build_metric(
     metric.update(all_params)
 
     merged = {**raw, "metrics": [*existing_metrics, metric]}
-    validate(merged, metric_types, root=Path(), source=Path(), templates=templates)
+    validate(merged, metric_types, source=Path(), templates=templates)
     return metric
 
 

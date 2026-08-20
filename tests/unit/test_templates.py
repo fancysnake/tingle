@@ -180,6 +180,15 @@ def test_an_unknown_type_is_caught_at_the_template() -> None:
     assert errors == ["template \"pack.one\": unknown type 'no_such_type'"]
 
 
+def test_a_name_a_metric_could_not_carry_is_refused() -> None:
+    """A string is not enough: it becomes a metric name, so it lives by those rules."""
+    _, errors = _verified(MetricTemplate(type="regex_count", name="noqa comments!"))
+
+    assert errors == [
+        "template \"pack.one\": invalid name (allowed: letters, digits, '_', '-', '.')"
+    ]
+
+
 def test_field_types_are_checked_because_annotations_are_not() -> None:
     """A package can put anything in these fields; nothing stops it at runtime."""
     wrong: dict[str, Any] = {"name": 17, "guide": 0, "ranges": ["python"]}
@@ -315,6 +324,14 @@ def test_a_local_template_may_not_name_a_base_that_is_not_there() -> None:
     _, errors = _resolve({"templates": {"a": {"base": "nope"}}})
 
     assert errors == ['template "a": unknown base "nope"']
+
+
+def test_a_local_template_states_a_type_that_has_to_exist() -> None:
+    """The one field an entry cannot override, so it is checked where it is stated."""
+    resolved, errors = _resolve({"templates": {"a": {"type": "no_such_type"}}})
+
+    assert errors == ["template \"a\": unknown type 'no_such_type'"]
+    assert resolved["a"] is None
 
 
 def test_a_local_template_is_carried_through_as_the_table_it_was_written_as() -> None:

@@ -110,7 +110,7 @@ def test_list_metric_types_orders_by_name() -> None:
 
 
 def _config() -> Config:
-    return validate(RAW, METRIC_TYPES, root=CWD, source=SOURCE)
+    return validate(RAW, METRIC_TYPES, source=SOURCE)
 
 
 def test_run_anchors_the_project_files_at_the_config_root() -> None:

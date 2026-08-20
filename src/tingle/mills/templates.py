@@ -6,7 +6,9 @@ field by field and then flattened into the table a metric entry already is.
 Templates declared as `[templates.<id>]` in the config file are tables to
 begin with. From there on there is one currency and one validator for it --
 the one that checks the metric that finally uses the fields, which already
-names where a field came from.
+names where a field came from. `type` is the exception, because it is the
+one field an entry cannot override: it is checked where it is stated, so a
+template nothing uses yet is still wrong out loud.
 
 What identifies a template is never what it names a metric. An imported
 one is identified by its import path, a local one by its table key, and
@@ -66,7 +68,7 @@ def resolve(
         metric_types=metric_types,
         errors=errors,
     )
-    return _locals(tables, imported, errors=errors)
+    return _locals(tables, imported, metric_types=metric_types, errors=errors)
 
 
 def apply(
@@ -283,6 +285,7 @@ class _Resolution:
 
     tables: Mapping[str, Mapping[str, Any]]
     errors: list[str]
+    metric_types: Mapping[str, MetricType]
     resolved: dict[str, Mapping[str, Any] | None]
     done: set[str] = field(default_factory=set)
     building: list[str] = field(default_factory=list)
@@ -292,10 +295,13 @@ def _locals(
     tables: Mapping[str, Mapping[str, Any]],
     imported: Mapping[str, Mapping[str, Any] | None],
     *,
+    metric_types: Mapping[str, MetricType],
     errors: list[str],
 ) -> dict[str, Mapping[str, Any] | None]:
     """Resolve local templates, following bases between them without looping."""
-    state = _Resolution(tables=tables, errors=errors, resolved=dict(imported))
+    state = _Resolution(
+        tables=tables, errors=errors, metric_types=metric_types, resolved=dict(imported)
+    )
     for name in tables:
         _build(state, name)
     return state.resolved
@@ -317,6 +323,9 @@ def _build(state: _Resolution, name: str) -> None:
     base, usable = _base_of(state, table, label=label)
     found = len(state.errors)
     merged = apply(base, table, label=label, errors=state.errors)
+    _check_type_name(
+        merged.get("type"), state.metric_types, label=label, errors=state.errors
+    )
     state.resolved[name] = merged if usable and len(state.errors) == found else None
     state.building.pop()
     state.done.add(name)
@@ -400,6 +409,10 @@ def _check_type_name(
     errors: list[str],
 ) -> None:
     """Check a stated type exists; a template without one is a mixin.
+
+    The type is the one field an entry cannot override, so it is checked
+    where it is stated rather than at whatever uses it -- once, naming the
+    template, however many metrics build on it.
 
     Its params are left unchecked here -- which ones are valid depends on
     the type, and the metric that supplies one takes that check as it
