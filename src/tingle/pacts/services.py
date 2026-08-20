@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from tingle.pacts.config import CheckPolicy, Config, MetricDraft
     from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
-    from tingle.pacts.metrics import MetricType
+    from tingle.pacts.metrics import MetricType, ProgressSink
     from tingle.pacts.report import MetricOutcome, ReportSection, RunReport
 
 
@@ -48,12 +48,27 @@ class MetricsServiceProtocol(Protocol):
     """Running the configured metrics, whole-tree or against a branch base."""
 
     @abstractmethod
-    def run(self, config: Config, selection: Selection = EVERY_METRIC) -> RunReport:
-        """Measure every selected metric over the whole project."""
+    def run(
+        self,
+        config: Config,
+        selection: Selection = EVERY_METRIC,
+        *,
+        progress: ProgressSink | None = None,
+    ) -> RunReport:
+        """Measure every selected metric over the whole project.
+
+        `progress` is told how far the run has got, for a caller with
+        somewhere to show it. Leaving it out is the same run, unwatched.
+        """
 
     @abstractmethod
     def diff(
-        self, config: Config, base: str, *, selection: Selection = EVERY_METRIC
+        self,
+        config: Config,
+        base: str,
+        *,
+        selection: Selection = EVERY_METRIC,
+        progress: ProgressSink | None = None,
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
 

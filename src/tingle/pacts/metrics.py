@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
 if TYPE_CHECKING:
@@ -27,6 +28,47 @@ def sniffed_binary(data: bytes) -> bool:
     read the same on both sides of `read()`.
     """
     return b"\0" in data[:BINARY_SNIFF_BYTES]
+
+
+class RunPhase(StrEnum):
+    """Which part of a run is under way.
+
+    Named after what the run is doing rather than how long it has left,
+    because the three do not measure in the same unit: two of them are
+    bounded by a number known before they start and one is not.
+    """
+
+    SCANNING = "scanning"
+    DIFFING = "diffing"
+    MEASURING = "measuring"
+
+
+@dataclass(frozen=True)
+class RunProgress:
+    """How far a run has got, as the runner last knew it.
+
+    `total` is None while the work is unbounded -- walking a tree cannot
+    say how big it is until it has finished walking it -- so a view shows
+    those two states differently rather than inventing a denominator.
+
+    `done` counts what is finished, so it never reaches `total` while
+    anything is still running: a run reports that it is starting the
+    metric it names, not that it has just finished one.
+    """
+
+    phase: RunPhase
+    done: int = 0
+    total: int | None = None
+    label: str = ""
+
+
+#: Told how far a run has got, whenever the run knows.
+#:
+#: Must be cheap and must not raise. A run does not guard against a sink
+#: that does: the isolation around a metric is there to keep one bad
+#: metric from ending the run, and catching a broken sink inside it would
+#: report the metric as failed because the progress bar did.
+ProgressSink: TypeAlias = Callable[[RunProgress], None]
 
 
 @dataclass(frozen=True)

@@ -8,6 +8,7 @@ implemented here because PurePath.full_match only exists on 3.13+.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from functools import cache
 from typing import TYPE_CHECKING
 
@@ -32,6 +33,7 @@ def resolve(
     )
 
 
+@dataclass
 class ResolvedRanges:
     """What each range set of one walk comes to, resolved once.
 
@@ -46,10 +48,10 @@ class ResolvedRanges:
     config, and a `RangeSpec` is not hashable.
     """
 
-    def __init__(self, walked: tuple[PurePath, ...]) -> None:
-        """Hold the walk every range set will be resolved against."""
-        self.walked = walked
-        self._resolved: dict[tuple[str, ...], tuple[PurePath, ...]] = {}
+    walked: tuple[PurePath, ...]
+    _resolved: dict[tuple[str, ...], tuple[PurePath, ...]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def files(
         self, names: tuple[str, ...], specs: Iterable[RangeSpec]

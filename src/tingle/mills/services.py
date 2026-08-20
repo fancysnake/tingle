@@ -20,7 +20,12 @@ if TYPE_CHECKING:
     from tingle.pacts.check import CheckVerdict
     from tingle.pacts.config import CheckPolicy, Config, ConfigStore, MetricDraft
     from tingle.pacts.diff import DiffReport, DiffSourceFactory
-    from tingle.pacts.metrics import MetricType, ProjectFiles, ProjectFilesFactory
+    from tingle.pacts.metrics import (
+        MetricType,
+        ProgressSink,
+        ProjectFiles,
+        ProjectFilesFactory,
+    )
     from tingle.pacts.report import RunReport
 
 
@@ -81,16 +86,28 @@ class MetricsService:
         """
         return self.project_files(config.root, prune=UNREACHABLE_DIRS)
 
-    def run(self, config: Config, selection: Selection = EVERY_METRIC) -> RunReport:
+    def run(
+        self,
+        config: Config,
+        selection: Selection = EVERY_METRIC,
+        *,
+        progress: ProgressSink | None = None,
+    ) -> RunReport:
         """Measure every selected metric over the whole project."""
         return run(
             narrowed(config, selection),
             self._files_of(config),
             metric_types=self.metric_types,
+            progress=progress,
         )
 
     def diff(
-        self, config: Config, base: str, *, selection: Selection = EVERY_METRIC
+        self,
+        config: Config,
+        base: str,
+        *,
+        selection: Selection = EVERY_METRIC,
+        progress: ProgressSink | None = None,
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
         runner = DiffRunner(
@@ -99,7 +116,7 @@ class MetricsService:
             diff_source=self.diff_source(config.root),
             metric_types=self.metric_types,
         )
-        return runner.run(base)
+        return runner.run(base, progress=progress)
 
     def check(
         self,
