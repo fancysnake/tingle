@@ -270,6 +270,16 @@ def test_add_base_on_a_mixin_still_needs_a_type_from_somewhere(workdir: Path) ->
     assert "states no type; give one alongside --base" in result.output
 
 
+def test_add_base_on_a_template_whose_type_is_blank_is_told_so(workdir: Path) -> None:
+    """An empty type is neither a type nor a mixin, and used to reach a traceback."""
+    (workdir / "tingle.toml").write_text(f'{RANGES}\n[templates.blank]\ntype = ""\n')
+
+    result = runner.invoke(app, ["add", "--base", "blank", "#\\s*noqa"])
+
+    assert result.exit_code == 2
+    assert 'template "blank": type must be a non-empty string' in result.output
+
+
 def _written(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, name: str, body: str
 ) -> str:

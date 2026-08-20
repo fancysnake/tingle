@@ -180,6 +180,13 @@ def test_an_unknown_type_is_caught_at_the_template() -> None:
     assert errors == ["template \"pack.one\": unknown type 'no_such_type'"]
 
 
+def test_a_packaged_template_states_a_type_the_same_way_a_table_does() -> None:
+    """One check owns the field, so the two sources cannot drift apart on it."""
+    _, errors = _verified(MetricTemplate(type=""))
+
+    assert errors == ['template "pack.one": type must be a non-empty string']
+
+
 def test_a_name_a_metric_could_not_carry_is_refused() -> None:
     """A string is not enough: it becomes a metric name, so it lives by those rules."""
     _, errors = _verified(MetricTemplate(type="regex_count", name="noqa comments!"))
@@ -332,6 +339,23 @@ def test_a_local_template_states_a_type_that_has_to_exist() -> None:
 
     assert errors == ["template \"a\": unknown type 'no_such_type'"]
     assert resolved["a"] is None
+
+
+def test_a_local_template_that_states_a_type_has_to_state_a_usable_one() -> None:
+    """A stated type is a type: an empty string is not "no type", it is a broken one.
+
+    `tingle add --base` reads the same field to decide whether the entry
+    may name a type of its own, so a table and a packaged template have to
+    agree on what counts as stating one.
+    """
+    resolved, errors = _resolve({"templates": {"a": {"type": ""}, "b": {"type": 17}}})
+
+    assert errors == [
+        'template "a": type must be a non-empty string',
+        'template "b": type must be a non-empty string',
+    ]
+    assert resolved["a"] is None
+    assert resolved["b"] is None
 
 
 def test_a_local_template_is_carried_through_as_the_table_it_was_written_as() -> None:

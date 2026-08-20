@@ -135,7 +135,6 @@ def verify(
 
     found = len(errors)
     for key, value in (
-        ("type", obj.type),
         ("name", obj.name),
         ("group", obj.group),
         ("description", obj.description),
@@ -408,17 +407,24 @@ def _check_type_name(
     label: str,
     errors: list[str],
 ) -> None:
-    """Check a stated type exists; a template without one is a mixin.
+    """Check a stated type is one that exists; a template without one is a mixin.
 
     The type is the one field an entry cannot override, so it is checked
     where it is stated rather than at whatever uses it -- once, naming the
-    template, however many metrics build on it.
+    template, however many metrics build on it. That makes this the only
+    reading of "states a type" there is: what is not `None` here is a type,
+    and has to look like one, or a table and a packaged template disagree
+    about what an empty string means.
 
     Its params are left unchecked here -- which ones are valid depends on
     the type, and the metric that supplies one takes that check as it
     stands.
     """
-    if isinstance(value, str) and value and value not in metric_types:
+    if value is None:
+        return
+    if not isinstance(value, str) or not value:
+        errors.append(f"{label}: type must be a non-empty string")
+    elif value not in metric_types:
         errors.append(f"{label}: unknown type {value!r}")
 
 
