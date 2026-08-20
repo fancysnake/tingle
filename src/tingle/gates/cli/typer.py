@@ -26,8 +26,10 @@ from tingle.pacts.diff import DiffReport, DiffSourceError
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    # type-checking only, so the lazy import of textual stays lazy
+    from tingle.gates.cli.textual.browse import Collect
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.metrics import MetricType
+    from tingle.pacts.metrics import MetricType, ProgressSink
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ServicesProtocol
 
@@ -331,21 +333,74 @@ class CliGate:
         typer.echo(f"Created {path}")
 
     def _interactive(self, request: _MetricRequest) -> None:
-        """Run the metrics, then hand the report to the interactive TUI."""
+        """Open the TUI, which runs the metrics itself and shows it happening.
+
+        The config is read here rather than in there: it costs milliseconds
+        and it fails as a command does, with `config error:` on stderr and
+        exit 2, which must not become a terminal app that appears and
+        vanishes. Everything after it is the wait worth watching.
+        """
+        config = self._load(request.config)
+        # None: quit before the run had finished, so there is nothing to say
+        if (report := self._browsed(config, self._collector(config, request))) is None:
+            return
+        if isinstance(report, DiffReport):
+            self._finish_diff(report)
+        else:
+            self._finish_run(report)
+
+    def _collector(self, config: Config, request: _MetricRequest) -> Collect:
+        """Bind the run the TUI will start once it is on screen."""
+        if request.diff:
+            base = self._base_of(config, request)
+
+            def collect_diff(progress: ProgressSink) -> DiffReport:
+                return self._services.metrics.diff(
+                    config, base, selection=request.selection, progress=progress
+                )
+
+            return collect_diff
+
+        def collect_run(progress: ProgressSink) -> RunReport:
+            return self._services.metrics.run(
+                config, request.selection, progress=progress
+            )
+
+        return collect_run
+
+    def _browsed(
+        self, config: Config, collect: Collect
+    ) -> RunReport | DiffReport | None:
+        """Hand the run to the TUI, and take back whatever it came to.
+
+        A run that failed comes back as the exception rather than as a
+        report, so the two errors it can raise are still reported by the
+        command line that knows what they mean -- the TUI only carries
+        them out.
+        """
         # imported lazily: textual is heavy and only needed on this path
         from tingle.gates.cli.textual.browse import (  # pylint: disable=import-outside-toplevel
             MetricsApp,
         )
 
-        opener, browse = self._services.editor, self._services.browse
-        if request.diff:
-            diff_report = self._collect_diff(request)
-            MetricsApp(diff_report, opener, browse=browse).run()
-            self._finish_diff(diff_report)
-        else:
-            run_report = self._collect_run(request)
-            MetricsApp(run_report, opener, browse=browse).run()
-            self._finish_run(run_report)
+        app = MetricsApp(
+            config.root,
+            collect=collect,
+            opener=self._services.editor,
+            browse=self._services.browse,
+        )
+        app.run()
+        if app.measured.failure is not None:
+            self._collection_failure(app.measured.failure)
+        return app.measured.report
+
+    def _collection_failure(self, exc: Exception) -> NoReturn:
+        """Report a failure the TUI carried out, the way a command would."""
+        if isinstance(exc, SelectionError):
+            self._selection_failure(exc)
+        if isinstance(exc, DiffSourceError):
+            self._diff_failure(exc)
+        raise exc  # pragma: no cover - the app carries out no other kind
 
     def _print_stat(self, request: _MetricRequest, *, json_out: bool) -> None:
         if request.diff:

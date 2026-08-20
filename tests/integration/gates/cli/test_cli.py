@@ -316,10 +316,17 @@ def test_a_terminal_asking_for_a_diff_gets_one(interactive: list[MetricsApp]) ->
 
 
 def _drawn_values(built: MetricsApp) -> list[str]:
-    """Run the app the gate built, and read its value column."""
+    """Run the app the gate built, and read its value column.
+
+    The app starts the run rather than being handed one, so the table is
+    read once the worker has finished and the message it posted has been
+    taken off the loop -- not merely once the app is up.
+    """
 
     async def scenario() -> list[str]:
-        async with built.run_test():
+        async with built.run_test() as pilot:
+            await built.workers.wait_for_complete()
+            await pilot.pause()
             return column(built, 2)
 
     values = asyncio.run(scenario())
