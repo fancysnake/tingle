@@ -51,7 +51,7 @@ METRIC_TYPES = {
 
 
 def _validate(raw: Mapping[str, Any]) -> Config:
-    return validate(raw, METRIC_TYPES, root=ROOT, source=SOURCE)
+    return validate(raw, METRIC_TYPES, source=SOURCE)
 
 
 def _errors_of(raw: Mapping[str, Any]) -> list[str]:
@@ -126,7 +126,9 @@ def test_errors_are_aggregated() -> None:
         'metric "bad name!": invalid name '
         "(allowed: letters, digits, '_', '-', '.')" in errors
     )
-    assert 'metric "no-type": missing type' in errors
+    assert (
+        'metric "no-type": missing type (state one, or a base that has one)' in errors
+    )
 
 
 def test_duplicate_metric_names() -> None:
@@ -538,3 +540,33 @@ def test_narrowing_rejects_unknown_names_and_groups_together() -> None:
         narrowed(config, Selection(metrics=("nope",), groups=("nogroup",)))
 
     assert excinfo.value.errors == ['unknown metric "nope"', 'unknown group "nogroup"']
+
+
+def _based(base: str, templates: Mapping[str, Mapping[str, Any] | None]) -> list[str]:
+    raw = {
+        "ranges": {"all": {"include": ["**/*"], "default": True}},
+        "metrics": [{"base": base, "name": "files", "type": "file_count"}],
+    }
+    try:
+        validate(raw, METRIC_TYPES, source=SOURCE, templates=templates)
+    except ConfigError as exc:
+        return exc.errors
+    return []
+
+
+def test_a_field_a_template_supplied_is_reported_under_the_metric_and_its_base() -> (
+    None
+):
+    """One validator for the shape, and it says where the field came from."""
+    assert _based("shared", {"shared": {"guide": -1}}) == [
+        'metric "files" (base "shared"): guide must be a positive integer'
+    ]
+
+
+def test_a_base_that_broke_says_nothing_further() -> None:
+    """The resolver already said what went wrong, naming the template."""
+    assert _based("broken", {"broken": None}) == []
+
+
+def test_a_base_nothing_declared_is_the_one_that_is_unknown() -> None:
+    assert _based("nope", {}) == ['metrics[0]: unknown base "nope"']

@@ -102,6 +102,16 @@ def test_toml_table_array_can_be_added() -> None:
     assert metric["label"] == "module"
 
 
+def test_a_metrics_key_that_is_not_an_array_of_tables_is_rejected() -> None:
+    """The shape is checked before the base, so the message names the real fault."""
+    draft = MetricDraft(base="pack.one", type_name="regex_count", value="x")
+
+    with pytest.raises(ConfigError) as excinfo:
+        build_metric({"metrics": "nope"}, METRIC_TYPES, draft=draft, templates={})
+
+    assert excinfo.value.errors == ["[[metrics]] must be an array of tables"]
+
+
 def test_unknown_type_is_rejected() -> None:
     with pytest.raises(ConfigError) as excinfo:
         build_metric({}, METRIC_TYPES, draft=MetricDraft(type_name="nope"))

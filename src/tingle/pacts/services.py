@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
     from tingle.pacts.browse import BrowseState, Row, SortKey
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.config import CheckPolicy, Config, MetricDraft
+    from tingle.pacts.config import CheckPolicy, Config, Library, MetricDraft
     from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.metrics import MetricType
@@ -42,6 +42,10 @@ class ConfigServiceProtocol(Protocol):
     @abstractmethod
     def list_metric_types(self) -> tuple[MetricType, ...]:
         """Every metric type a config may name, in name order."""
+
+    @abstractmethod
+    def list_library(self, package: str) -> Library:
+        """Every usable template a package offers, and why the rest are not."""
 
 
 class MetricsServiceProtocol(Protocol):

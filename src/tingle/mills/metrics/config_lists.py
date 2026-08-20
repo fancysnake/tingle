@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import configparser
 import tomllib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import PurePath
 from typing import Any, TypeAlias
 
@@ -60,6 +60,11 @@ def _delta(
     )
 
 
+#: Distinguishes "the key is not there" from a key whose value is None,
+#: which TOML has no way to write but a walk still has to be able to say.
+_MISSING = object()
+
+
 def _descend_toml(read: _Reader, params: Mapping[str, Any]) -> tuple[Any, str | None]:
     """Load `file`, walk to the dotted `key`; return (value, warning).
 
@@ -77,11 +82,41 @@ def _descend_toml(read: _Reader, params: Mapping[str, Any]) -> tuple[Any, str | 
     except tomllib.TOMLDecodeError as exc:
         return None, f"{file}: invalid TOML: {exc}"
 
-    for part in key.split("."):
+    if (found := _at(data, key.split("."))) is _MISSING:
+        return None, f'{file}: key "{key}" not found'
+    return found, None
+
+
+def _at(data: object, parts: list[str]) -> object:
+    """Walk a dotted path, gathering across any array of tables it crosses.
+
+    A key that carries on past an array of tables means it once per entry,
+    and what comes back is those entries' values run together -- so one
+    key reaches `ignore_imports` in every import-linter contract at once,
+    and a contract that states none contributes nothing rather than one.
+    """
+    for index, part in enumerate(parts):
+        if isinstance(data, list) and all(isinstance(item, Mapping) for item in data):
+            return _joined(
+                found
+                for item in data
+                if (found := _at(item, parts[index:])) is not _MISSING
+            )
         if not (isinstance(data, Mapping) and part in data):
-            return None, f'{file}: key "{key}" not found'
+            return _MISSING
         data = data[part]
-    return data, None
+    return data
+
+
+def _joined(values: Iterable[object]) -> list[object]:
+    """One list out of what each entry of an array of tables held."""
+    gathered: list[object] = []
+    for value in values:
+        if isinstance(value, list):
+            gathered.extend(value)
+        else:
+            gathered.append(value)
+    return gathered
 
 
 def _toml_count(read: _Reader, params: Mapping[str, Any]) -> MetricResult:

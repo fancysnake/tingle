@@ -1,0 +1,11 @@
+{
+  // mkdocs-material's admonition bodies are indented four spaces, which
+  // markdownlint reads as indented code blocks; MD046 can never hold here.
+  "config": {
+    "MD013": { "tables": false, "code_blocks": false },
+    "MD024": { "siblings_only": true },
+    "MD046": false
+  },
+  // one snippet include line: its heading comes from CHANGELOG.md
+  "ignores": ["docs/changelog.md"]
+}

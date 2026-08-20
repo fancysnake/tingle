@@ -313,3 +313,65 @@ def test_validate_ini_params() -> None:
     assert validate_ini_params({"file": 1, "section": "b", "option": "c"}) == [
         "file must be a string"
     ]
+
+
+CONTRACTS = """
+[[tool.importlinter.contracts]]
+name = "layers"
+ignore_imports = ["a -> b", "c -> d"]
+
+[[tool.importlinter.contracts]]
+name = "clean"
+
+[[tool.importlinter.contracts]]
+name = "one"
+ignore_imports = ["e -> f"]
+"""
+
+
+def test_a_key_carrying_on_past_an_array_of_tables_means_it_once_per_entry() -> None:
+    """Three contracts, three excused imports: the entries, not the lists."""
+    result = toml_list_length(
+        _context(
+            {"pyproject.toml": CONTRACTS},
+            {"key": "tool.importlinter.contracts.ignore_imports"},
+        )
+    )
+
+    assert result.value == 3
+    assert not result.warnings
+    assert [o.note for o in result.occurrences] == ["a -> b", "c -> d", "e -> f"]
+
+
+def test_an_entry_that_states_nothing_contributes_nothing() -> None:
+    """Once per entry means none of them holding it is zero, not missing."""
+    result = toml_list_length(
+        _context(
+            {"pyproject.toml": CONTRACTS}, {"key": "tool.importlinter.contracts.nope"}
+        )
+    )
+
+    assert result.value == 0
+    assert not result.warnings
+
+
+def test_an_array_of_tables_that_is_not_there_is_still_not_found() -> None:
+    result = toml_list_length(
+        _context({"pyproject.toml": CONTRACTS}, {"key": "tool.nope.contracts.ignore"})
+    )
+
+    assert result.warnings == (
+        'pyproject.toml: key "tool.nope.contracts.ignore" not found',
+    )
+
+
+def test_a_key_reaching_a_scalar_in_each_entry_counts_the_entries() -> None:
+    """Not every field of a contract is a list, and the fan-out is the same."""
+    result = toml_list_length(
+        _context(
+            {"pyproject.toml": CONTRACTS}, {"key": "tool.importlinter.contracts.name"}
+        )
+    )
+
+    assert result.value == 3
+    assert [o.note for o in result.occurrences] == ["layers", "clean", "one"]

@@ -9,6 +9,7 @@ from tingle.links.config_file.toml import TomlConfigStore
 from tingle.links.editor import VsCodeCli
 from tingle.links.fs.local import LocalProjectFiles
 from tingle.links.git.cli import GitCli
+from tingle.links.library.python import PythonTemplateLoader
 from tingle.mills import browse
 from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.mills.services import ConfigService, MetricsService
@@ -23,7 +24,11 @@ class Services:
     @cached_property
     def config(self) -> ConfigService:
         """Configuration discovery and editing, backed by the TOML store."""
-        return ConfigService(store=TomlConfigStore(), metric_types=METRIC_TYPES)
+        return ConfigService(
+            store=TomlConfigStore(),
+            metric_types=METRIC_TYPES,
+            templates=PythonTemplateLoader(),
+        )
 
     @cached_property
     def metrics(self) -> MetricsService:
