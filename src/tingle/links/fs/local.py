@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from enum import Enum, auto
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,14 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Sequence
 
     from tingle.pacts.metrics import UnreachableDir
+
+
+class _Entry(Enum):
+    """What a directory entry is, as far as the walk is concerned."""
+
+    DIRECTORY = auto()
+    FILE = auto()
+    NEITHER = auto()
 
 
 class LocalProjectFiles:
@@ -45,11 +54,8 @@ class LocalProjectFiles:
         and stats every one of them, which on a tree carrying a virtualenv
         is most of what a run spends its time on.
 
-        The two symlink rules are `rglob`'s, kept so that swapping the
-        implementation cannot change which files a metric sees. A link to
-        a directory is not descended into, so a cycle cannot hang the
-        walk; a link to a file is followed, so it counts as the file it
-        points at; and a broken one is neither, so it is skipped.
+        What counts as a directory to descend and what counts as a file
+        to yield is `_reading`'s, which keeps rglob's symlink rules.
         """
         root = PurePath()
         stack = [(str(self._root), root)]
@@ -58,14 +64,13 @@ class LocalProjectFiles:
             at_root = relative == root
             for entry in _listing(directory):
                 child = relative / entry.name
-                if _is_file(entry):
-                    yield child
-                elif self._descends(entry, at_root=at_root):
+                reading = _reading(entry)
+                if reading is _Entry.DIRECTORY and not self._prunes(
+                    entry.name, at_root=at_root
+                ):
                     stack.append((entry.path, child))
-
-    def _descends(self, entry: os.DirEntry[str], *, at_root: bool) -> bool:
-        """Whether the walk goes into this entry: a directory it may reach."""
-        return _is_directory(entry) and not self._prunes(entry.name, at_root=at_root)
+                elif reading is _Entry.FILE:
+                    yield child
 
     def _prunes(self, name: str, *, at_root: bool) -> bool:
         """Whether a directory of this name, at this depth, is unreachable."""
@@ -101,17 +106,27 @@ def _scanned(directory: str) -> list[os.DirEntry[str]]:
         return list(scan)
 
 
-def _is_directory(entry: os.DirEntry[str]) -> bool:
-    """Whether to descend into this entry: a directory, and not a link."""
+def _reading(entry: os.DirEntry[str]) -> _Entry:
+    """Decide what the walk does with one entry, in a single guarded look.
+
+    One `try` around both questions because they fail together: whatever
+    makes an entry unreadable -- it went away mid-walk, it is a link that
+    points at itself -- leaves neither of them answerable, and an entry
+    nobody can classify is one to leave alone.
+
+    The two symlink rules are rglob's, kept so that swapping the walk
+    cannot change which files a metric sees: a link to a directory is not
+    descended into, so a cycle cannot hang the walk, while a link to a
+    file is followed and counts as the file it points at.
+    """
     try:
-        return entry.is_dir(follow_symlinks=False)
+        return _classified(entry)
     except OSError:
-        return False
+        return _Entry.NEITHER
 
 
-def _is_file(entry: os.DirEntry[str]) -> bool:
-    """Whether this entry is a file, following a link to reach one."""
-    try:
-        return entry.is_file()
-    except OSError:
-        return False
+def _classified(entry: os.DirEntry[str]) -> _Entry:
+    """Say what the entry is, letting an unreadable one raise."""
+    if entry.is_dir(follow_symlinks=False):
+        return _Entry.DIRECTORY
+    return _Entry.FILE if entry.is_file() else _Entry.NEITHER

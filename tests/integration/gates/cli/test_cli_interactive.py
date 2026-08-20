@@ -83,3 +83,14 @@ def test_a_clean_run_exits_zero_and_prints_no_table() -> None:
 
     assert result.exit_code == 0
     assert "lint-escapes" not in result.output
+
+
+@pytest.mark.usefixtures("repo", "headless")
+def test_an_interactive_diff_reports_its_notes_after_the_table() -> None:
+    """A branch run browsed and then finished, notes and exit code and all."""
+    result = runner.invoke(app, ["--diff"])
+
+    assert result.exit_code == 0
+    # the config carries a metric with no diff variant, which is skipped
+    assert "note: ruff-ignores" not in result.output
+    assert "lint-escapes" not in result.output

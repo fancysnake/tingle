@@ -7,11 +7,12 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+from conftest import SETTLE_STEP, SETTLE_TRIES
 from textual_support import column
 from typer.testing import CliRunner
 
 from tingle.gates.cli import typer as typer_gate
-from tingle.gates.cli.textual.browse import MetricsApp
+from tingle.gates.cli.textual.browse import BrowseTable, MetricsApp
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 from tingle.mills.metrics.registry import METRIC_TYPES
@@ -325,8 +326,13 @@ def _drawn_values(built: MetricsApp) -> list[str]:
 
     async def scenario() -> list[str]:
         async with built.run_test() as pilot:
-            await built.workers.wait_for_complete()
-            await pilot.pause()
+            for _ in range(SETTLE_TRIES):
+                if (
+                    built.measured.report is not None
+                    and built.query_one(BrowseTable).row_count
+                ):
+                    break
+                await pilot.pause(SETTLE_STEP)
             return column(built, 2)
 
     values = asyncio.run(scenario())

@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from tingle.pacts.report import RunReport
 
 #: Longer than the app waits before drawing the screen, so that a test
-#: looking at the screen is looking at one that had its chance to appear.
+#: about the screen *not* appearing has given it every chance to.
 PAST_THE_WAIT = 0.4
 
 #: How long a test will wait for a run to land before giving up on it.
@@ -43,6 +43,35 @@ SETTLE_TIMEOUT = 5.0
 SETTLE_STEP = 0.02
 
 
+async def until(check: Callable[[], bool], pilot: Pilot[None]) -> None:
+    """Wait for something to become true, rather than for a length of time.
+
+    A fixed pause is a guess about how slow the machine is, and under
+    coverage it guesses wrong. Giving up quietly is deliberate: whatever
+    the test was waiting for is what it goes on to assert, so a wait that
+    runs out fails there, with a message about the behaviour rather than
+    about the waiting.
+    """
+    for _ in range(int(SETTLE_TIMEOUT / SETTLE_STEP)):
+        if check():
+            return
+        await pilot.pause(SETTLE_STEP)
+
+
+def _drawn(app: MetricsApp) -> bool:
+    """Whether the loading screen is up *and* has put its widgets out."""
+    screen = app.screen
+    return isinstance(screen, LoadingScreen) and bool(screen.query("#flavour"))
+
+
+async def loading(app: MetricsApp, pilot: Pilot[None]) -> LoadingScreen:
+    """Wait for the loading screen to be drawn, and hand it over."""
+    await until(lambda: _drawn(app), pilot)
+    screen = app.screen
+    assert isinstance(screen, LoadingScreen)
+    return screen
+
+
 async def settled(app: MetricsApp, pilot: Pilot[None]) -> None:
     """Wait until the run inside the app has landed, one way or the other.
 
@@ -50,10 +79,7 @@ async def settled(app: MetricsApp, pilot: Pilot[None]) -> None:
     failure cancels its own worker, and a cancelled worker is what the
     test was about rather than an error in it.
     """
-    for _ in range(int(SETTLE_TIMEOUT / SETTLE_STEP)):
-        if app.measured.over:
-            return
-        await pilot.pause(SETTLE_STEP)
+    await until(lambda: app.measured.over, pilot)
 
 
 def held_app(
@@ -95,7 +121,7 @@ def test_a_run_that_outlasts_the_wait_puts_the_screen_up() -> None:
     async def scenario() -> None:
         nonlocal showing
         async with app.run_test() as pilot:
-            await pilot.pause(PAST_THE_WAIT)
+            await loading(app, pilot)
             showing = isinstance(app.screen, LoadingScreen)
             hold.set()
             await settled(app, pilot)
@@ -137,9 +163,8 @@ def test_progress_reaches_the_bar_and_the_sentence_under_it() -> None:
 
     async def scenario() -> None:
         async with app.run_test() as pilot:
-            await pilot.pause(PAST_THE_WAIT)
-            screen = app.screen
-            assert isinstance(screen, LoadingScreen)
+            screen = await loading(app, pilot)
+            await until(lambda: screen.query_one(ProgressBar).total is not None, pilot)
             shown = screen.query_one(ProgressBar)
             seen.extend(
                 [
@@ -166,8 +191,7 @@ def test_the_screen_goes_away_and_leaves_the_table_filled() -> None:
     async def scenario() -> None:
         nonlocal showing
         async with app.run_test() as pilot:
-            await pilot.pause(PAST_THE_WAIT)
-            assert isinstance(app.screen, LoadingScreen)
+            await loading(app, pilot)
             hold.set()
             await settled(app, pilot)
             await pilot.pause()
@@ -212,9 +236,7 @@ def test_the_flavour_line_turns_over_when_the_phase_does() -> None:
 
     async def scenario() -> None:
         async with app.run_test() as pilot:
-            await pilot.pause(PAST_THE_WAIT)
-            screen = app.screen
-            assert isinstance(screen, LoadingScreen)
+            screen = await loading(app, pilot)
             lines.append(str(screen.query_one("#flavour", Label).content))
             screen.advance(RunProgress(RunPhase.MEASURING, done=0, total=3, label="a"))
             await pilot.pause()
@@ -235,7 +257,7 @@ def test_a_quit_during_the_run_leaves_no_report_and_no_failure() -> None:
 
     async def scenario() -> None:
         async with app.run_test() as pilot:
-            await pilot.pause(PAST_THE_WAIT)
+            await loading(app, pilot)
             app.exit()
         hold.set()
 
@@ -252,7 +274,7 @@ def test_the_table_is_answerable_before_the_report_lands() -> None:
 
     async def scenario() -> None:
         async with app.run_test() as pilot:
-            await pilot.pause(PAST_THE_WAIT)
+            await loading(app, pilot)
             await pilot.press("v", "f", "0")
             await pilot.pause()
             app.exit()
@@ -279,3 +301,32 @@ def test_collecting_hands_the_report_straight_back() -> None:
     collect = collecting(RUN_REPORT)
 
     assert collect(lambda _: None) is RUN_REPORT
+
+
+def test_progress_arriving_after_the_screen_reaches_it_too() -> None:
+    """The screen catches up on the way in, and keeps up once it is there."""
+    up, hold = threading.Event(), threading.Event()
+    doing: list[str] = []
+
+    def collect(progress: ProgressSink) -> RunReport:
+        up.wait(timeout=5)
+        progress(RunProgress(RunPhase.MEASURING, done=2, total=4, label="later"))
+        hold.wait(timeout=5)
+        return RUN_REPORT
+
+    app = MetricsApp(
+        RUN_REPORT.root, collect=collect, opener=VsCodeCli(), browse=Services().browse
+    )
+
+    async def scenario() -> None:
+        async with app.run_test() as pilot:
+            screen = await loading(app, pilot)
+            up.set()
+            await until(lambda: screen.query_one(ProgressBar).total is not None, pilot)
+            doing.append(str(screen.query_one("#doing", Label).content))
+            hold.set()
+            await settled(app, pilot)
+
+    asyncio.run(scenario())
+
+    assert doing == ["measuring — later (3/4)"]

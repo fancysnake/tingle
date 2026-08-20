@@ -140,3 +140,26 @@ def test_pruning_never_touches_files(tmp_path: Path) -> None:
     )
 
     assert files == [PurePath("dist")]
+
+
+def test_walk_skips_a_link_that_points_at_itself(tmp_path: Path) -> None:
+    """An entry nobody can classify is one to leave alone, not to fail on."""
+    (tmp_path / "a").symlink_to(tmp_path / "b")
+    (tmp_path / "b").symlink_to(tmp_path / "a")
+    (tmp_path / "real.py").write_text("x")
+
+    assert list(LocalProjectFiles(tmp_path).walk()) == [PurePath("real.py")]
+
+
+def test_walk_skips_a_directory_it_may_not_read(tmp_path: Path) -> None:
+    (tmp_path / "shut").mkdir()
+    (tmp_path / "shut" / "hidden.py").write_text("x")
+    (tmp_path / "open.py").write_text("y")
+    (tmp_path / "shut").chmod(0o000)
+
+    try:
+        files = list(LocalProjectFiles(tmp_path).walk())
+    finally:
+        (tmp_path / "shut").chmod(0o700)
+
+    assert files == [PurePath("open.py")]
