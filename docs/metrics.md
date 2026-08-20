@@ -5,7 +5,7 @@ type requires. `tingle list --types` prints the same table from your
 installed version, and works without a config file.
 
 | Type | Params | Counts |
-|---|---|---|
+| --- | --- | --- |
 | `regex_count` | `pattern` (positional), `flags`, `ignore_lines` | regex matches in the range's files |
 | `regex_spread` | `pattern` (positional), `flags`, `ignore_lines` | files the regex matches in, however often |
 | `symbol_uses` | `symbol` (positional), `ignore_lines` | references to a function/class in Python files |
@@ -244,7 +244,7 @@ explode = true
 
 `label` names a field used to describe each occurrence, so the report reads
 `pyproject.toml: foo.*` instead of a raw dict. A list-valued label is joined
-with `, `.
+with `,`.
 
 By default one table counts as one. `explode = true` instead counts each
 element of the label list separately — one override silencing five modules

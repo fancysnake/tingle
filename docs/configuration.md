@@ -91,7 +91,7 @@ anywhere, output is exactly as it is without the feature.
 Add a grouped metric from the CLI with `--group`:
 
 ```console
-$ tingle add regex_count '#\s*type:\s*ignore' --name type-ignores --group typing
+tingle add regex_count '#\s*type:\s*ignore' --name type-ignores --group typing
 ```
 
 Every human view also shows what a group's metrics **add up to** — the sum

@@ -17,17 +17,17 @@ laid over it.
 See what is on offer:
 
 ```console
-$ tingle library                 # the bundled pack
-$ tingle library mycorp_metrics  # somebody else's
-$ tingle library --expand        # each one as the config it stands for
-$ tingle add --base tingle.builtins.mypy.type_ignore_comment
+tingle library                 # the bundled pack
+tingle library mycorp_metrics  # somebody else's
+tingle library --expand        # each one as the config it stands for
+tingle add --base tingle.builtins.mypy.type_ignore_comment
 ```
 
 `tingle add` takes a metric type or a `--base`, and both together only when
 the base is a mixin — which states no type, so the entry has to:
 
 ```console
-$ tingle add regex_count '#\s*noqa:' --base generated
+tingle add regex_count '#\s*noqa:' --base generated
 ```
 
 ## What `base` may name
@@ -177,7 +177,7 @@ recorded in the changelog — but if you would rather not follow one at all,
 print what it stands for and paste that in place of the `base` line:
 
 ```console
-$ tingle library tingle.builtins --expand
+tingle library tingle.builtins --expand
 ```
 
 ## The bundled pack

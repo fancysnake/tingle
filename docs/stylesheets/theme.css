@@ -1,7 +1,7 @@
-/* tingle palette: red chrome, blue interaction, yellow highlight.
+/*tingle palette: red chrome, blue interaction, yellow highlight.
    Red carries structure (header, nav, rules), blue carries anything the
    reader can act on (links, hover, focus), yellow only ever appears as a
-   surface behind dark text — it fails contrast as a foreground. */
+   surface behind dark text — it fails contrast as a foreground.*/
 
 [data-md-color-scheme="default"] {
   --tingle-red: #c62828;
@@ -53,7 +53,7 @@
   --md-footer-bg-color--dark: #101216;
 }
 
-/* Structure — red */
+/*Structure — red*/
 
 .md-typeset h1 {
   color: var(--tingle-red);
@@ -82,7 +82,7 @@
   border-color: var(--md-accent-fg-color);
 }
 
-/* Interaction — blue */
+/*Interaction — blue*/
 
 .md-typeset a:hover,
 .md-typeset a:focus {
@@ -99,7 +99,7 @@
   background-color: var(--md-accent-fg-color--transparent);
 }
 
-/* Highlight — yellow, always as a surface under dark text */
+/*Highlight — yellow, always as a surface under dark text*/
 
 .md-typeset mark,
 .md-search-result__link mark {
@@ -125,7 +125,7 @@
     0 -0.1rem 0.2rem var(--md-default-fg-color--lightest) inset;
 }
 
-/* Admonitions — the three colors split by intent, everything else default */
+/*Admonitions — the three colors split by intent, everything else default*/
 
 .md-typeset .admonition.danger,
 .md-typeset details.danger,
@@ -190,7 +190,7 @@
   background-color: var(--tingle-yellow);
 }
 
-/* Tables — red rule under the head, blue on row hover */
+/*Tables — red rule under the head, blue on row hover*/
 
 .md-typeset table:not([class]) th {
   background-color: var(--md-default-fg-color--lightest);

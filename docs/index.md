@@ -18,24 +18,24 @@ that lands and publishes a chart of them.
 ## Install
 
 ```console
-$ pip install tingle
+pip install tingle
 ```
 
 ## Quick start
 
 ```console
-$ tingle init                                    # starter tingle.toml
-$ tingle library                                 # ready-made metrics for known tools
-$ tingle add --base tingle.builtins.ruff.noqa_comment
-$ tingle add regex_count '#\s*noqa'              # or state one yourself
-$ tingle add toml_list_length tool.ruff.lint.ignore --name ruff-ignores
-$ tingle                                         # interactive mode (on a terminal)
-$ tingle stat                                    # summary table
-$ tingle stat --json                             # machine-readable output
-$ tingle stat --diff                             # impact of the current branch
-$ tingle report                                  # every occurrence, file:line
-$ tingle report --diff                           # what the branch added/removed
-$ tingle report --group linting                  # one group, or --metric NAME
+tingle init                                    # starter tingle.toml
+tingle library                                 # ready-made metrics for known tools
+tingle add --base tingle.builtins.ruff.noqa_comment
+tingle add regex_count '#\s*noqa'              # or state one yourself
+tingle add toml_list_length tool.ruff.lint.ignore --name ruff-ignores
+tingle                                         # interactive mode (on a terminal)
+tingle stat                                    # summary table
+tingle stat --json                             # machine-readable output
+tingle stat --diff                             # impact of the current branch
+tingle report                                  # every occurrence, file:line
+tingle report --diff                           # what the branch added/removed
+tingle report --group linting                  # one group, or --metric NAME
 ```
 
 ## What it does

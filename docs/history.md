@@ -111,7 +111,7 @@ Nothing to set up before the first run.
 ### Inputs
 
 | Input | Default | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `name` | `tingle` | chart title; keep it stable, it keys the stored series |
 | `config` | auto-discovered | path to `tingle.toml` |
 | `data-branch` | `gh-pages` | branch the history is committed to |
@@ -158,7 +158,7 @@ build checks, rather than an absolute URL nobody validates. tingle's own is
 [the chart this page opened with][own], published exactly this way.
 
 | Input | Default | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `data-branch` | `gh-pages` | branch the history was recorded to |
 | `data-dir` | `metrics` | directory in that branch holding the chart |
 | `into` | required | directory the chart is copied into |

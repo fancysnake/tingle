@@ -5,6 +5,8 @@ experimental = true
 enter = "poetry install"
 
 [tools]
+markdownlint-cli2 = "0.23.2"
+node = "26.7.0"
 pipx = "1.16.7"
 "pipx:poetry" = "2.4.1"
 python = "3.11"
@@ -26,6 +28,9 @@ TOML_PATHS = "*.toml"
 
 [task_config]
 includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"]
+
+[tasks."lint:markdown"]
+run = "markdownlint-cli2 --fix docs/**/*.md CHANGELOG.md README.md"
 
 # the docs group is optional, so the `enter` hook's plain `poetry install`
 # does not provide mkdocs; every docs task pulls it in first.
@@ -60,6 +65,7 @@ run = [
 description = "Run every check: formatters, linters, diff coverage, tingle"
 run = [
     { task = "format:py" },
+    { task = "lint:markdown" },
     { task = "lint:py" },
     { task = "lint:strict" },
     { task = "test:py:cov:diff" },
