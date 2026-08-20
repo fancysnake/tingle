@@ -55,3 +55,30 @@ def test_exists(tmp_path: Path) -> None:
     files = LocalProjectFiles(tmp_path)
     assert files.exists(PurePath("a.py"))
     assert not files.exists(PurePath("b.py"))
+
+
+def test_walk_follows_a_link_to_a_file(tmp_path: Path) -> None:
+    (tmp_path / "real.py").write_text("x")
+    (tmp_path / "link.py").symlink_to(tmp_path / "real.py")
+
+    files = list(LocalProjectFiles(tmp_path).walk())
+
+    assert files == [PurePath("link.py"), PurePath("real.py")]
+
+
+def test_walk_does_not_descend_into_a_linked_directory(tmp_path: Path) -> None:
+    """A link to a directory is not walked, so a cycle cannot hang the walk."""
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "a.py").write_text("a")
+    (tmp_path / "mirror").symlink_to(tmp_path / "pkg", target_is_directory=True)
+
+    files = list(LocalProjectFiles(tmp_path).walk())
+
+    assert files == [PurePath("pkg/a.py")]
+
+
+def test_walk_skips_a_broken_link(tmp_path: Path) -> None:
+    (tmp_path / "gone.py").symlink_to(tmp_path / "nowhere.py")
+    (tmp_path / "real.py").write_text("x")
+
+    assert list(LocalProjectFiles(tmp_path).walk()) == [PurePath("real.py")]
