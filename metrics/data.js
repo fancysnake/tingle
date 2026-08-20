@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786905346067,
+  "lastUpdate": 1787249581637,
   "repoUrl": "https://github.com/fancysnake/tingle",
   "entries": {
     "tingle": [
@@ -928,6 +928,119 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/fancysnake/tingle/commit/a116aacbb0310386b1aeb43b43cc3daaa1b323d1"
         },
         "date": 1786905345432,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "fmt-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "taplo-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "codespell-comment",
+            "value": 2,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "ruff-format-ignore",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "noqa-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "ruff-ignores",
+            "value": 4,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "ruff-per-file-ignores",
+            "value": 15,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "pylint-comment",
+            "value": 5,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "pylint-disables",
+            "value": 3,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "long-files",
+            "value": 0,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "type-ignores",
+            "value": 4,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "type-ignore-spread",
+            "value": 3,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "mypy-overrides",
+            "value": 1,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "deferred-import-contracts",
+            "value": 0,
+            "unit": "count",
+            "extra": "architecture"
+          },
+          {
+            "name": "any-uses",
+            "value": 1,
+            "unit": "count"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "committer": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "distinct": true,
+          "id": "06eb955573350fc2684d152ab77dbdb5908f2ff9",
+          "message": "Upgrade packages",
+          "timestamp": "2026-08-20T18:12:20Z",
+          "tree_id": "d7650983430d849fc416ac305cb3142af0fe486e",
+          "url": "https://github.com/fancysnake/tingle/commit/06eb955573350fc2684d152ab77dbdb5908f2ff9"
+        },
+        "date": 1787249579570,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
