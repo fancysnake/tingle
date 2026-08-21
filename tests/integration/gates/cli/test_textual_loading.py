@@ -269,24 +269,32 @@ def test_a_quit_during_the_run_leaves_no_report_and_no_failure() -> None:
     assert app.measured.failure is None
 
 
-def test_a_quit_stops_the_run_rather_than_waiting_it_out() -> None:
+def test_a_cancelled_run_stops_itself_rather_than_finishing() -> None:
     """A thread cannot be stopped, so the run has to notice and return.
 
     Nothing joins the walk while the app shuts down, so a run that kept
     going would still be waited on once the app was gone: the terminal
     comes back and the shell does not, for as long as the walk had left.
 
-    The run here reports the way a walk does, so what it notices, a walk
-    notices in the same place.
+    Cancelled here rather than quit, which is what asks for it: that a
+    quit cancels its workers is textual's own behaviour, and going
+    through it would put the app's whole shutdown between the ask and
+    the answer. What is ours is the noticing, and it is asked directly.
+    `test_a_quit_during_the_run_leaves_no_report_and_no_failure` covers
+    the quit itself.
+
+    The run reports the way a walk does -- every so often, from the
+    worker thread -- so what it notices here, a walk notices in the same
+    place.
     """
-    started = threading.Event()
+    reporting = threading.Event()
     stopped = threading.Event()
 
     def walking(progress: ProgressSink) -> None:
         # bounded, so that a run which never notices fails this test
         # rather than hanging the suite on it
         for _ in range(int(SETTLE_TIMEOUT / SETTLE_STEP)):
-            started.set()
+            reporting.set()
             progress(RunProgress(RunPhase.SCANNING, done=500))
             time.sleep(SETTLE_STEP)
 
@@ -304,12 +312,14 @@ def test_a_quit_stops_the_run_rather_than_waiting_it_out() -> None:
 
     async def scenario() -> None:
         async with app.run_test() as pilot:
-            await until(started.is_set, pilot)
+            await until(reporting.is_set, pilot)
+            app.workers.cancel_all()
+            await until(stopped.is_set, pilot)
             app.exit()
 
     asyncio.run(scenario())
 
-    assert stopped.wait(timeout=SETTLE_TIMEOUT)
+    assert stopped.is_set()
     assert app.measured.report is None
     assert app.measured.failure is None
 
