@@ -145,6 +145,10 @@ def headless(monkeypatch: pytest.MonkeyPatch) -> None:
                     if self.measured.over:
                         return
                     await pilot.pause(SETTLE_STEP)
+                # without this an unfinished run leaves no report and no
+                # failure, which is what a quit leaves too -- so the gate
+                # would exit 0 and the test would read as a clean run
+                pytest.fail("the TUI run did not finish before the settle timeout")
 
         asyncio.run(drive())
 

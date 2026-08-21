@@ -30,11 +30,10 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     # type-checking only, so the lazy import of textual stays lazy
-    from tingle.gates.cli.textual.browse import Collect
+    from tingle.gates.cli.textual.run import Collect
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.metrics import MetricType, ProgressSink
     from tingle.pacts.config import LibraryEntry
-    from tingle.pacts.metrics import MetricType
+    from tingle.pacts.metrics import MetricType, ProgressSink
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ServicesProtocol
 
@@ -442,16 +441,22 @@ class CliGate:
         )
         app.run()
         if app.measured.failure is not None:
-            self._collection_failure(app.measured.failure)
+            self._reported(app.measured.failure)
         return app.measured.report
 
-    def _collection_failure(self, exc: Exception) -> NoReturn:
-        """Report a failure the TUI carried out, the way a command would."""
+    def _reported(self, exc: Exception) -> NoReturn:
+        """Report a failure collection raised, the way a command would.
+
+        One mapping for every path that collects: the three commands that
+        measure directly and the TUI, which carries its failure back out
+        rather than printing underneath itself. A new kind of collection
+        error is then one place to teach rather than four.
+        """
         if isinstance(exc, SelectionError):
             self._selection_failure(exc)
         if isinstance(exc, DiffSourceError):
             self._diff_failure(exc)
-        raise exc  # pragma: no cover - the app carries out no other kind
+        raise exc  # pragma: no cover - collection raises no other kind
 
     def _print_stat(self, request: _MetricRequest, *, json_out: bool) -> None:
         if request.diff:
@@ -473,8 +478,8 @@ class CliGate:
         config = self._load(request.config)
         try:
             return self._services.metrics.run(config, request.selection)
-        except SelectionError as exc:
-            self._selection_failure(exc)
+        except (SelectionError, DiffSourceError) as exc:
+            self._reported(exc)
 
     def _collect_diff(self, request: _MetricRequest) -> DiffReport:
         config = self._load(request.config)
@@ -482,10 +487,8 @@ class CliGate:
             return self._services.metrics.diff(
                 config, self._base_of(config, request), selection=request.selection
             )
-        except SelectionError as exc:
-            self._selection_failure(exc)
-        except DiffSourceError as exc:
-            self._diff_failure(exc)
+        except (SelectionError, DiffSourceError) as exc:
+            self._reported(exc)
 
     def _collect_check(
         self, config: Config, request: _MetricRequest, *, policy: CheckPolicy | None
@@ -497,10 +500,8 @@ class CliGate:
                 selection=request.selection,
                 policy=policy,
             )
-        except SelectionError as exc:
-            self._selection_failure(exc)
-        except DiffSourceError as exc:
-            self._diff_failure(exc)
+        except (SelectionError, DiffSourceError) as exc:
+            self._reported(exc)
 
     @staticmethod
     def _base_of(config: Config, request: _MetricRequest) -> str:

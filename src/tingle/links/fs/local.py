@@ -3,22 +3,18 @@
 from __future__ import annotations
 
 import os
-from enum import Enum, auto
 from pathlib import Path, PurePath
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypeAlias
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Sequence
+    from collections.abc import Iterator, Sequence
 
     from tingle.pacts.metrics import UnreachableDir
 
-
-class _Entry(Enum):
-    """What a directory entry is, as far as the walk is concerned."""
-
-    DIRECTORY = auto()
-    FILE = auto()
-    NEITHER = auto()
+#: What an entry is, as far as the walk is concerned. The empty string is
+#: everything else: a socket, a broken link, an entry that went away
+#: mid-walk -- anything there is neither to descend into nor to measure.
+_Kind: TypeAlias = Literal["directory", "file", ""]
 
 
 class LocalProjectFiles:
@@ -42,20 +38,24 @@ class LocalProjectFiles:
         self._anywhere = frozenset(d.name for d in prune if not d.anchored)
         self._at_root = frozenset(d.name for d in prune if d.anchored)
 
-    def walk(self) -> Iterable[PurePath]:
-        """Yield every file under the root as a sorted relative path."""
-        return iter(sorted(self._descend()))
+    def walk(self) -> Iterator[PurePath]:
+        """Yield every file under the root, as a relative path, as it is found.
 
-    def _descend(self) -> Iterator[PurePath]:
-        """Walk the tree from the root, yielding files in no order.
+        Lazily, and so in no particular order: the caller counting the
+        walk is the loading screen, and a tree is the one part of a run
+        whose size is unknown until it ends. Sorting here would drain the
+        whole tree before the first path came back, leaving that screen
+        with nothing to say for exactly as long as the walk takes.
 
         `scandir` rather than `rglob`, because a directory entry already
         knows whether it is a directory: `rglob` builds a `Path` per entry
         and stats every one of them, which on a tree carrying a virtualenv
         is most of what a run spends its time on.
 
-        What counts as a directory to descend and what counts as a file
-        to yield is `_reading`'s, which keeps rglob's symlink rules.
+        The two symlink rules are rglob's, kept so that swapping the walk
+        cannot change which files a metric sees: a link to a directory is
+        not descended into, so a cycle cannot hang the walk, while a link
+        to a file is followed and counts as the file it points at.
         """
         root = PurePath()
         stack = [(str(self._root), root)]
@@ -63,14 +63,13 @@ class LocalProjectFiles:
             directory, relative = stack.pop()
             at_root = relative == root
             for entry in _listing(directory):
-                child = relative / entry.name
-                reading = _reading(entry)
-                if reading is _Entry.DIRECTORY and not self._prunes(
+                kind = _kind(entry)
+                if kind == "directory" and not self._prunes(
                     entry.name, at_root=at_root
                 ):
-                    stack.append((entry.path, child))
-                elif reading is _Entry.FILE:
-                    yield child
+                    stack.append((entry.path, relative / entry.name))
+                elif kind == "file":
+                    yield relative / entry.name
 
     def _prunes(self, name: str, *, at_root: bool) -> bool:
         """Whether a directory of this name, at this depth, is unreachable."""
@@ -91,42 +90,33 @@ class LocalProjectFiles:
 def _listing(directory: str) -> list[os.DirEntry[str]]:
     """Every entry in one directory, or none when it cannot be read.
 
+    Read to the end rather than yielded through, so that handing a path
+    back does not hold a directory open for as long as the caller takes
+    to use it: a scandir iterator closes itself once exhausted, and
+    `list` is what exhausts it.
+
     Skipping an unreadable directory rather than failing on it is what
     rglob did, and a source tree is exactly where one turns up.
     """
     try:
-        return _scanned(directory)
+        return list(os.scandir(directory))
     except OSError:
         return []
 
 
-def _scanned(directory: str) -> list[os.DirEntry[str]]:
-    """Read one directory to the end, closing the scan behind it."""
-    with os.scandir(directory) as scan:
-        return list(scan)
-
-
-def _reading(entry: os.DirEntry[str]) -> _Entry:
-    """Decide what the walk does with one entry, in a single guarded look.
+def _kind(entry: os.DirEntry[str]) -> _Kind:
+    """Say what the walk does with one entry, in a single guarded look.
 
     One `try` around both questions because they fail together: whatever
     makes an entry unreadable -- it went away mid-walk, it is a link that
     points at itself -- leaves neither of them answerable, and an entry
     nobody can classify is one to leave alone.
-
-    The two symlink rules are rglob's, kept so that swapping the walk
-    cannot change which files a metric sees: a link to a directory is not
-    descended into, so a cycle cannot hang the walk, while a link to a
-    file is followed and counts as the file it points at.
     """
     try:
-        return _classified(entry)
+        return (
+            "directory"
+            if entry.is_dir(follow_symlinks=False)
+            else "file" if entry.is_file() else ""
+        )
     except OSError:
-        return _Entry.NEITHER
-
-
-def _classified(entry: os.DirEntry[str]) -> _Entry:
-    """Say what the entry is, letting an unreadable one raise."""
-    if entry.is_dir(follow_symlinks=False):
-        return _Entry.DIRECTORY
-    return _Entry.FILE if entry.is_file() else _Entry.NEITHER
+        return ""

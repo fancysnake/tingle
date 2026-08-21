@@ -1,24 +1,61 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path, PurePath
+from typing import TYPE_CHECKING
 
 from tingle.links.fs.local import LocalProjectFiles
 from tingle.pacts.metrics import UnreachableDir
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-def test_walk_yields_relative_files_sorted(tmp_path: Path) -> None:
+    import pytest
+
+
+def test_walk_yields_every_relative_file(tmp_path: Path) -> None:
     (tmp_path / "src" / "pkg").mkdir(parents=True)
     (tmp_path / "src" / "pkg" / "b.py").write_text("b")
     (tmp_path / "src" / "pkg" / "a.py").write_text("a")
     (tmp_path / "README.md").write_text("readme")
 
-    files = list(LocalProjectFiles(tmp_path).walk())
+    files = sorted(LocalProjectFiles(tmp_path).walk())
 
     assert files == [
         PurePath("README.md"),
         PurePath("src/pkg/a.py"),
         PurePath("src/pkg/b.py"),
     ]
+
+
+def test_walk_hands_back_a_path_before_it_has_read_the_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What counts the walk is a loading screen, and it counts as it goes.
+
+    A walk that resolved itself before yielding anything would leave that
+    screen with nothing to say for exactly as long as the walk takes,
+    which is the wait it exists to explain.
+    """
+    for index in range(5):
+        (tmp_path / f"dir{index}").mkdir()
+        (tmp_path / f"dir{index}" / "f.py").write_text("x")
+
+    scanned: list[str] = []
+    real_scandir = os.scandir
+
+    def counting_scandir(path: str) -> Iterator[os.DirEntry[str]]:
+        scanned.append(path)
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", counting_scandir)
+
+    walk = LocalProjectFiles(tmp_path).walk()
+    next(iter(walk))
+    part_way = len(scanned)
+    list(walk)
+
+    assert part_way < len(scanned)
 
 
 def test_walk_includes_dot_directories(tmp_path: Path) -> None:

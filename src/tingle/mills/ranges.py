@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from tingle.specs.ranges import DEFAULT_EXCLUDES
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
     from pathlib import PurePath
 
     from tingle.pacts.config import RangeSpec
@@ -45,7 +45,9 @@ class ResolvedRanges:
 
     Keyed by range names rather than by the specs themselves: names are
     what a metric asks for, they identify a spec uniquely within one
-    config, and a `RangeSpec` is not hashable.
+    config, and a `RangeSpec` is not hashable. The key is read off the
+    specs rather than passed alongside them, so a caller cannot hand over
+    a name that describes something other than what it is asking for.
     """
 
     walked: tuple[PurePath, ...]
@@ -53,11 +55,9 @@ class ResolvedRanges:
         default_factory=dict, init=False, repr=False
     )
 
-    def files(
-        self, names: tuple[str, ...], specs: Iterable[RangeSpec]
-    ) -> tuple[PurePath, ...]:
-        """Return the files of the set `names`, resolving it on first ask."""
-        if names not in self._resolved:
+    def files(self, specs: Sequence[RangeSpec]) -> tuple[PurePath, ...]:
+        """Return the files these ranges come to, resolving them on first ask."""
+        if (names := tuple(spec.name for spec in specs)) not in self._resolved:
             self._resolved[names] = resolve(self.walked, specs)
         return self._resolved[names]
 

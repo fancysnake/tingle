@@ -4,52 +4,45 @@ The table is drawn from the browse service, which decides what is visible
 and in what order; nothing here reads an outcome or resolves a fold. This
 module's whole job is turning `Row`s into cells and keys into gestures.
 
-The run itself happens here too, on a worker thread, because a report
-collected before the app started would be a wait with nothing on screen
-to explain it.
+Starting the run and getting an answer back out of it is `run.py`'s.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, ClassVar, TypeAlias
+from typing import TYPE_CHECKING, ClassVar
 
 from rich.cells import cell_len
 from rich.text import Text
 from textual.app import App
 from textual.binding import Binding
-from textual.message import Message
 from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from tingle.gates.cli.textual.loading import LoadingScreen
+from tingle.gates.cli.textual.run import (
+    REVEAL_AFTER,
+    AbandonedError,
+    Measured,
+    RunFailed,
+    RunFinished,
+    RunProgressed,
+    abandon_if_cancelled,
+)
 from tingle.pacts.browse import RowKind, SortKey
 from tingle.pacts.config import SelectionError
-from tingle.pacts.diff import DiffReport, DiffSourceError
+from tingle.pacts.diff import DiffSourceError
 from tingle.pacts.editor import EditorError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
     from pathlib import Path
 
     from textual.app import ComposeResult
 
+    from tingle.gates.cli.textual.run import Collect
     from tingle.pacts.browse import BrowseState, Row
     from tingle.pacts.editor import EditorOpener
-    from tingle.pacts.metrics import ProgressSink, RunProgress
-    from tingle.pacts.report import RunReport
+    from tingle.pacts.metrics import RunProgress
     from tingle.pacts.services import BrowseServiceProtocol
-
-#: Starts the run and hands back what it came to, reporting its progress
-#: to the sink it is given. The gate binds the selection and the base
-#: before handing it over, so the app starts a run without knowing what
-#: kind of run it is.
-Collect: TypeAlias = "Callable[[ProgressSink], RunReport | DiffReport]"
-
-#: How long the run gets to finish before anything is drawn to say it is
-#: happening. A screen that flashes up and vanishes is worse than a beat
-#: of stillness, and on a small project the whole run fits in here.
-REVEAL_AFTER = 0.25
 
 #: Marks a row that can be folded, open and shut.
 UNFOLDED, FOLDED = "▾ ", "▸ "
@@ -131,53 +124,6 @@ class SearchBar(Input):
     """
 
     BINDINGS: ClassVar = [Binding("escape", "app.end_search", "Leave search")]
-
-
-@dataclass
-class Measured:
-    """What the run inside the app has come to so far.
-
-    One object rather than three attributes because they are one fact
-    read at three moments: what the run last said, what it finally came
-    to, and why it could not. The gate reads the last two after the app
-    has closed, which is the only way a report leaves a terminal.
-    """
-
-    latest: RunProgress | None = None
-    report: RunReport | DiffReport | None = None
-    failure: Exception | None = None
-
-    @property
-    def over(self) -> bool:
-        """Whether the run has stopped, whichever way it stopped."""
-        return self.report is not None or self.failure is not None
-
-
-class RunProgressed(Message):
-    """How far the run inside the app has got."""
-
-    def __init__(self, progress: RunProgress) -> None:
-        """Carry one progress report across from the worker thread."""
-        super().__init__()
-        self.progress = progress
-
-
-class RunFinished(Message):
-    """The run is done, and this is what it came to."""
-
-    def __init__(self, report: RunReport | DiffReport) -> None:
-        """Carry the finished report across from the worker thread."""
-        super().__init__()
-        self.report = report
-
-
-class RunFailed(Message):
-    """The run could not be done, for a reason the command line knows."""
-
-    def __init__(self, error: Exception) -> None:
-        """Carry the failure across from the worker thread."""
-        super().__init__()
-        self.error = error
 
 
 class MetricsApp(App[None]):
@@ -285,9 +231,14 @@ class MetricsApp(App[None]):
         knows how to print: they are carried out rather than handled, so
         the gate keeps deciding what a bad selection or an unreachable
         base means. Anything else is a bug and is left to crash loudly.
+
+        A quit is the third way out and says nothing: there is no report
+        and nothing went wrong, so the gate has nothing to print.
         """
         try:
             report = self._collect(self._note)
+        except AbandonedError:
+            return
         except (SelectionError, DiffSourceError) as exc:
             self.post_message(RunFailed(exc))
         else:
@@ -298,7 +249,13 @@ class MetricsApp(App[None]):
 
         `post_message` is thread-safe, so the walk hands over its count
         without bouncing every report through a call into the loop.
+
+        This is also where the run notices it has been abandoned: the
+        sink is the one point it passes through regularly, so checking
+        here costs a run nothing and saves a quit from waiting out the
+        whole walk.
         """
+        abandon_if_cancelled()
         self.post_message(RunProgressed(progress))
 
     def on_run_progressed(self, event: RunProgressed) -> None:

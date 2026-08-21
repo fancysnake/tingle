@@ -57,7 +57,7 @@ class ProjectLoc:
         """Sum the lines of every readable file in the loc range."""
         total = 0
         spec = self.range_spec()
-        for path in self._ranges.files((spec.name,), [spec]):
+        for path in self._ranges.files([spec]):
             if (text := self._read(path)) is not None:
                 total += len(text.splitlines())
         return total

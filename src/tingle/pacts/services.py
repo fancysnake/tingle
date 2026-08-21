@@ -6,6 +6,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
 from tingle.pacts.config import EVERY_METRIC, Selection
+from tingle.pacts.metrics import unwatched
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -57,7 +58,7 @@ class MetricsServiceProtocol(Protocol):
         config: Config,
         selection: Selection = EVERY_METRIC,
         *,
-        progress: ProgressSink | None = None,
+        progress: ProgressSink = unwatched,
     ) -> RunReport:
         """Measure every selected metric over the whole project.
 
@@ -72,7 +73,7 @@ class MetricsServiceProtocol(Protocol):
         base: str,
         *,
         selection: Selection = EVERY_METRIC,
-        progress: ProgressSink | None = None,
+        progress: ProgressSink = unwatched,
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
 

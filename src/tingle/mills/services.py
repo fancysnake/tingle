@@ -10,8 +10,6 @@ from tingle.mills.check import judge
 from tingle.mills.config import narrowed, validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
-from tingle.pacts.config import EVERY_METRIC, ConfigNotFoundError, Selection
-from tingle.specs.ranges import UNREACHABLE_DIRS
 from tingle.mills.templates import as_table, resolve, verify
 from tingle.pacts.config import (
     EVERY_METRIC,
@@ -21,6 +19,8 @@ from tingle.pacts.config import (
     LibraryEntry,
     Selection,
 )
+from tingle.pacts.metrics import unwatched
+from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -157,7 +157,7 @@ class MetricsService:
         config: Config,
         selection: Selection = EVERY_METRIC,
         *,
-        progress: ProgressSink | None = None,
+        progress: ProgressSink = unwatched,
     ) -> RunReport:
         """Measure every selected metric over the whole project."""
         return run(
@@ -173,7 +173,7 @@ class MetricsService:
         base: str,
         *,
         selection: Selection = EVERY_METRIC,
-        progress: ProgressSink | None = None,
+        progress: ProgressSink = unwatched,
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
         runner = DiffRunner(

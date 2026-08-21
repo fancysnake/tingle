@@ -16,14 +16,9 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from tingle.gates.cli.textual.browse import (
-    BrowseTable,
-    Collect,
-    MetricsApp,
-    SearchBar,
-    SortBar,
-)
+from tingle.gates.cli.textual.browse import BrowseTable, MetricsApp, SearchBar, SortBar
 from tingle.inits.services import Services
 from tingle.links.editor import VsCodeCli
 from tingle.mills.display import outcome_emoji, sections
@@ -31,6 +26,9 @@ from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence, ProgressSink
 from tingle.pacts.report import MetricOutcome, RunReport
+
+if TYPE_CHECKING:
+    from tingle.gates.cli.textual.run import Collect
 
 ROOT = Path("/proj")
 SOURCE = Path("/proj/tingle.toml")

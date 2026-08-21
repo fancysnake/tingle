@@ -17,26 +17,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on. Under it, a line of Sims-flavoured nonsense about code quality, turning
   over on a timer and whenever the phase changes. A run that finishes quickly
   never draws it, since a screen that flashes up and vanishes is worse than a
-  beat of stillness.
+  beat of stillness. Quitting part-way through stops the run rather than
+  waiting it out, so the prompt comes back with the terminal.
 
 ### Changed
 
 - Runs are around four times faster on a project carrying a virtualenv.
   `tingle stat` on this repo went from ~3.6s to ~0.85s, and nothing it reports
   changed. Three things were in the way:
-    - the tree walk descended into `.venv/`, `.git/`, `node_modules/` and the
-      rest of the always-excluded directories — 26,581 files walked here to
-      measure 102 — and then every metric rediscovered that they matched
-      nothing. It now skips them while descending. A `.venv` nested inside a
-      package is not the project's own and is still measured, exactly as
-      before.
-    - walking used `Path.rglob`, which builds a path object per entry and
-      stats every one of them. It now reads directory entries directly, which
-      is ten times faster over the same files.
-    - each metric resolved its ranges separately, so metrics sharing a range —
-      most of them — rescanned the tree to arrive at the same answer. Each
-      distinct set of ranges is now resolved once per run.
-
+  - the tree walk descended into `.venv/`, `.git/`, `node_modules/` and the
+    rest of the always-excluded directories — 26,581 files walked here to
+    measure 102 — and then every metric rediscovered that they matched
+    nothing. It now skips them while descending. A `.venv` nested inside a
+    package is not the project's own and is still measured, exactly as
+    before.
+  - walking used `Path.rglob`, which builds a path object per entry and stats
+    every one of them. It now reads directory entries directly, which is ten
+    times faster over the same files.
+  - each metric resolved its ranges separately, so metrics sharing a range —
+    most of them — rescanned the tree to arrive at the same answer. Each
+    distinct set of ranges is now resolved once per run.
 
 ## [0.6.0] - 2026-08-20
 

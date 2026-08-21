@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -18,6 +19,7 @@ from textual_support import RUN_REPORT, collecting, labels, metrics_app
 
 from tingle.gates.cli.textual.browse import MetricsApp
 from tingle.gates.cli.textual.loading import LoadingScreen, plainly
+from tingle.gates.cli.textual.run import AbandonedError
 from tingle.inits.services import Services
 from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import SelectionError
@@ -263,6 +265,51 @@ def test_a_quit_during_the_run_leaves_no_report_and_no_failure() -> None:
 
     asyncio.run(scenario())
 
+    assert app.measured.report is None
+    assert app.measured.failure is None
+
+
+def test_a_quit_stops_the_run_rather_than_waiting_it_out() -> None:
+    """A thread cannot be stopped, so the run has to notice and return.
+
+    Nothing joins the walk while the app shuts down, so a run that kept
+    going would still be waited on once the app was gone: the terminal
+    comes back and the shell does not, for as long as the walk had left.
+
+    The run here reports the way a walk does, so what it notices, a walk
+    notices in the same place.
+    """
+    started = threading.Event()
+    stopped = threading.Event()
+
+    def walking(progress: ProgressSink) -> None:
+        # bounded, so that a run which never notices fails this test
+        # rather than hanging the suite on it
+        for _ in range(int(SETTLE_TIMEOUT / SETTLE_STEP)):
+            started.set()
+            progress(RunProgress(RunPhase.SCANNING, done=500))
+            time.sleep(SETTLE_STEP)
+
+    def collect(progress: ProgressSink) -> RunReport:
+        try:
+            walking(progress)
+        except AbandonedError:
+            stopped.set()
+            raise
+        return RUN_REPORT
+
+    app = MetricsApp(
+        RUN_REPORT.root, collect=collect, opener=VsCodeCli(), browse=Services().browse
+    )
+
+    async def scenario() -> None:
+        async with app.run_test() as pilot:
+            await until(started.is_set, pilot)
+            app.exit()
+
+    asyncio.run(scenario())
+
+    assert stopped.wait(timeout=SETTLE_TIMEOUT)
     assert app.measured.report is None
     assert app.measured.failure is None
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
 from tingle.mills.ranges import ResolvedRanges, resolve
-from tingle.mills.runner import ranges_for, scanned, watcher
+from tingle.mills.runner import announced, ranges_for, scanned
 from tingle.mills.text import TextReader, text_reader
 from tingle.pacts.diff import (
     BranchDiff,
@@ -24,6 +24,7 @@ from tingle.pacts.metrics import (
     ProjectFiles,
     RunPhase,
     RunProgress,
+    unwatched,
 )
 
 if TYPE_CHECKING:
@@ -66,10 +67,9 @@ class DiffRunner:
     diff_source: DiffSource
     metric_types: Mapping[str, MetricType]
 
-    def run(self, base: str, *, progress: ProgressSink | None = None) -> DiffReport:
+    def run(self, base: str, *, progress: ProgressSink = unwatched) -> DiffReport:
         """Measure the branch impact against merge-base(base, HEAD)."""
-        note = watcher(progress)
-        note(RunProgress(RunPhase.DIFFING, label=base))
+        progress(RunProgress(RunPhase.DIFFING, label=base))
         branch_diff = self.diff_source.branch_diff(base)
         # both ports hand over bytes; what counts as readable text is
         # decided here, once per side, and never at a call site
@@ -77,7 +77,7 @@ class DiffRunner:
             current=text_reader(self.project.read),
             base=text_reader(self.diff_source.read_base),
         )
-        ranges = ResolvedRanges(tuple(scanned(self.project, note)))
+        ranges = ResolvedRanges(scanned(self.project, progress))
         context = _DiffContext(
             branch_diff=branch_diff,
             readers=readers,
@@ -96,24 +96,19 @@ class DiffRunner:
             else:
                 measurable.append((spec, diff_func))
 
-        outcomes: list[DiffOutcome] = []
-        for done, (spec, diff_func) in enumerate(measurable):
-            note(
-                RunProgress(
-                    RunPhase.MEASURING,
-                    done=done,
-                    total=len(measurable),
-                    label=spec.name,
-                )
+        outcomes = tuple(
+            self._outcome(spec, diff_func, context=context)
+            for spec, diff_func in announced(
+                measurable, progress, label=lambda pair: pair[0].name
             )
-            outcomes.append(self._outcome(spec, diff_func, context=context))
+        )
 
         return DiffReport(
             root=self.config.root,
             source=self.config.source,
             base_ref=branch_diff.base_ref,
             merge_base=branch_diff.merge_base,
-            sections=sections(tuple(outcomes)),
+            sections=sections(outcomes),
             skipped=tuple(skipped),
         )
 
@@ -129,7 +124,7 @@ class DiffRunner:
             params=spec.params,
         )
         total_context = MetricContext(
-            files=context.ranges.files(range_names, range_specs),
+            files=context.ranges.files(range_specs),
             read=context.readers.current,
             exists=self.project.exists,
             params=spec.params,

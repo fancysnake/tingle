@@ -71,6 +71,16 @@ class RunProgress:
 ProgressSink: TypeAlias = Callable[[RunProgress], None]
 
 
+def unwatched(_: RunProgress) -> None:
+    """Take the progress of a run nobody is watching, and drop it.
+
+    The default sink, so that a run reports the same way whether or not
+    anyone is listening. No caller distinguishes "no sink" from a sink
+    that drops it, and making that the default is what lets every runner
+    say `note(...)` outright rather than guarding each report.
+    """
+
+
 @dataclass(frozen=True)
 class UnreachableDir:
     """A directory whose contents no range can ever match.

@@ -82,8 +82,8 @@ def test_a_range_set_is_resolved_once_however_many_ask() -> None:
     ranges = ResolvedRanges(tuple(_paths("a.py", "b.py", "notes.md")))
     spec = RangeSpec(name="python", include=("**/*.py",))
 
-    first = ranges.files(("python",), [spec])
-    second = ranges.files(("python",), [spec])
+    first = ranges.files([spec])
+    second = ranges.files([spec])
 
     assert first == (PurePath("a.py"), PurePath("b.py"))
     assert first is second
@@ -92,8 +92,8 @@ def test_a_range_set_is_resolved_once_however_many_ask() -> None:
 def test_different_range_sets_are_resolved_separately() -> None:
     ranges = ResolvedRanges(tuple(_paths("a.py", "notes.md")))
 
-    python = ranges.files(("python",), [RangeSpec(name="python", include=("**/*.py",))])
-    docs = ranges.files(("docs",), [RangeSpec(name="docs", include=("**/*.md",))])
+    python = ranges.files([RangeSpec(name="python", include=("**/*.py",))])
+    docs = ranges.files([RangeSpec(name="docs", include=("**/*.md",))])
 
     assert python == (PurePath("a.py"),)
     assert docs == (PurePath("notes.md"),)
