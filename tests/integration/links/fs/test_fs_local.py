@@ -99,7 +99,7 @@ def test_walk_follows_a_link_to_a_file(tmp_path: Path) -> None:
     (tmp_path / "real.py").write_text("x")
     (tmp_path / "link.py").symlink_to(tmp_path / "real.py")
 
-    files = list(LocalProjectFiles(tmp_path).walk())
+    files = sorted(LocalProjectFiles(tmp_path).walk())
 
     assert files == [PurePath("link.py"), PurePath("real.py")]
 
