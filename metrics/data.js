@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787256593174,
+  "lastUpdate": 1787302680460,
   "repoUrl": "https://github.com/fancysnake/tingle",
   "entries": {
     "tingle": [
@@ -1154,6 +1154,120 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/fancysnake/tingle/commit/ce38c88b231a95db0211df2865359a62b66ccae2"
         },
         "date": 1787256591195,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "fmt-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "taplo-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "codespell-comment",
+            "value": 2,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "ruff-format-excludes",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "noqa-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "ruff-ignores",
+            "value": 4,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "ruff-per-file-ignores",
+            "value": 15,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "pylint-comment",
+            "value": 5,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "pylint-rcfile-disables",
+            "value": 3,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "long-files",
+            "value": 0,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "type-ignores",
+            "value": 4,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "type-ignore-spread",
+            "value": 3,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "mypy-overrides",
+            "value": 1,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "any-uses",
+            "value": 1,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "deferred-import-contracts",
+            "value": 0,
+            "unit": "count",
+            "extra": "architecture"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a716cf0ab85f2b4ad445f528fc041a211faa4c25",
+          "message": "Merge pull request #45 from fancysnake/feat/tui-loading\n\nFeat/tui loading",
+          "timestamp": "2026-08-21T10:57:39+02:00",
+          "tree_id": "6b0d3165f34bae061afde55a71f3f5af514b4e8b",
+          "url": "https://github.com/fancysnake/tingle/commit/a716cf0ab85f2b4ad445f528fc041a211faa4c25"
+        },
+        "date": 1787302679644,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
