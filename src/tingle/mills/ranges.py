@@ -8,13 +8,14 @@ implemented here because PurePath.full_match only exists on 3.13+.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from functools import cache
 from typing import TYPE_CHECKING
 
 from tingle.specs.ranges import DEFAULT_EXCLUDES
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
     from pathlib import PurePath
 
     from tingle.pacts.config import RangeSpec
@@ -30,6 +31,35 @@ def resolve(
             path for path in files if any(_matches(path, spec) for spec in spec_list)
         )
     )
+
+
+@dataclass
+class ResolvedRanges:
+    """What each range set of one walk comes to, resolved once.
+
+    Resolving is a scan of the whole walk, and metrics share ranges --
+    most measure the default one and say nothing. A run that resolved per
+    metric would therefore rescan the tree once per metric to arrive at
+    the same tuple, which is the cost that grows with the codebase and
+    the config together.
+
+    Keyed by range names rather than by the specs themselves: names are
+    what a metric asks for, they identify a spec uniquely within one
+    config, and a `RangeSpec` is not hashable. The key is read off the
+    specs rather than passed alongside them, so a caller cannot hand over
+    a name that describes something other than what it is asking for.
+    """
+
+    walked: tuple[PurePath, ...]
+    _resolved: dict[tuple[str, ...], tuple[PurePath, ...]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+
+    def files(self, specs: Sequence[RangeSpec]) -> tuple[PurePath, ...]:
+        """Return the files these ranges come to, resolving them on first ask."""
+        if (names := tuple(spec.name for spec in specs)) not in self._resolved:
+            self._resolved[names] = resolve(self.walked, specs)
+        return self._resolved[names]
 
 
 def _matches(path: PurePath, spec: RangeSpec) -> bool:

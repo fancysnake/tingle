@@ -26,6 +26,22 @@ groups a config carries.
 Interactive mode on a terminal; the static summary table otherwise (CI,
 pipes).
 
+The metrics are measured inside the TUI rather than before it opens, so a
+project big enough to take a moment shows a progress bar while it works —
+the phase it is in and the metric it is on, over a rotating line of
+nonsense:
+
+```text
+                  Alphabetising the spaghetti…
+
+          ━━━━━━━━━━━━━━━━━╺━━━━━━━━━━━━━━━   53%
+          measuring — any-uses (9/15)
+```
+
+The bar has no percentage while it is walking the tree, since there is no
+way to know how big a tree is before walking it; it counts files instead.
+A run that finishes quickly never draws it at all.
+
 The TUI is one table. Group headers, the metrics under them and — once a
 metric is unfolded — what it measures and every hit it located are all
 rows in it, indented into an outline:

@@ -14,7 +14,13 @@ from tingle.pacts.diff import (
     FileDiff,
     FileStatus,
 )
-from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
+from tingle.pacts.metrics import (
+    MetricContext,
+    MetricResult,
+    MetricType,
+    RunPhase,
+    RunProgress,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -179,3 +185,40 @@ def test_runs_every_metric_the_config_it_was_handed_carries() -> None:
     )
 
     assert [outcome.spec.name for outcome in report.outcomes] == ["first", "second"]
+
+
+def test_a_diff_run_reports_the_git_call_then_each_metric() -> None:
+    """The branch diff is a phase of its own: it is a subprocess, not a scan."""
+    seen: list[RunProgress] = []
+    config = make_config(
+        MetricSpec(name="one", type="touched"),
+        MetricSpec(name="skipped", type="no_diff"),
+        MetricSpec(name="two", type="touched"),
+    )
+
+    DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
+        "main", progress=seen.append
+    )
+
+    assert (seen[0].phase, seen[0].label) == (RunPhase.DIFFING, "main")
+    measuring = [p for p in seen if p.phase is RunPhase.MEASURING]
+    assert [(p.done, p.total, p.label) for p in measuring] == [
+        (0, 2, "one"),
+        (1, 2, "two"),
+    ]
+
+
+def test_the_diff_bar_counts_only_what_it_will_measure() -> None:
+    """A metric with no diff variant is skipped, so it is not in the total."""
+    seen: list[RunProgress] = []
+    config = make_config(
+        MetricSpec(name="one", type="touched"),
+        MetricSpec(name="skipped", type="no_diff"),
+    )
+
+    report = DiffRunner(config, PROJECT, FakeDiffSource(BRANCH, {}), METRIC_TYPES).run(
+        "main", progress=seen.append
+    )
+
+    assert report.skipped == ("skipped",)
+    assert [p.total for p in seen if p.phase is RunPhase.MEASURING] == [1]

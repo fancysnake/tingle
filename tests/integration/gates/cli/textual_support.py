@@ -16,15 +16,19 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from tingle.gates.cli.textual import BrowseTable, MetricsApp, SearchBar, SortBar
+from tingle.gates.cli.textual.browse import BrowseTable, MetricsApp, SearchBar, SortBar
 from tingle.inits.services import Services
 from tingle.links.editor import VsCodeCli
 from tingle.mills.display import outcome_emoji, sections
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
-from tingle.pacts.metrics import MetricResult, Occurrence
+from tingle.pacts.metrics import MetricResult, Occurrence, ProgressSink
 from tingle.pacts.report import MetricOutcome, RunReport
+
+if TYPE_CHECKING:
+    from tingle.gates.cli.textual.run import Collect
 
 ROOT = Path("/proj")
 SOURCE = Path("/proj/tingle.toml")
@@ -146,13 +150,29 @@ def metrics_app(
 ) -> MetricsApp:
     """Build the app the way inits does, browse service and all.
 
+    The report is handed over as a run that has already finished, since
+    the app now starts its own: a test about the table wants the table
+    filled, not a stopwatch. What that run does while it is still running
+    is `test_textual_loading.py`.
+
     A test that is not about opening a hit gets an opener with nothing to
     open, which is a state the app already has to handle -- rather than
     the absence of one, which production never passes.
     """
     if opener is None:
         opener, _calls = recording_opener(available=False)
-    return MetricsApp(report, opener, browse=Services().browse)
+    return MetricsApp(
+        report.root, collect=collecting(report), opener=opener, browse=Services().browse
+    )
+
+
+def collecting(report: RunReport | DiffReport) -> Collect:
+    """Hand back a run that is already over, reporting nothing on the way."""
+
+    def collect(_: ProgressSink) -> RunReport | DiffReport:
+        return report
+
+    return collect
 
 
 def column(app: MetricsApp, index: int) -> list[str]:

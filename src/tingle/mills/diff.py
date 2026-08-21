@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 from tingle.mills.display import effective_guide, outcome_emoji, sections
 from tingle.mills.loc import ProjectLoc
-from tingle.mills.ranges import resolve
-from tingle.mills.runner import ranges_for
+from tingle.mills.ranges import ResolvedRanges, resolve
+from tingle.mills.runner import announced, ranges_for, scanned
 from tingle.mills.text import TextReader, text_reader
 from tingle.pacts.diff import (
     BranchDiff,
@@ -18,13 +18,21 @@ from tingle.pacts.diff import (
     DiffSource,
     FileDiff,
 )
-from tingle.pacts.metrics import MetricContext, MetricType, ProjectFiles
+from tingle.pacts.metrics import (
+    MetricContext,
+    MetricType,
+    ProjectFiles,
+    RunPhase,
+    RunProgress,
+    unwatched,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
     from tingle.pacts.config import Config, MetricSpec, RangeSpec
     from tingle.pacts.diff import DiffMetricFunction
+    from tingle.pacts.metrics import ProgressSink
 
 
 @dataclass(frozen=True)
@@ -36,6 +44,21 @@ class _Readers:
 
 
 @dataclass(frozen=True)
+class _DiffContext:
+    """What every metric in one diff run is measured against.
+
+    Built once and handed down whole, the way a full run's context is:
+    none of it varies by metric, and threading each piece separately is
+    what grows the signature.
+    """
+
+    branch_diff: BranchDiff
+    readers: _Readers
+    loc: ProjectLoc
+    ranges: ResolvedRanges
+
+
+@dataclass(frozen=True)
 class DiffRunner:
     """Runs the diff variant of every configured metric plus its total."""
 
@@ -44,8 +67,9 @@ class DiffRunner:
     diff_source: DiffSource
     metric_types: Mapping[str, MetricType]
 
-    def run(self, base: str) -> DiffReport:
+    def run(self, base: str, *, progress: ProgressSink = unwatched) -> DiffReport:
         """Measure the branch impact against merge-base(base, HEAD)."""
+        progress(RunProgress(RunPhase.DIFFING, label=base))
         branch_diff = self.diff_source.branch_diff(base)
         # both ports hand over bytes; what counts as readable text is
         # decided here, once per side, and never at a call site
@@ -53,51 +77,55 @@ class DiffRunner:
             current=text_reader(self.project.read),
             base=text_reader(self.diff_source.read_base),
         )
-        loc = ProjectLoc(
-            self.config, read=readers.current, walked=tuple(self.project.walk())
+        ranges = ResolvedRanges(scanned(self.project, progress))
+        context = _DiffContext(
+            branch_diff=branch_diff,
+            readers=readers,
+            loc=ProjectLoc(self.config, read=readers.current, ranges=ranges),
+            ranges=ranges,
         )
 
-        outcomes: list[DiffOutcome] = []
+        # a metric with no diff variant is skipped rather than measured, so
+        # the two are sorted out before anything runs: what the bar counts
+        # has to be the metrics that will actually take time
+        measurable: list[tuple[MetricSpec, DiffMetricFunction]] = []
         skipped: list[str] = []
         for spec in self.config.metrics:
             if (diff_func := self.metric_types[spec.type].diff_func) is None:
                 skipped.append(spec.name)
-                continue
-            outcomes.append(
-                self._outcome(
-                    spec, diff_func, branch_diff=branch_diff, loc=loc, readers=readers
-                )
+            else:
+                measurable.append((spec, diff_func))
+
+        outcomes = tuple(
+            self._outcome(spec, diff_func, context=context)
+            for spec, diff_func in announced(
+                measurable, progress, label=lambda pair: pair[0].name
             )
+        )
 
         return DiffReport(
             root=self.config.root,
             source=self.config.source,
             base_ref=branch_diff.base_ref,
             merge_base=branch_diff.merge_base,
-            sections=sections(tuple(outcomes)),
+            sections=sections(outcomes),
             skipped=tuple(skipped),
         )
 
     def _outcome(
-        self,
-        spec: MetricSpec,
-        diff_func: DiffMetricFunction,
-        *,
-        branch_diff: BranchDiff,
-        loc: ProjectLoc,
-        readers: _Readers,
+        self, spec: MetricSpec, diff_func: DiffMetricFunction, *, context: _DiffContext
     ) -> DiffOutcome:
         range_specs, range_names = ranges_for(spec, self.config)
-        guide = effective_guide(spec, self.config.display, loc=loc.lines)
+        guide = effective_guide(spec, self.config.display, loc=context.loc.lines)
         diff_context = DiffMetricContext(
-            files=_filter_files(branch_diff.files, range_specs),
-            read=readers.current,
-            read_base=readers.base,
+            files=_filter_files(context.branch_diff.files, range_specs),
+            read=context.readers.current,
+            read_base=context.readers.base,
             params=spec.params,
         )
         total_context = MetricContext(
-            files=resolve(loc.walked, range_specs),
-            read=readers.current,
+            files=context.ranges.files(range_specs),
+            read=context.readers.current,
             exists=self.project.exists,
             params=spec.params,
         )

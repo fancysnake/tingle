@@ -5,7 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-08-21
+
+### Added
+
+- The interactive TUI measures with the screen already up, rather than
+  leaving the terminal blank until the table is ready. A progress bar counts
+  files while it walks the tree — where there is no total to be a proportion
+  of — then metrics as it measures them, naming the one it is on. Under it, a
+  line of Sims-flavoured nonsense about code quality, turning over on a timer
+  and whenever the phase changes. A run that finishes quickly never draws it,
+  since a screen that flashes up and vanishes is worse than a beat of
+  stillness. Quitting part-way stops the run instead of waiting it out.
+
+### Changed
+
+- Runs are around four times faster on a project carrying a virtualenv:
+  `tingle stat` on this repo went from ~3.6s to ~0.85s, and nothing it
+  reports changed. The walk now skips the always-excluded directories
+  instead of descending into them and then rediscovering, once per metric,
+  that they match nothing — 26,581 files walked here to measure 102. It
+  reads directory entries directly rather than through `Path.rglob`, which
+  builds a path object per entry and stats every one. And each distinct set
+  of ranges resolves once per run rather than once per metric, where before
+  the metrics sharing a range — most of them — each rescanned the tree to
+  arrive at the same answer. A `.venv` nested inside a package is not the
+  project's own and is still measured, exactly as before.
 
 ## [0.6.0] - 2026-08-20
 

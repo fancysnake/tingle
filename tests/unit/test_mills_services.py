@@ -9,6 +9,7 @@ from tingle.mills.config import validate
 from tingle.mills.services import ConfigService, MetricsService
 from tingle.pacts.config import Config, ConfigError, ConfigNotFoundError, MetricDraft
 from tingle.pacts.metrics import MetricResult, MetricType
+from tingle.specs.ranges import UNREACHABLE_DIRS
 
 CWD = Path("/project")
 SOURCE = Path("/project/tingle.toml")
@@ -122,7 +123,7 @@ def test_run_anchors_the_project_files_at_the_config_root() -> None:
 
     report = service.run(_config())
 
-    project_files.assert_called_once_with(CWD)
+    project_files.assert_called_once_with(CWD, prune=UNREACHABLE_DIRS)
     assert [outcome.spec.name for outcome in report.outcomes] == ["files"]
 
 
@@ -137,6 +138,6 @@ def test_diff_anchors_both_adapters_at_the_config_root() -> None:
 
     service.diff(_config(), "main")
 
-    project_files.assert_called_once_with(CWD)
+    project_files.assert_called_once_with(CWD, prune=UNREACHABLE_DIRS)
     diff_source.assert_called_once_with(CWD)
     diff_source.return_value.branch_diff.assert_called_once_with("main")

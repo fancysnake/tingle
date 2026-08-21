@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from support import PROJECT, FakeProject, make_config
 
+from tingle.mills import ranges as ranges_module
 from tingle.mills.runner import run
 from tingle.pacts.config import DisplaySpec, MetricSpec, RangeSpec
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import PurePath
+
+    import pytest
 
 
 def _file_count(ctx: MetricContext) -> MetricResult:
@@ -159,3 +168,29 @@ def test_a_failed_metric_still_carries_its_guide() -> None:
     outcome = report.outcomes[0]
     assert outcome.error is not None
     assert outcome.guide == 7
+
+
+def test_metrics_sharing_a_range_resolve_it_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Resolving scans the whole walk, so a run must not do it per metric."""
+    scans = 0
+    real = ranges_module.resolve
+
+    def counted(
+        files: Iterable[PurePath], specs: Iterable[RangeSpec]
+    ) -> tuple[PurePath, ...]:
+        nonlocal scans
+        scans += 1
+        return real(files, specs)
+
+    monkeypatch.setattr(ranges_module, "resolve", counted)
+    config = make_config(
+        MetricSpec(name="one", type="counter"),
+        MetricSpec(name="two", type="counter"),
+        MetricSpec(name="three", type="counter"),
+    )
+
+    run(config, PROJECT, metric_types={"counter": MetricType("counter", _file_count)})
+
+    assert scans == 1

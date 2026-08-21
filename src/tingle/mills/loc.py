@@ -9,11 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from tingle.mills.ranges import resolve
-
 if TYPE_CHECKING:
-    from pathlib import PurePath
-
+    from tingle.mills.ranges import ResolvedRanges
     from tingle.mills.text import TextReader
     from tingle.pacts.config import Config, RangeSpec
 
@@ -25,17 +22,19 @@ class ProjectLoc:
     has no reason to pay for -- so nothing is read until something needs
     a number, and then it is read once.
 
-    `walked` is the tree the run already walked; it is public because every
-    metric resolves its own range against the same walk.
+    The loc range is usually a range the metrics measure too, so it is
+    resolved through the run's shared resolver rather than against the
+    walk directly: counting the lines then costs a scan of the tree only
+    when nothing else asked for that range first.
     """
 
     def __init__(
-        self, config: Config, *, read: TextReader, walked: tuple[PurePath, ...]
+        self, config: Config, *, read: TextReader, ranges: ResolvedRanges
     ) -> None:
         """Hold what counting will need, without counting anything yet."""
         self._config = config
         self._read = read
-        self.walked = walked
+        self._ranges = ranges
         self._lines: int | None = None
 
     def lines(self) -> int:
@@ -57,7 +56,8 @@ class ProjectLoc:
     def _count(self) -> int:
         """Sum the lines of every readable file in the loc range."""
         total = 0
-        for path in resolve(self.walked, [self.range_spec()]):
+        spec = self.range_spec()
+        for path in self._ranges.files([spec]):
             if (text := self._read(path)) is not None:
                 total += len(text.splitlines())
         return total
