@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-23
+
+### Added
+
+- Templates for the suppressions every project was still writing by hand:
+  `coverage.pragma_comment`, `pytest.skip_marks`, `pytest.xfail_marks`,
+  `mypy.strictness_holes`, `python.cast_used` and `python.object_used`.
+- The ruff pack covers the rest of ruff's suppression comments, split by how
+  much each one covers: `ruff.ignore_comment` for `# ruff: ignore[...]` over
+  a line or a statement, `ruff.suppressed_ranges` for the
+  `# ruff: disable[...]` that opens a block, and `ruff.file_exemptions` for
+  `# ruff: noqa`, `# ruff: file-ignore[...]` and `# flake8: noqa`. A
+  whole-file exemption is not the admission a single `# noqa` is, so it is
+  not the same number.
+
+### Changed
+
+- `python.todo_comments` counts `XXX` and `HACK` alongside `TODO` and
+  `FIXME`; `ruff.noqa_comment` and `ruff.noqa_spread` match a `# noqa` with
+  no rule code, which silences every rule on the line and was going
+  uncounted. A repository holding either sees the number rise on upgrade.
+
 ## [0.6.0] - 2026-08-20
 
 ### Added

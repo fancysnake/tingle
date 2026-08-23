@@ -7,6 +7,7 @@ from tingle.pacts.config import MetricTemplate
 __all__ = [
     "disabled_error_codes",
     "overrides",
+    "strictness_holes",
     "type_ignore_comment",
     "type_ignore_spread",
 ]
@@ -25,6 +26,14 @@ type_ignore_spread = MetricTemplate(
     group="typing",
     description="Files carrying a `# type: ignore`, however many each holds.",
     params={"pattern": r"#\s*type:\s*ignore"},
+)
+
+strictness_holes = MetricTemplate(
+    type="regex_count",
+    name="mypy-strictness-holes",
+    group="typing",
+    description="`disallow_*` settings switched off, wherever mypy is configured.",
+    params={"pattern": r"disallow_\w+ = false"},
 )
 
 overrides = MetricTemplate(

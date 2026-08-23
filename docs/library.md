@@ -10,7 +10,7 @@ base = "tingle.builtins.ruff.noqa_comment"
 extra_ignore_lines = ['# @generated']
 ```
 
-That is a `regex_count` over `#\s*noqa:`, named `noqa-comment`, grouped
+That is a `regex_count` over `#\s*noqa`, named `noqa-comment`, grouped
 under `linting`, described in the report — with one line of local knowledge
 laid over it.
 
@@ -188,10 +188,12 @@ tingle library tingle.builtins --expand
 | --- | --- |
 | `black` | `# fmt` comments |
 | `codespell` | `# codespell:ignore` comments |
+| `coverage` | `# pragma` comments |
 | `import_linter` | commented-out contracts, `ignore_imports` |
-| `mypy` | `# type: ignore`, overrides, disabled codes |
+| `mypy` | `# type: ignore`, overrides, disabled codes, `disallow_*` holes |
 | `pylint` | `# pylint:` comments, rcfile and pyproject disables |
-| `python` | `typing.Any`, `TODO`/`FIXME`, long files |
-| `ruff` | `# noqa:` comments, ignores, per-file ignores |
+| `pytest` | `skip` and `xfail` marks |
+| `python` | `typing.Any`, `typing.cast`, `object`, `TODO`/`FIXME`, long files |
+| `ruff` | `# noqa`, `# ruff: ignore`/`disable`, file exemptions, ignores |
 | `taplo` | `# taplo:` comments |
 | `unittest_mock` | `ANY` placeholders, `patch` uses |

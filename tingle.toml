@@ -31,9 +31,10 @@ base = "tingle.builtins.ruff.format_excludes"
 
 [[metrics]]
 base = "tingle.builtins.ruff.noqa_comment"
-# `_source(...)` writes sample code for a test to measure; the markers in
-# it are the subject, not something silenced.
-extra_ignore_lines = ['_source\(']
+# `_source(...)` writes sample code for a test to measure, and a `# sample`
+# line is the same thing spelled out in a fixture; the markers in either are
+# the subject, not something silenced.
+extra_ignore_lines = ['_source\(', '#\s*sample$']
 
 [[metrics]]
 base = "tingle.builtins.ruff.lint_ignores"

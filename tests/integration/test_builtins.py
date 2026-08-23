@@ -8,6 +8,7 @@ that it is not a special case.
 
 from __future__ import annotations
 
+from pathlib import PurePath
 from typing import TYPE_CHECKING
 
 import pytest
@@ -158,3 +159,94 @@ def test_a_toml_template_points_at_the_key_the_tool_actually_writes(
 
     assert not result.warnings
     assert result.value == expected
+
+
+#: Every suppression form ruff documents, plus the ones its neighbours do.
+#: Each template must pick out its own and leave the rest to the others,
+#: since they all open with a hash and three of them name ruff after it.
+REAL_SOURCE = """\
+# ruff: noqa: E501
+# ruff: file-ignore[F401]
+from typing import Any, cast
+
+import pytest
+
+# ruff: disable[E741]
+l = 1
+# ruff: enable[E741]
+
+
+@pytest.mark.skip(reason="broken")
+@pytest.mark.xfail
+def test_it(value: object) -> Any:  # pragma: no cover
+    # TODO: narrow this
+    # HACK: until the API settles
+    # ruff: ignore[ARG001]
+    x = 1  # noqa: F841  # sample
+    y = 2  # noqa  # sample
+    return cast(int, value)
+"""
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    (
+        pytest.param("ruff.noqa_comment", 2, id="noqa-comment"),
+        pytest.param("ruff.ignore_comment", 1, id="ruff-ignore-comment"),
+        pytest.param("ruff.suppressed_ranges", 1, id="ruff-suppressed-ranges"),
+        pytest.param("ruff.file_exemptions", 2, id="ruff-file-exemptions"),
+        pytest.param("coverage.pragma_comment", 1, id="pragma-comment"),
+        pytest.param("pytest.skip_marks", 1, id="pytest-skip"),
+        pytest.param("pytest.xfail_marks", 1, id="pytest-xfail"),
+        pytest.param("python.todo_comments", 2, id="todo-comments"),
+        pytest.param("python.cast_used", 2, id="cast-uses"),
+        pytest.param("python.object_used", 1, id="object-uses"),
+    ),
+)
+def test_a_source_template_matches_the_suppression_it_names(
+    path: str, expected: int
+) -> None:
+    """The pattern is the whole template, so a typo in it is the bug."""
+    template = PythonTemplateLoader().load(f"{BUILTIN_TEMPLATE_PACKAGE}.{path}")
+    assert isinstance(template, MetricTemplate)
+    assert template.type is not None
+
+    result = METRIC_TYPES[template.type].func(
+        MetricContext(
+            files=(PurePath("test_it.py"),),
+            read=lambda _: REAL_SOURCE,
+            exists=lambda _: True,
+            params=template.params,
+        )
+    )
+
+    assert not result.warnings
+    assert result.value == expected
+
+
+#: mypy's strictness settings as a project writes them off.
+RELAXED_CONFIG = """
+[tool.mypy]
+disallow_untyped_defs = false
+disallow_any_generics = false
+warn_unused_ignores = true
+"""
+
+
+def test_the_mypy_strictness_template_counts_only_the_holes() -> None:
+    template = PythonTemplateLoader().load(
+        f"{BUILTIN_TEMPLATE_PACKAGE}.mypy.strictness_holes"
+    )
+    assert isinstance(template, MetricTemplate)
+    assert template.type is not None
+
+    result = METRIC_TYPES[template.type].func(
+        MetricContext(
+            files=(PurePath("pyproject.toml"),),
+            read=lambda _: RELAXED_CONFIG,
+            exists=lambda _: True,
+            params=template.params,
+        )
+    )
+
+    assert result.value == 2
