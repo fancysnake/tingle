@@ -19,6 +19,8 @@ from tingle.pacts.config import (
     LibraryEntry,
     Selection,
 )
+from tingle.pacts.metrics import unwatched
+from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -33,7 +35,12 @@ if TYPE_CHECKING:
         TemplateLoader,
     )
     from tingle.pacts.diff import DiffReport, DiffSourceFactory
-    from tingle.pacts.metrics import MetricType, ProjectFilesFactory
+    from tingle.pacts.metrics import (
+        MetricType,
+        ProgressSink,
+        ProjectFiles,
+        ProjectFilesFactory,
+    )
     from tingle.pacts.report import RunReport
 
 
@@ -136,25 +143,46 @@ class MetricsService:
     diff_source: DiffSourceFactory
     metric_types: Mapping[str, MetricType]
 
-    def run(self, config: Config, selection: Selection = EVERY_METRIC) -> RunReport:
+    def _files_of(self, config: Config) -> ProjectFiles:
+        """Build the project tree, leaving what no range reaches unwalked.
+
+        Deciding that stays here: the adapter is told which directories to
+        skip rather than knowing any, so the exclusion and the skipping
+        are the same list read twice.
+        """
+        return self.project_files(config.root, prune=UNREACHABLE_DIRS)
+
+    def run(
+        self,
+        config: Config,
+        selection: Selection = EVERY_METRIC,
+        *,
+        progress: ProgressSink = unwatched,
+    ) -> RunReport:
         """Measure every selected metric over the whole project."""
         return run(
             narrowed(config, selection),
-            self.project_files(config.root),
+            self._files_of(config),
             metric_types=self.metric_types,
+            progress=progress,
         )
 
     def diff(
-        self, config: Config, base: str, *, selection: Selection = EVERY_METRIC
+        self,
+        config: Config,
+        base: str,
+        *,
+        selection: Selection = EVERY_METRIC,
+        progress: ProgressSink = unwatched,
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
         runner = DiffRunner(
             config=narrowed(config, selection),
-            project=self.project_files(config.root),
+            project=self._files_of(config),
             diff_source=self.diff_source(config.root),
             metric_types=self.metric_types,
         )
-        return runner.run(base)
+        return runner.run(base, progress=progress)
 
     def check(
         self,

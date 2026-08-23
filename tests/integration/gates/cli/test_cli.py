@@ -7,11 +7,12 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+from conftest import SETTLE_STEP, SETTLE_TRIES
 from textual_support import column
 from typer.testing import CliRunner
 
 from tingle.gates.cli import typer as typer_gate
-from tingle.gates.cli.textual import MetricsApp
+from tingle.gates.cli.textual.browse import BrowseTable, MetricsApp
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 from tingle.mills.metrics.registry import METRIC_TYPES
@@ -316,10 +317,22 @@ def test_a_terminal_asking_for_a_diff_gets_one(interactive: list[MetricsApp]) ->
 
 
 def _drawn_values(built: MetricsApp) -> list[str]:
-    """Run the app the gate built, and read its value column."""
+    """Run the app the gate built, and read its value column.
+
+    The app starts the run rather than being handed one, so the table is
+    read once the worker has finished and the message it posted has been
+    taken off the loop -- not merely once the app is up.
+    """
 
     async def scenario() -> list[str]:
-        async with built.run_test():
+        async with built.run_test() as pilot:
+            for _ in range(SETTLE_TRIES):
+                if (
+                    built.measured.report is not None
+                    and built.query_one(BrowseTable).row_count
+                ):
+                    break
+                await pilot.pause(SETTLE_STEP)
             return column(built, 2)
 
     values = asyncio.run(scenario())

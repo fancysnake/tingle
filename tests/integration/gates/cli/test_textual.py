@@ -47,7 +47,7 @@ from textual_support import (
     valued,
 )
 
-from tingle.gates.cli.textual import BrowseTable, MetricsApp
+from tingle.gates.cli.textual.browse import BrowseTable, MetricsApp
 from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.metrics import MetricResult, Occurrence

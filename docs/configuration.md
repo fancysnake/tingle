@@ -51,8 +51,11 @@ are matched against the whole path relative to the project root, with the
 usual pathlib meaning: `*`, `?`, and `[abc]` stay inside one path segment,
 and `**` spans any number of segments.
 
-`.git/`, `.venv/`, `__pycache__/`, `node_modules/`, `dist/`, `.tox/`, and
-`.mise/` are always excluded.
+`.git/`, `.venv/`, `node_modules/`, `dist/`, `.tox/` and `.mise/` at the
+project root are always excluded, as is `__pycache__/` at any depth. The walk
+declines to descend into them rather than reading them and throwing the
+result away. A `.venv` nested inside a package is not the project's own, so
+its files are measured like any others.
 
 A metric whose ranges match no file at all is not an error — it reports 0 and
 warns `ranges matched no files`, which is what a typo in a glob looks like.

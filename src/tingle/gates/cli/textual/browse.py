@@ -3,6 +3,8 @@
 The table is drawn from the browse service, which decides what is visible
 and in what order; nothing here reads an outcome or resolves a fold. This
 module's whole job is turning `Row`s into cells and keys into gestures.
+
+Starting the run and getting an answer back out of it is `run.py`'s.
 """
 
 from __future__ import annotations
@@ -16,16 +18,30 @@ from textual.app import App
 from textual.binding import Binding
 from textual.widgets import DataTable, Footer, Header, Input, Static
 
+from tingle.gates.cli.textual.loading import LoadingScreen
+from tingle.gates.cli.textual.run import (
+    REVEAL_AFTER,
+    AbandonedError,
+    Measured,
+    RunFailed,
+    RunFinished,
+    RunProgressed,
+    abandon_if_cancelled,
+)
 from tingle.pacts.browse import RowKind, SortKey
+from tingle.pacts.config import SelectionError
+from tingle.pacts.diff import DiffSourceError
 from tingle.pacts.editor import EditorError
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from textual.app import ComposeResult
 
+    from tingle.gates.cli.textual.run import Collect
     from tingle.pacts.browse import BrowseState, Row
-    from tingle.pacts.diff import DiffReport
     from tingle.pacts.editor import EditorOpener
-    from tingle.pacts.report import RunReport
+    from tingle.pacts.metrics import RunProgress
     from tingle.pacts.services import BrowseServiceProtocol
 
 #: Marks a row that can be folded, open and shut.
@@ -153,23 +169,31 @@ class MetricsApp(App[None]):
 
     def __init__(
         self,
-        report: RunReport | DiffReport,
-        opener: EditorOpener,
+        root: Path,
         *,
+        collect: Collect,
+        opener: EditorOpener,
         browse: BrowseServiceProtocol,
     ) -> None:
-        """Present an already-computed report; the TUI never runs metrics."""
+        """Open on an empty table, and start the run that will fill it.
+
+        The session begins over no sections rather than over none at all,
+        so every gesture is answerable from the first frame: they act on
+        an empty outline until the report lands and replaces it.
+        """
         super().__init__()
-        self._report = report
+        self._root = root
+        self._collect = collect
         self._opener = opener
         self._browse = browse
-        self._state = browse.fold_quiet_groups(browse.start(report.sections))
+        self._state = browse.start(())
         self._rows: tuple[Row, ...] = ()
+        self.measured = Measured()
 
     def compose(self) -> ComposeResult:
         """Header, the table the whole report lives in, and the key legend."""
         yield Header()
-        self.sub_title = str(self._report.root)
+        self.sub_title = str(self._root)
         table = BrowseTable(cursor_type="row")
         for heading, key in COLUMNS:
             table.add_column(heading + MARKER_ROOM, key=key)
@@ -179,9 +203,87 @@ class MetricsApp(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        """Fill the table and put the cursor on its first row."""
+        """Start measuring, and arrange to say so if it takes a moment."""
+        self.set_timer(REVEAL_AFTER, self._show_loading)
+        self.query_one(BrowseTable).focus()
+        # off the event loop: the run reads the whole tree, and the app has
+        # to stay answerable -- and redrawable -- the entire time
+        self.run_worker(self._measure, thread=True)
+
+    def _show_loading(self) -> None:
+        """Put the loading screen up, if the run is still going by now.
+
+        Asking whether the run is over beats holding the timer and
+        stopping it: the question has an answer either way round, so the
+        two cannot race.
+
+        It opens on the last thing the run said rather than on nothing:
+        the run has been going since before there was anywhere to show it.
+        """
+        if self.measured.over:
+            return
+        self.push_screen(LoadingScreen(self.measured.latest))
+
+    def _measure(self) -> None:
+        """Run the metrics, off the event loop, and report back either way.
+
+        The two failures caught here are the ones the command line already
+        knows how to print: they are carried out rather than handled, so
+        the gate keeps deciding what a bad selection or an unreachable
+        base means. Anything else is a bug and is left to crash loudly.
+
+        A quit is the third way out and says nothing: there is no report
+        and nothing went wrong, so the gate has nothing to print.
+        """
+        try:
+            report = self._collect(self._note)
+        except AbandonedError:
+            return
+        except (SelectionError, DiffSourceError) as exc:
+            self.post_message(RunFailed(exc))
+        else:
+            self.post_message(RunFinished(report))
+
+    def _note(self, progress: RunProgress) -> None:
+        """Take a progress report from the worker thread onto the loop.
+
+        `post_message` is thread-safe, so the walk hands over its count
+        without bouncing every report through a call into the loop.
+
+        This is also where the run notices it has been abandoned: the
+        sink is the one point it passes through regularly, so checking
+        here costs a run nothing and saves a quit from waiting out the
+        whole walk.
+        """
+        abandon_if_cancelled()
+        self.post_message(RunProgressed(progress))
+
+    def on_run_progressed(self, event: RunProgressed) -> None:
+        """Keep the latest, and show it if there is a screen up to show it."""
+        self.measured.latest = event.progress
+        if isinstance(self.screen, LoadingScreen):
+            self.screen.advance(event.progress)
+
+    def on_run_finished(self, event: RunFinished) -> None:
+        """Fill the table with what the run came to, and get out of its way."""
+        self.measured.report = event.report
+        self._state = self._browse.fold_quiet_groups(
+            self._browse.start(event.report.sections)
+        )
+        self._hide_loading()
         self._draw()
         self.query_one(BrowseTable).focus()
+
+    def on_run_failed(self, event: RunFailed) -> None:
+        """Leave, carrying the failure out to the gate that can report it."""
+        self.measured.failure = event.error
+        self._hide_loading()
+        self.exit()
+
+    def _hide_loading(self) -> None:
+        """Take the loading screen down, if one ever went up."""
+        if isinstance(self.screen, LoadingScreen):
+            self.pop_screen()
 
     def action_fold(self) -> None:
         """Fold the row the cursor is on, or the metric that holds it."""
@@ -334,7 +436,7 @@ class MetricsApp(App[None]):
         if not self._opener.available:
             self.notify("No VS Code terminal to open in.", severity="warning")
             return
-        target = str(self._report.root / row.occurrence.path)
+        target = str(self._root / row.occurrence.path)
         line = row.occurrence.line
         # off the event loop: handing the file over means waiting on
         # another process, and the table must stay answerable meanwhile

@@ -13,7 +13,7 @@ from textual_support import (
     summed_report,
 )
 
-from tingle.gates.cli.textual import BrowseTable, SearchBar
+from tingle.gates.cli.textual.browse import BrowseTable, SearchBar
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.metrics import MetricResult, Occurrence
 from tingle.pacts.report import MetricOutcome
