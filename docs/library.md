@@ -193,7 +193,7 @@ tingle library tingle.builtins --expand
 | `mypy` | `# type: ignore`, overrides, disabled codes, `disallow_*` holes |
 | `pylint` | `# pylint:` comments, rcfile and pyproject disables |
 | `pytest` | `skip` and `xfail` marks |
-| `python` | `typing.Any`, `typing.cast`, `object`, `TODO`/`FIXME`, long files |
+| `python` | `typing.Any`, `typing.cast`, `TODO`/`FIXME`, long files |
 | `ruff` | `# noqa`, `# ruff: ignore`/`disable`, file exemptions, ignores |
 | `taplo` | `# taplo:` comments |
 | `unittest_mock` | `ANY` placeholders, `patch` uses |

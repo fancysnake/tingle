@@ -1,0 +1,29 @@
+# Every suppression form ruff documents, plus the ones its neighbours do.
+# Each template must pick out its own and leave the rest to the others,
+# since they all open with a hash and three of them name ruff after it.
+#
+# Not a .py file: `ranges.python` includes `tests/**/*.py`, so a sample
+# spelled as source would be measured by the project it is a fixture for.
+# ruff: noqa: E501
+# ruff: file-ignore[F401]
+# flake8: noqa
+import sys
+from typing import Any, cast
+
+import pytest
+
+# ruff: disable[E741]
+l = 1
+# ruff: enable[E741]
+
+
+@pytest.mark.skip(reason="broken")
+@pytest.mark.skipif(sys.platform == "win32", reason="posix only")
+@pytest.mark.xfail
+def test_it(value: str) -> Any:  # pragma: no cover
+    # TODO: narrow this
+    # HACK: until the API settles
+    # ruff: ignore[ARG001]
+    x = 1  # noqa: F841
+    y = 2  # noqa
+    return cast(int, value)

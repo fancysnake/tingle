@@ -11,14 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Templates for the suppressions every project was still writing by hand:
   `coverage.pragma_comment`, `pytest.skip_marks`, `pytest.xfail_marks`,
-  `mypy.strictness_holes`, `python.cast_used` and `python.object_used`.
+  `mypy.strictness_holes` and `python.cast_used`. `mypy.strictness_holes`
+  reads the ini spellings too, since `mypy.ini` and `setup.cfg` write
+  `= False` and only TOML has a formatter settling its spacing.
 - The ruff pack covers the rest of ruff's suppression comments, split by how
   much each one covers: `ruff.ignore_comment` for `# ruff: ignore[...]` over
   a line or a statement, `ruff.suppressed_ranges` for the
   `# ruff: disable[...]` that opens a block, and `ruff.file_exemptions` for
-  `# ruff: noqa`, `# ruff: file-ignore[...]` and `# flake8: noqa`. A
-  whole-file exemption is not the admission a single `# noqa` is, so it is
-  not the same number.
+  `# ruff: noqa` and `# ruff: file-ignore[...]`. A whole-file exemption is
+  not the admission a single `# noqa` is, so it is not the same number.
 
 ### Changed
 

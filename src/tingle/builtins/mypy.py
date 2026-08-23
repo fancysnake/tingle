@@ -33,7 +33,13 @@ strictness_holes = MetricTemplate(
     name="mypy-strictness-holes",
     group="typing",
     description="`disallow_*` settings switched off, wherever mypy is configured.",
-    params={"pattern": r"disallow_\w+ = false"},
+    # mypy.ini and setup.cfg write the value capitalised, and only TOML has
+    # a formatter settling the spacing, so neither is fixed enough to match
+    # literally. The anchor keeps a commented-out setting from counting.
+    params={
+        "pattern": r"^\s*disallow_\w+\s*=\s*false\b",
+        "flags": ["MULTILINE", "IGNORECASE"],
+    },
 )
 
 overrides = MetricTemplate(

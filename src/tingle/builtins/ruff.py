@@ -60,7 +60,7 @@ file_exemptions = MetricTemplate(
     name="ruff-file-exemptions",
     group="linting",
     description="Comments exempting a whole file: `# ruff: noqa` or `file-ignore`.",
-    params={"pattern": r"#\s*(?:ruff:\s*(?:noqa|file-ignore\[)|flake8:\s*noqa)"},
+    params={"pattern": r"#\s*ruff:\s*(?:noqa|file-ignore\[)"},
 )
 
 lint_ignores = MetricTemplate(

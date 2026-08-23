@@ -11,7 +11,9 @@ skip_marks = MetricTemplate(
     name="pytest-skip",
     group="testing",
     description="`mark.skip` marks: tests that never run.",
-    params={"pattern": r"mark\.skip"},
+    # `mark.skipif` runs whenever its condition is false, so the boundary
+    # keeps a conditional skip out of a count of tests that never run.
+    params={"pattern": r"mark\.skip\b"},
 )
 
 xfail_marks = MetricTemplate(
