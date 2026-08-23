@@ -8,6 +8,7 @@ that it is not a special case.
 
 from __future__ import annotations
 
+from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
 import pytest
@@ -20,9 +21,26 @@ from tingle.pacts.config import BUILTIN_TEMPLATE_PACKAGE, ConfigError, MetricTem
 from tingle.pacts.metrics import MetricContext
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from tingle.pacts.metrics import MetricResult
 
 PATHS = sorted(PythonTemplateLoader().catalogue(BUILTIN_TEMPLATE_PACKAGE))
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _measure(path: str, source: str, *, filename: str = "test_it.py") -> MetricResult:
+    """Run one bundled template over one source, as a real run would."""
+    template = PythonTemplateLoader().load(f"{BUILTIN_TEMPLATE_PACKAGE}.{path}")
+    assert isinstance(template, MetricTemplate)
+    assert template.type is not None
+
+    return METRIC_TYPES[template.type].func(
+        MetricContext(
+            files=(PurePath(filename),),
+            read=lambda _: source,
+            exists=lambda _: True,
+            params=template.params,
+        )
+    )
 
 
 def test_the_pack_is_not_empty() -> None:
@@ -142,19 +160,84 @@ def test_a_toml_template_points_at_the_key_the_tool_actually_writes(
     path: str, expected: int
 ) -> None:
     """A key no tool writes reads as 0 with a warning, for every project."""
-    template = PythonTemplateLoader().load(f"{BUILTIN_TEMPLATE_PACKAGE}.{path}")
-    assert isinstance(template, MetricTemplate)
-    assert template.type is not None
-    metric_type = METRIC_TYPES[template.type]
+    result = _measure(path, REAL_CONFIG, filename="pyproject.toml")
 
-    result = metric_type.func(
-        MetricContext(
-            files=(),
-            read=lambda _: REAL_CONFIG,
-            exists=lambda _: True,
-            params=template.params,
-        )
-    )
+    assert not result.warnings
+    assert result.value == expected
+
+
+#: Every suppression form ruff documents, plus the ones its neighbours do,
+#: read from a `.txt` so the project does not measure its own test data.
+SUPPRESSIONS = (FIXTURES / "suppressions.py.txt").read_text()
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    (
+        pytest.param("ruff.noqa_comment", 2, id="noqa-comment"),
+        pytest.param("ruff.ignore_comment", 1, id="ruff-ignore-comment"),
+        pytest.param("ruff.suppressed_ranges", 1, id="ruff-suppressed-ranges"),
+        pytest.param("ruff.file_exemptions", 2, id="ruff-file-exemptions"),
+        pytest.param("coverage.pragma_comment", 1, id="pragma-comment"),
+        pytest.param("pytest.skip_marks", 1, id="pytest-skip"),
+        pytest.param("pytest.xfail_marks", 1, id="pytest-xfail"),
+        pytest.param("python.todo_comments", 2, id="todo-comments"),
+        pytest.param("python.cast_used", 2, id="cast-uses"),
+    ),
+)
+def test_a_source_template_matches_the_suppression_it_names(
+    path: str, expected: int
+) -> None:
+    """The pattern is the whole template, so a typo in it is the bug.
+
+    One shared fixture on purpose: the counts only hold if each pattern
+    leaves its neighbours' comments alone, which per-case sources cannot say.
+    """
+    result = _measure(path, SUPPRESSIONS)
+
+    assert not result.warnings
+    assert result.value == expected
+
+
+#: mypy's strictness settings as a project writes them off, in each of the
+#: spellings a config file is allowed -- only TOML has a formatter settling
+#: its spacing, and `False` is how mypy.ini and setup.cfg write it.
+@pytest.mark.parametrize(
+    ("source", "filename", "expected"),
+    (
+        pytest.param(
+            "[tool.mypy]\n"
+            "disallow_untyped_defs = false\n"
+            "disallow_any_generics = false\n"
+            "warn_unused_ignores = true\n",
+            "pyproject.toml",
+            2,
+            id="toml",
+        ),
+        pytest.param(
+            "[mypy]\ndisallow_untyped_defs = False\n",
+            "mypy.ini",
+            1,
+            id="ini-capitalised",
+        ),
+        pytest.param(
+            "[tool.mypy]\ndisallow_untyped_defs=false\n",
+            "pyproject.toml",
+            1,
+            id="unspaced",
+        ),
+        pytest.param(
+            "[tool.mypy]\n# disallow_untyped_defs = false\n",
+            "pyproject.toml",
+            0,
+            id="commented-out",
+        ),
+    ),
+)
+def test_the_mypy_strictness_template_counts_only_the_holes(
+    source: str, filename: str, *, expected: int
+) -> None:
+    result = _measure("mypy.strictness_holes", source, filename=filename)
 
     assert not result.warnings
     assert result.value == expected

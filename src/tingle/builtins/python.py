@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tingle.pacts.config import MetricTemplate
 
-__all__ = ["any_used", "long_files", "todo_comments"]
+__all__ = ["any_used", "cast_used", "long_files", "todo_comments"]
 
 any_used = MetricTemplate(
     type="symbol_uses",
@@ -14,12 +14,20 @@ any_used = MetricTemplate(
     params={"symbol": "typing.Any"},
 )
 
+cast_used = MetricTemplate(
+    type="symbol_uses",
+    name="cast-uses",
+    group="typing",
+    description="`typing.cast`: a type asserted where it could not be inferred.",
+    params={"symbol": "typing.cast"},
+)
+
 todo_comments = MetricTemplate(
     type="regex_count",
     name="todo-comments",
     group="linting",
-    description="`TODO` and `FIXME` comments: work written down, not done.",
-    params={"pattern": r"#\s*(TODO|FIXME)\b"},
+    description="`TODO`, `FIXME`, `XXX` and `HACK`: work written down, not done.",
+    params={"pattern": r"#\s*(TODO|FIXME|XXX|HACK)\b"},
 )
 
 long_files = MetricTemplate(

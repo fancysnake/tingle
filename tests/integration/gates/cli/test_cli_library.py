@@ -41,7 +41,7 @@ def test_library_expands_a_pack_into_pasteable_config() -> None:
     assert result.exit_code == 0
     assert "[[metrics]]" in result.output
     assert 'name = "noqa-comment"' in result.output
-    assert r"pattern = '#\s*noqa:'" in result.output
+    assert r"pattern = '#\s*noqa'" in result.output
 
 
 def test_library_reports_a_package_that_is_not_there() -> None:
