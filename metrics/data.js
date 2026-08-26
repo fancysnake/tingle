@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787512437539,
+  "lastUpdate": 1787726518373,
   "repoUrl": "https://github.com/fancysnake/tingle",
   "entries": {
     "tingle": [
@@ -1382,6 +1382,120 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/fancysnake/tingle/commit/b48624338ad818a525ac1fc42ab85ef7b97c806f"
         },
         "date": 1787512436825,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "fmt-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "taplo-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "codespell-comment",
+            "value": 2,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "ruff-format-excludes",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "noqa-comment",
+            "value": 61,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "ruff-ignores",
+            "value": 4,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "ruff-per-file-ignores",
+            "value": 15,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "pylint-comment",
+            "value": 5,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "pylint-rcfile-disables",
+            "value": 3,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "long-files",
+            "value": 0,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "type-ignores",
+            "value": 4,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "type-ignore-spread",
+            "value": 3,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "mypy-overrides",
+            "value": 1,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "any-uses",
+            "value": 1,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "deferred-import-contracts",
+            "value": 0,
+            "unit": "count",
+            "extra": "architecture"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ec9fe5ce61a8e16748c7eea247512bfc336c95f4",
+          "message": "Merge pull request #49 from fancysnake/renovate/jdx-mise-action-digest\n\nUpdate jdx/mise-action digest to c2a8761",
+          "timestamp": "2026-08-26T08:41:42+02:00",
+          "tree_id": "483c0a8b9a99604376186ab2709c7dabb752ad9d",
+          "url": "https://github.com/fancysnake/tingle/commit/ec9fe5ce61a8e16748c7eea247512bfc336c95f4"
+        },
+        "date": 1787726517927,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
