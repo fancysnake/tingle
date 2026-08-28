@@ -9,6 +9,7 @@ and skipped on the other.
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import cache
 from pathlib import PurePath
 from typing import TypeAlias
 
@@ -52,11 +53,8 @@ def text_reader(read: Callable[[PurePath], bytes | None]) -> TextReader:
     The cache is unbounded on purpose: it holds at most one run's readable
     text, and the run reads all of it anyway.
     """
-    cache: dict[PurePath, str | None] = {}
-
+    @cache
     def read_text(path: PurePath) -> str | None:
-        if path not in cache:
-            cache[path] = decode_text(read(path))
-        return cache[path]
+        return decode_text(read(path))
 
     return read_text
