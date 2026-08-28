@@ -52,6 +52,11 @@ def _finder(parts: tuple[str, ...]) -> LocatedFinder:
     """Locate every reference to the symbol in one file's source."""
 
     def find(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
+        # every counted occurrence needs the symbol's last part somewhere in
+        # the text (chains end with it, imports of the symbol name it), so a
+        # file without the substring needs no parse at all
+        if parts[-1] not in text:
+            return [], []
         try:
             tree = ast.parse(text)
         except SyntaxError as exc:

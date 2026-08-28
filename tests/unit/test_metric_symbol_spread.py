@@ -85,7 +85,7 @@ def test_file_whose_every_reference_is_excused_does_not_count() -> None:
 
 
 def test_syntax_error_warns_and_does_not_count() -> None:
-    contents = {"a.py": "def (:\n", "b.py": "x = OldClient()\n"}
+    contents = {"a.py": "x = OldClient(\n", "b.py": "x = OldClient()\n"}
 
     result = symbol_spread(_context(contents, {"symbol": "OldClient"}))
 

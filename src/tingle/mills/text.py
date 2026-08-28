@@ -46,9 +46,17 @@ def text_reader(read: Callable[[PurePath], bytes | None]) -> TextReader:
     Called at the seam, where the port is picked up, and never at a call
     site: one reader per source is what makes the rule applied once rather
     than remembered five times.
+
+    Decoded text is cached for the reader's lifetime -- one reader serves
+    every metric of a run, and each would otherwise re-read the whole tree.
+    The cache is unbounded on purpose: it holds at most one run's readable
+    text, and the run reads all of it anyway.
     """
+    cache: dict[PurePath, str | None] = {}
 
     def read_text(path: PurePath) -> str | None:
-        return decode_text(read(path))
+        if path not in cache:
+            cache[path] = decode_text(read(path))
+        return cache[path]
 
     return read_text

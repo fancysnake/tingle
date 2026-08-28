@@ -53,10 +53,12 @@ def _finder(pattern: re.Pattern[str]) -> LocatedFinder:
     """Locate every match in a file's text, at the line each one starts on."""
 
     def find(path: PurePath, text: str) -> tuple[list[Occurrence], list[str]]:
+        if not (starts := [match.start() for match in pattern.finditer(text)]):
+            return [], []
         line_starts = _line_starts(text)
         return [
-            Occurrence(path=str(path), line=bisect_right(line_starts, match.start()))
-            for match in pattern.finditer(text)
+            Occurrence(path=str(path), line=bisect_right(line_starts, start))
+            for start in starts
         ], []
 
     return find
