@@ -9,7 +9,7 @@ markdownlint-cli2 = "0.23.2"
 node = "26.7.0"
 pipx = "1.16.7"
 "pipx:poetry" = "2.4.1"
-python = "3.14"
+python = "3.11"
 
 [env]
 _.python.venv = { path = ".venv", create = true }
@@ -28,6 +28,13 @@ TOML_PATHS = "*.toml"
 
 [task_config]
 includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"]
+
+[tasks.update]
+run = [
+    "mise upgrade --bump --exclude python --minimum-release-age=7d",
+    "mise install",
+    { task = "dep:upgrade:py" },
+]
 
 [tasks."lint:markdown"]
 run = "markdownlint-cli2 --fix docs/**/*.md CHANGELOG.md README.md"
