@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-08-28
+
+### Changed
+
+- Runs are faster again — 12.4s to 1.9s on an 800-file repository. A symbol
+  metric parses a file only when its text contains the symbol's last part,
+  since no counted occurrence exists without it; a regex metric computes
+  line offsets only for files its pattern matched; and each file is read
+  and decoded once per run rather than once per metric. Nothing reported
+  changes, except that a file both unparsable and free of the symbol is now
+  skipped without a warning — it contributes zero either way.
+
 ## [0.7.1] - 2026-08-23
 
 ### Added
