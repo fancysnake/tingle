@@ -53,6 +53,7 @@ def text_reader(read: Callable[[PurePath], bytes | None]) -> TextReader:
     The cache is unbounded on purpose: it holds at most one run's readable
     text, and the run reads all of it anyway.
     """
+
     @cache
     def read_text(path: PurePath) -> str | None:
         return decode_text(read(path))
