@@ -120,10 +120,17 @@ def test_star_import_falls_back_to_bare_counting() -> None:
 
 
 def test_syntax_error_skips_file_with_warning() -> None:
-    result = _run_files({"bad.py": "def broken(:\n", "ok.py": ""})
+    result = _run_files({"bad.py": "x = OldClient(\n", "ok.py": ""})
 
     assert result.value == 0
     assert "syntax error" in result.warnings[0]
+
+
+def test_unparsable_file_without_the_symbol_is_skipped_silently() -> None:
+    result = _run_files({"bad.py": "def broken(:\n"})
+
+    assert result.value == 0
+    assert not result.warnings
 
 
 def test_non_python_files_are_ignored() -> None:

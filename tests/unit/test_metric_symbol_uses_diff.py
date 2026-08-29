@@ -77,7 +77,7 @@ def test_base_syntax_error_warns_and_skips_side() -> None:
     result = _run(
         file,
         {"a.py": "from myapp.legacy import OldClient\n"},
-        base={"a.py": "def broken(:\n"},
+        base={"a.py": "x = OldClient(\n"},
     )
 
     assert result.added == 1

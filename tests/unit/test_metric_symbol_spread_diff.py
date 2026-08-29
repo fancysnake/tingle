@@ -136,7 +136,7 @@ def test_syntax_error_on_one_side_names_that_side() -> None:
     result = symbol_spread_diff(
         _context(
             (_modified("a.py"),),
-            {"a.py": "def (:\n"},
+            {"a.py": "x = OldClient(\n"},
             base={"a.py": "x = OldClient()\n"},
         )
     )
