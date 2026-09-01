@@ -7,7 +7,7 @@ enter = "poetry install"
 [tools]
 markdownlint-cli2 = "0.23.2"
 node = "26.7.0"
-pipx = "1.16.7"
+pipx = "1.17.2"
 "pipx:poetry" = "2.4.1"
 python = "3.11"
 
