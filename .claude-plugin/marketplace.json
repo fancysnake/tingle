@@ -1,0 +1,16 @@
+{
+  "name": "tingle",
+  "owner": {
+    "name": "fancysnake"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for configuring and reading tingle"
+  },
+  "plugins": [
+    {
+      "name": "tingle-config",
+      "source": "./plugins/tingle-config",
+      "category": "development"
+    }
+  ]
+}
