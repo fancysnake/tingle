@@ -113,6 +113,18 @@ $ echo $?
 - [CLI reference](https://tingle.fancysnake.dev/cli/) — every command and
   flag.
 
+## Claude Code plugin
+
+The `tingle-config` skill teaches Claude Code to set up or extend a
+`tingle.toml`: it surveys the project's languages and tools for debt markers
+worth counting and writes metrics that validate. Install it from this repo's
+marketplace:
+
+```console
+claude plugin marketplace add fancysnake/tingle
+claude plugin install tingle-config@tingle
+```
+
 ## Development
 
 Python 3.11–3.14 are supported (CI runs the full matrix). The project uses

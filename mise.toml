@@ -5,6 +5,8 @@ experimental = true
 enter = "poetry install"
 
 [tools]
+# `jq` is what `release:bump` edits the plugin manifest with.
+jq = "1.8.2"
 markdownlint-cli2 = "0.23.2"
 node = "26.9.0"
 pipx = "1.17.4"
@@ -54,6 +56,20 @@ run = "poetry run mkdocs serve"
 depends = ["docs:_install"]
 description = "Build the documentation site (fails on broken links)"
 run = "poetry run mkdocs build --strict"
+
+# The plugin carries the package version, so a bump is two files that must
+# agree. `poetry version` is what validates the string; the manifest follows it.
+[tasks."release:bump"]
+description = "Set the package version in pyproject.toml and the plugin manifest"
+usage = 'arg "<version>"'
+run = """
+set -eu
+poetry version "$usage_version"
+manifest=plugins/tingle-config/.claude-plugin/plugin.json
+jq --arg v "$(poetry version -s)" '.version = $v' "$manifest" > "$manifest.tmp"
+mv "$manifest.tmp" "$manifest"
+git --no-pager diff --stat -- pyproject.toml "$manifest"
+"""
 
 # Two checks the shared lint:py cannot express, because an included task
 # cannot be overridden by name: it runs mypy on source only, and it runs
