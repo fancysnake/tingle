@@ -17,7 +17,7 @@ on a fork:
 
 ```console
 git remote add https-origin https://github.com/fancysnake/tingle.git
-gh auth setup-git
+gh auth login && gh auth setup-git
 ```
 
 ## Checks
