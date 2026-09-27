@@ -26,7 +26,9 @@ PACKAGE = "tingle"
 SRC_PATHS = "src"
 TEST_PATHS = "tests"
 SCRIPT_PATHS = ""
-TOML_PATHS = "*.toml"
+# both globs, because a shell one does not match a leading dot and .vekna.toml
+# and .taplo.toml are held to the same column width as the rest
+TOML_PATHS = "*.toml .*.toml"
 
 [task_config]
 includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"]
@@ -38,8 +40,15 @@ run = [
     { task = "dep:upgrade:py" },
 ]
 
+# split the way the shared config splits black, ruff and taplo: the checking
+# half is what a gate may run, since the fixing half rewrites the files
 [tasks."lint:markdown"]
-run = "markdownlint-cli2 --fix docs/**/*.md plugins/**/*.md CHANGELOG.md README.md"
+description = "Check Markdown with markdownlint"
+run = "markdownlint-cli2 docs/**/*.md plugins/**/*.md CHANGELOG.md CLAUDE.md README.md"
+
+[tasks."format:markdown"]
+description = "Format Markdown with markdownlint"
+run = "markdownlint-cli2 --fix docs/**/*.md plugins/**/*.md CHANGELOG.md CLAUDE.md README.md"
 
 # the docs group is optional, so the `enter` hook's plain `poetry install`
 # does not provide mkdocs; every docs task pulls it in first.
@@ -82,26 +91,35 @@ run = [
     "pylint -j 0 --enable=duplicate-code {{ env.SRC_PATHS }} {{ env.SCRIPT_PATHS }}",
 ]
 
-# The gate: everything that can fail a branch, changing no file. fullcheck
-# below is the same ground plus the formatters, diff coverage and tingle's
-# own report, and is what runs before a commit.
-[tasks.gate]
-description = "Linters, types and tests, changing no file"
-run = [{ task = "check:py" }, { task = "lint:strict" }, { task = "lint:versions" }]
+# what the `quality` job in ci.yml runs, in the same order
+[tasks."lint:all"]
+description = "Run every linter: Python, Markdown, and the scoped checks"
+run = [{ task = "lint:py" }, { task = "lint:markdown" }, { task = "lint:strict" }]
 
-# check:py plus the gates CI cares about: the scoped checks above, coverage
-# of the lines this branch changed, and tingle's own debt report
-[tasks.fullcheck]
-description = "Run every check: formatters, linters, diff coverage, tingle"
+# what an unattended `vekna cast` may run: it changes no file, so the ritual's
+# `git add -A` cannot sweep up a repo-wide reformat, and it measures no
+# coverage, because cabinet's own `coverage` key owns that and a gap found
+# there reaches the agent as a coverage report rather than a red gate.
+[tasks.gate]
+description = "Linters, types and the test suite, changing nothing"
+run = [{ task = "lint:all" }, { task = "lint:versions" }, { task = "test:py" }]
+
+# the gate a human commits behind: the formatters as well, coverage of the
+# lines this branch changed, and — in `fullcheck` alone, since CI has it
+# continue-on-error — tingle's own debt report
+[tasks.check]
+description = "Run every check but tingle's own debt report"
 run = [
     { task = "format:py" },
-    { task = "lint:markdown" },
-    { task = "lint:py" },
-    { task = "lint:strict" },
-    { task = "test:py:cov:diff" },
-    { task = "lint:tingle" },
+    { task = "format:markdown" },
+    { task = "lint:all" },
     { task = "lint:versions" },
+    { task = "test:py:cov:diff" },
 ]
+
+[tasks.fullcheck]
+description = "Run every check: formatters, linters, diff coverage, tingle"
+run = [{ task = "check" }, { task = "lint:tingle" }]
 
 # The plugin manifest carries the package version (see release:bump), so the
 # two files can drift. Checked here, on the branch, rather than only against

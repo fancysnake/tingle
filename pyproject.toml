@@ -6,7 +6,7 @@ authors = [{ name = "Radosław Ganczarek", email = "radoslaw@ganczarek.in" }]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.11,<3.15"
 keywords = ["metrics", "refactoring", "technical-debt", "code-quality", "linting", "ci"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -42,6 +42,8 @@ packages = [{ include = "tingle", from = "src" }]
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.5.1"
+# cabinet is not on PyPI and is not going there; git is its only source.
+cabinet = { git = "https://github.com/fancysnake/cabinet.git", rev = "v0.3.0" }
 codespell = "^2.4.2"
 deptry = "^0.25.1"
 diff-cover = "^10.4.1"

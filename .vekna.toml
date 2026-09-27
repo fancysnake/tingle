@@ -1,0 +1,36 @@
+# What `vekna cast <ritual>` runs here: cabinet's pull request maintenance
+# rituals (refresh, cover, review, labels), read from the `[cabinet]` section.
+# Only what differs from cabinet's defaults; everything else follows the tome,
+# so a cabinet bump is not silently frozen out by a copied value.
+[rituals]
+modules = ["cabinet.rituals"]
+
+[cabinet]
+# A cast has no terminal to answer a prompt on, so neither the push nor the
+# commit may ask for one: `origin` is ssh and would want a key passphrase, so
+# pushes go through a second remote that is https with `gh` behind it, and
+# signing stays off for a contributor whose global `commit.gpgsign` is on and
+# whose key has a passphrase. docs/contributing.md carries the two commands a
+# fresh clone runs.
+remote = "https-origin"
+sign_commits = false
+# `mise run gate` is the sweep that changes no file and measures no coverage —
+# see the task in mise.toml. `coverage` is named because cabinet's default is
+# `mise run diff-cover`, which is not a task here; the suite is seconds long,
+# so the full measurement and the fast one are the same.
+gate = "mise run gate"
+coverage = "mise run test:py:cov:diff"
+
+# Job names in .github/workflows/ci.yml, matched by prefix: `tests` covers the
+# interpreter matrix. `tingle` is left out on purpose — it is continue-on-error
+# and never turns the board red.
+[cabinet.ci]
+gate_checks = ["quality", "tests"]
+
+# The unit suite, whole: mise appends arguments to the task's own pytest
+# invocation rather than replacing its paths, so this grants the 34 unit files
+# together, not one of them, and the prefix reaches the `:cov` variants too.
+# The integration suite is left out — it is the slow half the cover prompt
+# tells the agent to stay out of, and the sweeps stay the ritual's.
+[cabinet.agent]
+may_run = ["mise run test:unit"]
