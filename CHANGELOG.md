@@ -9,20 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`tingle-config` is a Claude Code plugin.** The repo is its marketplace:
-
-  ```bash
-  claude plugin marketplace add fancysnake/tingle
-  claude plugin install tingle-config@tingle
-  ```
-
-  The skill sets up or extends a project's config: it surveys the languages
-  and tools actually in use for the markers they leave behind — silenced
-  linters, typing escape hatches, skipped tests, retiring packages — in
-  Python and beyond, knows the bundled templates and the configuration
-  caveats, and verifies that what it wrote measures something. The plugin
-  carries the package version, and the release workflow refuses a tag the
-  two disagree on.
+- **`tingle-config` is a Claude Code plugin.** A skill that surveys a
+  project's languages and tools for the debt markers they leave behind and
+  writes the config that counts them, in Python and beyond. Install it from
+  this repository's marketplace — see
+  [Claude Code plugin](https://tingle.fancysnake.dev/claude-plugin/).
 
 ## [0.7.2] - 2026-08-28
 

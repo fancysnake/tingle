@@ -17,6 +17,10 @@ that should disappear. This skill writes the config that says what to count.
 It is a survey first and an edit second — a metric is only worth its row if
 the project actually leaves that marker behind.
 
+<https://tingle.fancysnake.dev/configuration/> and
+<https://tingle.fancysnake.dev/metrics/> are the authority where this file
+disagrees with them; what follows is the compressed form.
+
 ## 1. Find the current state
 
 - `tingle --version`. Not installed: `pipx run tingle …` or `uvx tingle …`
@@ -25,7 +29,10 @@ the project actually leaves that marker behind.
 - The config is `./tingle.toml`, else `[tool.tingle]` in `./pyproject.toml`.
   Discovery looks in the working directory only, never upward, and the
   config file's directory is the root every glob and `file` param resolves
-  against. A non-Python project always gets `tingle.toml`.
+  against. `--config <path>` names one elsewhere — on `tingle` itself, and
+  on `stat`, `check`, `report` and `list`, but not on `add` — and moves
+  that root to the named file's directory. A non-Python project always gets
+  `tingle.toml`.
 - Existing config: `tingle list` validates it (exit 2 is a config error, all
   problems reported at once), then `tingle stat` shows the numbers and any
   `ranges matched no files` warning on stderr. Read the file before editing;
@@ -33,7 +40,7 @@ the project actually leaves that marker behind.
 - No config: `tingle init` writes a commented starter, or write the file from
   scratch — the starter is only a scaffold.
 - `tingle list --types` and `tingle library` print what the installed
-  version supports. They are the authority over the tables below.
+  version supports. They are the authority over the catalog below.
 
 ## 2. Survey the project
 
@@ -65,20 +72,9 @@ Look, do not assume. Four passes:
 ### Python tools — use the bundled templates
 
 `base = "tingle.builtins.<module>.<name>"`. Every template carries its
-`type`, `name`, `group` and pattern; state only what differs.
-
-| Tool in use | Templates (`tingle.builtins.…`) |
-| --- | --- |
-| ruff | `ruff.noqa_comment`, `ruff.noqa_spread`, `ruff.ignore_comment`, `ruff.suppressed_ranges`, `ruff.file_exemptions`, `ruff.lint_ignores`, `ruff.per_file_ignores`, `ruff.format_excludes` |
-| pylint | `pylint.disable_comment`, `pylint.pyproject_disables`, `pylint.rcfile_disables` (reads `.pylintrc`) |
-| mypy | `mypy.type_ignore_comment`, `mypy.type_ignore_spread`, `mypy.strictness_holes`, `mypy.overrides`, `mypy.disabled_error_codes` |
-| black | `black.fmt_comment`, `black.fmt_spread` |
-| pytest | `pytest.skip_marks`, `pytest.xfail_marks` |
-| coverage | `coverage.pragma_comment` |
-| unittest.mock | `unittest_mock.any_used`, `unittest_mock.patch_used` |
-| import-linter | `import_linter.deferred_contracts`, `import_linter.ignored_imports` |
-| codespell, taplo | `codespell.ignore_comment`, `taplo.ignore_comment` |
-| any Python | `python.any_used`, `python.cast_used`, `python.todo_comments`, `python.long_files` (over 1000 lines) |
+`type`, `name`, `group` and pattern; state only what differs. Read the
+bases off `tingle library`, or `tingle library --expand` for each one as
+pasteable config — do not guess a name.
 
 The `*_spread` twins count files reached rather than occurrences — pick one
 of a pair, or both when containment matters more than volume. The
@@ -89,19 +85,24 @@ kind read a config file, not a range: they need the file to exist, and
 **do** need `range = "config"`, or they search the default range and find
 nothing.
 
-Scope a marker to where it is debt: `coverage.pragma_comment`,
-`unittest_mock.any_used` and the pytest marks to the tests range; the
-typing templates to the source range. Templates used with a narrowed range
-usually get a `name` in the group's style (`type-any`, `mock-ANY`,
-`pylint-disables`).
+Scoping a marker to where it is debt is a judgement, not a rule:
+`coverage.pragma_comment`, `unittest_mock.any_used` and the pytest marks
+belong to the tests range and the typing templates to the source range
+*when the project treats the two sides differently*. Where it does not, the
+templates' own default range is the shorter config and counts the same
+markers. A template used with a narrowed range usually gets a `name` in the
+group's style (`type-any`, `mock-ANY`, `pylint-disables`).
 
 ### Everything else — state the metric yourself
 
 `regex_count`, `regex_spread`, `file_count` and `line_count` read any text
 file. `toml_list_length`, `toml_table_array` and `ini_list_length` read any
 TOML or INI file named by `file`. `symbol_uses` and `symbol_spread` are
-Python-only. There is no JSON or YAML reader: count entries in those configs
-with `regex_count` over the file, anchored with `flags = ["MULTILINE"]`.
+Python-only. There is no JSON or YAML reader: count entries in those
+configs with `regex_count`, anchored with `flags = ["MULTILINE"]`. It takes
+no `file` — it reads the metric's range — so the config has to be in a
+range (`config`, or one of its own) with that range named on the metric,
+or it counts nothing.
 
 Patterns below are starting points; confirm each against real lines with
 `tingle report --metric NAME` and excuse false positives with
@@ -120,7 +121,7 @@ Each line is marker, `pattern`, group.
   linting · unfinished `\b(todo|unimplemented)!\(` linting · ignored tests
   `#\[ignore\b` testing.
 - **Go**: nolint `//\s*nolint` linting · skipped tests `\bt\.Skip\w*\(`
-  testing · untyped `\binterface\{\}|\bany\b` typing.
+  testing.
 - **Ruby**: rubocop disabled `rubocop:disable` linting · pending specs
   `\b(xit|xdescribe|pending)\b` testing.
 - **PHP**: static analysis silenced
@@ -174,12 +175,13 @@ Whole-project shapes, independent of language:
 Ranges first, then metrics, grouped under comment headings the way
 `tingle init` does.
 
-- **Ranges** follow one convention: a whole-language range as the default
-  (`python` = `src/**/*.py` + `tests/**/*.py`, `default = true`), a source
-  and a tests split of it (`python-src`, `python-tests`), a `config` range
-  for the tool configs, then one per further tree (`js`, `templates`,
-  `legacy`, `gates`). At most one range is the default; with none, every
-  file is.
+- **Ranges**: a whole-language range as the default (`python` =
+  `src/**/*.py` + `tests/**/*.py`, `default = true`) is usually the whole
+  of it. Add a source and tests split (`python-src`, `python-tests`) only
+  where a metric is debt on one side and not the other, a `config` range
+  when a metric reads a tool config, and one per further tree (`js`,
+  `templates`, `legacy`, `gates`). At most one range is the default; with
+  none, every file is.
 - **Globs match the whole path from the root** with pathlib rules: `*` stays
   in one segment, `**` spans, always `/`. Only `.git/`, `.venv/`,
   `node_modules/`, `dist/`, `.tox/` and `.mise/` at the root and

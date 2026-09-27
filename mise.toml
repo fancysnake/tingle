@@ -39,7 +39,7 @@ run = [
 ]
 
 [tasks."lint:markdown"]
-run = "markdownlint-cli2 --fix docs/**/*.md CHANGELOG.md README.md"
+run = "markdownlint-cli2 --fix docs/**/*.md plugins/**/*.md CHANGELOG.md README.md"
 
 # the docs group is optional, so the `enter` hook's plain `poetry install`
 # does not provide mkdocs; every docs task pulls it in first.
@@ -82,6 +82,13 @@ run = [
     "pylint -j 0 --enable=duplicate-code {{ env.SRC_PATHS }} {{ env.SCRIPT_PATHS }}",
 ]
 
+# The gate: everything that can fail a branch, changing no file. fullcheck
+# below is the same ground plus the formatters, diff coverage and tingle's
+# own report, and is what runs before a commit.
+[tasks.gate]
+description = "Linters, types and tests, changing no file"
+run = [{ task = "check:py" }, { task = "lint:strict" }, { task = "lint:versions" }]
+
 # check:py plus the gates CI cares about: the scoped checks above, coverage
 # of the lines this branch changed, and tingle's own debt report
 [tasks.fullcheck]
@@ -93,4 +100,23 @@ run = [
     { task = "lint:strict" },
     { task = "test:py:cov:diff" },
     { task = "lint:tingle" },
+    { task = "lint:versions" },
 ]
+
+# The plugin manifest carries the package version (see release:bump), so the
+# two files can drift. Checked here, on the branch, rather than only against
+# the tag — this repo tags after merge, and a mismatch there costs a deleted
+# tag. mise puts the pinned jq on PATH; the release workflow's bare one was
+# the runner image's.
+[tasks."lint:versions"]
+description = "Check the plugin manifest declares the package version"
+run = """
+set -eu
+manifest=plugins/tingle-config/.claude-plugin/plugin.json
+declared=$(poetry version -s)
+plugin=$(jq -r .version "$manifest")
+if [ "$plugin" != "$declared" ]; then
+    echo "$manifest declares version $plugin, pyproject declares $declared" >&2
+    exit 1
+fi
+"""

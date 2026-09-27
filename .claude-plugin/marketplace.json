@@ -4,7 +4,7 @@
     "name": "fancysnake"
   },
   "metadata": {
-    "description": "Claude Code plugins for configuring and reading tingle"
+    "description": "The tingle-config Claude Code plugin: set up or extend a project's tingle config"
   },
   "plugins": [
     {
