@@ -11,6 +11,15 @@ mise install
 poetry install
 ```
 
+`vekna cast` pushes through an https remote, since a cast has no terminal for
+an ssh key passphrase. A fresh clone adds one once, substituting its own URL
+on a fork:
+
+```console
+git remote add https-origin https://github.com/fancysnake/tingle.git
+gh auth setup-git
+```
+
 ## Checks
 
 Tasks are defined in `mise.toml`; `mise tasks` lists them all.
@@ -23,6 +32,26 @@ mise run format       # black, ruff --fix, taplo
 
 tingle dogfoods its own CI gate — `tingle check` runs on every pull request,
 so a branch that takes on debt fails the build.
+
+## Tests
+
+`tests/` is split by test type, and the layer under test picks the type — not
+convenience, and not whichever is easier to reach coverage with.
+
+| Layer | Type | Where |
+| --- | --- | --- |
+| `mills`, `specs`, `pacts`, and pure helpers from any layer | unit | `tests/unit/` |
+| `links`, `gates`, `inits` — anything that touches the filesystem, git, or a terminal | integration | `tests/integration/` |
+
+Unit tests mock the protocols in `pacts` and assert how they were called;
+`tests/unit/` is organised by convenience rather than mirroring `src/`.
+Integration tests run against the real thing — a git repository in a tmpdir, a
+typer `CliRunner`, a textual pilot — and assert side effects.
+
+An uncovered line belongs to the test type that owns its layer: never raise
+`links` or `gates` coverage with a mock-everything unit test. Those two suites
+are also what the `test:unit` and `test:int` tasks run separately, so a
+boundary change can be checked without the whole suite.
 
 ## Docs
 
