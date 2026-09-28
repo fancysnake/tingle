@@ -1,59 +1,118 @@
-/*tingle palette: red chrome, blue interaction, yellow highlight.
-   Red carries structure (header, nav, rules), blue carries anything the
-   reader can act on (links, hover, focus), yellow only ever appears as a
-   surface behind dark text — it fails contrast as a foreground.*/
+/*
+ * tingle — red carries structure (header, nav, rules), blue carries anything
+ * the reader can act on (links, hover, focus), yellow only ever appears as a
+ * surface behind dark text, since it fails contrast as a foreground.
+ *
+ * Every pairing below clears WCAG AA against the surface it sits on, because
+ * a palette nobody can read is just a mood. Measured, not asserted: the
+ * tightest pairing is the light special-token pink on the code surface at
+ * 4.53:1, then the dark page title red on the dark page at 4.62:1.
+ *
+ * Material's `default` and `slate` schemes carry the surfaces; every colour
+ * below comes from here, and mkdocs.yml pins `primary`/`accent` to `custom`
+ * so no Material palette rule outranks these.
+ */
 
-[data-md-color-scheme="default"] {
+:root {
+  --tingle-paper: #ffffff;
+  --tingle-ink: #000000de;
   --tingle-red: #c62828;
   --tingle-red-light: #ef5350;
   --tingle-red-dark: #8c1d1d;
   --tingle-blue: #1565c0;
-  --tingle-blue-light: #42a5f5;
   --tingle-yellow: #f9a825;
   --tingle-yellow-surface: #fff8e1;
+}
+
+/*
+ * One block per scheme: its surfaces, its mapping onto Material's variables,
+ * and its code-highlight colours. Material ships a sensible default for that
+ * last group; what it does not do is agree with a palette it has never heard
+ * of, and a code block is most of what these pages are — so keywords take the
+ * structural red, functions the interaction blue, the rest stays as Material
+ * had it.
+ */
+
+/* ---- Light ---- */
+
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: var(--tingle-paper);
+  --md-default-fg-color: var(--tingle-ink);
 
   --md-primary-fg-color: var(--tingle-red);
   --md-primary-fg-color--light: var(--tingle-red-light);
   --md-primary-fg-color--dark: var(--tingle-red-dark);
   --md-primary-bg-color: #ffffff;
-  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+  --md-primary-bg-color--light: #ffffffb3;
 
   --md-accent-fg-color: var(--tingle-blue);
-  --md-accent-fg-color--transparent: rgba(21, 101, 192, 0.1);
+  --md-accent-fg-color--transparent: #1565c01a;
   --md-accent-bg-color: #ffffff;
-  --md-accent-bg-color--light: rgba(255, 255, 255, 0.7);
+  --md-accent-bg-color--light: #ffffffb3;
 
   --md-typeset-a-color: var(--tingle-blue);
-  --md-typeset-mark-color: rgba(249, 168, 37, 0.4);
+  --md-typeset-mark-color: #f9a82566;
+
   --md-footer-bg-color: var(--tingle-red-dark);
   --md-footer-bg-color--dark: #6d1616;
+
+  --md-code-hl-color: #4287ff;
+  --md-code-hl-color--light: #4287ff1a;
+  --md-code-hl-keyword-color: var(--tingle-red);
+  --md-code-hl-function-color: var(--tingle-blue);
+  --md-code-hl-string-color: #1c7d4d;
+  --md-code-hl-number-color: #d52a2a;
+  --md-code-hl-comment-color: #6b6b6b;
+  --md-code-hl-name-color: var(--md-code-fg-color);
+  --md-code-hl-operator-color: var(--md-default-fg-color--light);
+  --md-code-hl-punctuation-color: var(--md-default-fg-color--light);
+  --md-code-hl-constant-color: #6e59d9;
+  --md-code-hl-special-color: #db1457;
 }
+
+/* ---- Dark ---- */
 
 [data-md-color-scheme="slate"] {
   --tingle-red: #ef5350;
   --tingle-red-light: #ff8a80;
-  --tingle-red-dark: #b71c1c;
+  --tingle-red-dark: #a51f1f;
+  --tingle-red-darker: #7f1616;
   --tingle-blue: #64b5f6;
-  --tingle-blue-light: #90caf9;
   --tingle-yellow: #ffca28;
-  --tingle-yellow-surface: rgba(255, 202, 40, 0.14);
+  --tingle-yellow-surface: #ffca2824;
 
-  --md-primary-fg-color: #a51f1f;
+  --md-primary-fg-color: var(--tingle-red-dark);
   --md-primary-fg-color--light: var(--tingle-red);
-  --md-primary-fg-color--dark: #7f1616;
+  --md-primary-fg-color--dark: var(--tingle-red-darker);
   --md-primary-bg-color: #ffffff;
-  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+  --md-primary-bg-color--light: #ffffffb3;
 
   --md-accent-fg-color: var(--tingle-blue);
-  --md-accent-fg-color--transparent: rgba(100, 181, 246, 0.14);
+  --md-accent-fg-color--transparent: #64b5f624;
 
   --md-typeset-a-color: var(--tingle-blue);
-  --md-typeset-mark-color: rgba(255, 202, 40, 0.35);
+  --md-typeset-mark-color: #ffca2859;
+
   --md-footer-bg-color: #16181d;
   --md-footer-bg-color--dark: #101216;
+
+  --md-code-hl-color: #2977ff;
+  --md-code-hl-color--light: #2977ff1a;
+  --md-code-hl-keyword-color: #ff7b72;
+  --md-code-hl-function-color: var(--tingle-blue);
+  --md-code-hl-string-color: #2fb170;
+  --md-code-hl-number-color: #f0826f;
+  --md-code-hl-comment-color: #9a9fab;
+  --md-code-hl-name-color: var(--md-code-fg-color);
+  --md-code-hl-operator-color: var(--md-default-fg-color--light);
+  --md-code-hl-punctuation-color: var(--md-default-fg-color--light);
+  --md-code-hl-constant-color: #9383e2;
+  --md-code-hl-special-color: #f06090;
+  --md-code-hl-generic-color: var(--md-default-fg-color--light);
+  --md-code-hl-variable-color: var(--md-default-fg-color--light);
 }
 
-/*Structure — red*/
+/* Structure — red: the page title, and where the reader is in the nav. */
 
 .md-typeset h1 {
   color: var(--tingle-red);
@@ -70,23 +129,11 @@
   color: var(--tingle-red);
 }
 
-.md-typeset .md-button--primary {
-  background-color: var(--tingle-red);
-  border-color: var(--tingle-red);
-  color: var(--md-primary-bg-color);
-}
-
-.md-typeset .md-button--primary:hover,
-.md-typeset .md-button--primary:focus {
-  background-color: var(--md-accent-fg-color);
-  border-color: var(--md-accent-fg-color);
-}
-
-/*Interaction — blue*/
+/* Interaction — blue: anything under the pointer. */
 
 .md-typeset a:hover,
 .md-typeset a:focus {
-  color: var(--tingle-blue-light);
+  color: var(--md-accent-fg-color);
 }
 
 .md-typeset .headerlink:hover,
@@ -99,7 +146,7 @@
   background-color: var(--md-accent-fg-color--transparent);
 }
 
-/*Highlight — yellow, always as a surface under dark text*/
+/* Highlight — yellow, always as a surface under dark text. */
 
 .md-typeset mark,
 .md-search-result__link mark {
@@ -125,7 +172,7 @@
     0 -0.1rem 0.2rem var(--md-default-fg-color--lightest) inset;
 }
 
-/*Admonitions — the three colors split by intent, everything else default*/
+/* Admonitions — the three colours split by intent, everything else default. */
 
 .md-typeset .admonition.danger,
 .md-typeset details.danger,
@@ -138,7 +185,7 @@
 .md-typeset .danger > summary,
 .md-typeset .failure > .admonition-title,
 .md-typeset .failure > summary {
-  background-color: rgba(198, 40, 40, 0.1);
+  background-color: #c628281a;
 }
 
 .md-typeset .danger > .admonition-title::before,
@@ -190,7 +237,7 @@
   background-color: var(--tingle-yellow);
 }
 
-/*Tables — red rule under the head, blue on row hover*/
+/* Tables — a red rule under the head, blue on row hover. */
 
 .md-typeset table:not([class]) th {
   background-color: var(--md-default-fg-color--lightest);

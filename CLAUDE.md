@@ -19,6 +19,7 @@ directly. The ones that matter:
 mise run test:unit    # unit suite
 mise run test:int     # integration suite
 mise run gate         # linters, types and tests, changing no file
+mise run site:build   # the docs site; strict, so a broken link fails it
 mise run fullcheck    # the sweep before a commit: formatters and coverage too
 ```
 

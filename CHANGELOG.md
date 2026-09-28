@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The docs tasks are `site:dev` and `site:build`, replacing `docs:serve` and
+  `docs:build`; the strict build is now set in `mkdocs.yml`, so `site:dev`
+  fails on a broken link the same way.
+
 ## [0.8.0] - 2026-09-28
 
 ### Added

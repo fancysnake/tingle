@@ -124,8 +124,14 @@ outline exactly as it was.
 
 `tingle --diff [--base REF]` opens the [branch-impact](diff.md) view.
 
-Options: `--version`, `--diff`, `--base REF`, `--config PATH`, `--metric
-NAME`, `--group NAME`.
+| Option | Meaning |
+| --- | --- |
+| `--version` | print the version and exit |
+| `--diff` | measure the current branch's impact instead |
+| `--base REF` | base branch for `--diff` (implies `--diff`) |
+| `--config PATH` | path to the config file |
+| `--metric NAME` | run only the named metric (repeatable) |
+| `--group NAME` | run only the metrics in the named group (repeatable) |
 
 ## `tingle stat`
 

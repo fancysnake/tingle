@@ -1,0 +1,65 @@
+name: Site
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Keyed on the ref, so a newer push to main cancels the older build
+    # before it can reach the deploy. Workflow-level, this would cut off an
+    # in-flight deploy instead, which the group below deliberately avoids.
+    concurrency:
+      group: site-build-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+      # Pages serves this site, so the recorded history has no branch of its
+      # own to be served from: fetch its chart over the placeholder committed
+      # at that path. Before the build, not after, so MkDocs carries it into
+      # the site and strict checks the pages that link to it.
+      #
+      # This workflow and Metrics history both fire on the same push and run
+      # concurrently, so the chart published here is normally one commit
+      # behind; the next push to main brings it level.
+      - uses: ./actions/metrics-history/publish
+        with:
+          data-branch: metrics-data
+          into: docs/history/chart
+      - run: mise run site:build
+      # Nothing consumes the artifact on a pull request, since `deploy` is
+      # gated the same way; the strict build above is the whole review.
+      - if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: site/
+
+  # Pages has no per-pull-request preview, so a pull request builds and stops
+  # there. The build is the review; the deploy waits for main.
+  deploy:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    # Its own group, because a deploy wants the opposite policy to a build: a
+    # publish cut off halfway leaves the site on the old commit, so two merges
+    # queue here rather than cancel each other.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

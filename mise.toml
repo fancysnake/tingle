@@ -50,21 +50,20 @@ run = "markdownlint-cli2 docs/**/*.md plugins/**/*.md CHANGELOG.md CLAUDE.md REA
 description = "Format Markdown with markdownlint"
 run = "markdownlint-cli2 --fix docs/**/*.md plugins/**/*.md CHANGELOG.md CLAUDE.md README.md"
 
-# the docs group is optional, so the `enter` hook's plain `poetry install`
-# does not provide mkdocs; every docs task pulls it in first.
-[tasks."docs:_install"]
+# `--only docs --no-root` because mkdocs.yml declares no plugins: nothing here
+# imports the package, so neither the package nor the dev group is worth
+# installing. `--only` alone still installs the root project.
+[tasks."site:_install"]
 hide = true
-run = "poetry install --with docs"
+run = "poetry install --only docs --no-root --quiet"
 
-[tasks."docs:serve"]
-depends = ["docs:_install"]
-description = "Serve the documentation site locally with live reload"
-run = "poetry run mkdocs serve"
+[tasks."site:dev"]
+description = "Serve the documentation site with live reload"
+run = [{ task = "site:_install" }, "mkdocs serve"]
 
-[tasks."docs:build"]
-depends = ["docs:_install"]
-description = "Build the documentation site (fails on broken links)"
-run = "poetry run mkdocs build --strict"
+[tasks."site:build"]
+description = "Build the documentation site into site/"
+run = [{ task = "site:_install" }, "mkdocs build"]
 
 # The plugin carries the package version, so a bump is two files that must
 # agree. `poetry version` is what validates the string; the manifest follows it.
@@ -104,9 +103,11 @@ run = [{ task = "lint:py" }, { task = "lint:markdown" }, { task = "lint:strict" 
 description = "Linters, types and the test suite, changing nothing"
 run = [{ task = "lint:all" }, { task = "lint:versions" }, { task = "test:py" }]
 
-# the gate a human commits behind: the formatters as well, coverage of the
-# lines this branch changed, and — in `fullcheck` alone, since CI has it
-# continue-on-error — tingle's own debt report
+# the gate a human commits behind: the formatters as well, the strict docs
+# build, coverage of the lines this branch changed, and — in `fullcheck`
+# alone, since CI has it continue-on-error — tingle's own debt report.
+# `gate` stays without these: it is the unattended-cast task and wants to
+# stay fast and write nothing.
 [tasks.check]
 description = "Run every check but tingle's own debt report"
 run = [
@@ -114,11 +115,12 @@ run = [
     { task = "format:markdown" },
     { task = "lint:all" },
     { task = "lint:versions" },
+    { task = "site:build" },
     { task = "test:py:cov:diff" },
 ]
 
 [tasks.fullcheck]
-description = "Run every check: formatters, linters, diff coverage, tingle"
+description = "Run every check: formatters, linters, docs, diff coverage, tingle"
 run = [{ task = "check" }, { task = "lint:tingle" }]
 
 # The plugin manifest carries the package version (see release:bump), so the
