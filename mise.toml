@@ -5,6 +5,8 @@ experimental = true
 enter = "poetry install"
 
 [tools]
+# `jq` is what `release:bump` edits the plugin manifest with.
+jq = "1.8.2"
 markdownlint-cli2 = "0.23.2"
 node = "26.9.0"
 pipx = "1.17.4"
@@ -42,11 +44,11 @@ run = [
 # half is what a gate may run, since the fixing half rewrites the files
 [tasks."lint:markdown"]
 description = "Check Markdown with markdownlint"
-run = "markdownlint-cli2 docs/**/*.md CHANGELOG.md CLAUDE.md README.md"
+run = "markdownlint-cli2 docs/**/*.md plugins/**/*.md CHANGELOG.md CLAUDE.md README.md"
 
 [tasks."format:markdown"]
 description = "Format Markdown with markdownlint"
-run = "markdownlint-cli2 --fix docs/**/*.md CHANGELOG.md CLAUDE.md README.md"
+run = "markdownlint-cli2 --fix docs/**/*.md plugins/**/*.md CHANGELOG.md CLAUDE.md README.md"
 
 # the docs group is optional, so the `enter` hook's plain `poetry install`
 # does not provide mkdocs; every docs task pulls it in first.
@@ -63,6 +65,20 @@ run = "poetry run mkdocs serve"
 depends = ["docs:_install"]
 description = "Build the documentation site (fails on broken links)"
 run = "poetry run mkdocs build --strict"
+
+# The plugin carries the package version, so a bump is two files that must
+# agree. `poetry version` is what validates the string; the manifest follows it.
+[tasks."release:bump"]
+description = "Set the package version in pyproject.toml and the plugin manifest"
+usage = 'arg "<version>"'
+run = """
+set -eu
+poetry version "$usage_version"
+manifest=plugins/tingle-config/.claude-plugin/plugin.json
+jq --arg v "$(poetry version -s)" '.version = $v' "$manifest" > "$manifest.tmp"
+mv "$manifest.tmp" "$manifest"
+git --no-pager diff --stat -- pyproject.toml "$manifest"
+"""
 
 # Two checks the shared lint:py cannot express, because an included task
 # cannot be overridden by name: it runs mypy on source only, and it runs
@@ -86,7 +102,7 @@ run = [{ task = "lint:py" }, { task = "lint:markdown" }, { task = "lint:strict" 
 # there reaches the agent as a coverage report rather than a red gate.
 [tasks.gate]
 description = "Linters, types and the test suite, changing nothing"
-run = [{ task = "lint:all" }, { task = "test:py" }]
+run = [{ task = "lint:all" }, { task = "lint:versions" }, { task = "test:py" }]
 
 # the gate a human commits behind: the formatters as well, coverage of the
 # lines this branch changed, and — in `fullcheck` alone, since CI has it
@@ -97,9 +113,28 @@ run = [
     { task = "format:py" },
     { task = "format:markdown" },
     { task = "lint:all" },
+    { task = "lint:versions" },
     { task = "test:py:cov:diff" },
 ]
 
 [tasks.fullcheck]
 description = "Run every check: formatters, linters, diff coverage, tingle"
 run = [{ task = "check" }, { task = "lint:tingle" }]
+
+# The plugin manifest carries the package version (see release:bump), so the
+# two files can drift. Checked here, on the branch, rather than only against
+# the tag — this repo tags after merge, and a mismatch there costs a deleted
+# tag. mise puts the pinned jq on PATH; the release workflow's bare one was
+# the runner image's.
+[tasks."lint:versions"]
+description = "Check the plugin manifest declares the package version"
+run = """
+set -eu
+manifest=plugins/tingle-config/.claude-plugin/plugin.json
+declared=$(poetry version -s)
+plugin=$(jq -r .version "$manifest")
+if [ "$plugin" != "$declared" ]; then
+    echo "$manifest declares version $plugin, pyproject declares $declared" >&2
+    exit 1
+fi
+"""

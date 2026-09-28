@@ -44,6 +44,7 @@ nav:
       - Branch impact: diff.md
       - CI gate: check.md
       - History: history.md
+      - Claude Code plugin: claude-plugin.md
   - Reference:
       - CLI: cli.md
       - Changelog: changelog.md
