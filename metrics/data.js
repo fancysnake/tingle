@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790515407162,
+  "lastUpdate": 1790628716894,
   "repoUrl": "https://github.com/fancysnake/tingle",
   "entries": {
     "tingle": [
@@ -2636,6 +2636,120 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/fancysnake/tingle/commit/6973b84c3802dc10ac76bdb46bb495eca9607b05"
         },
         "date": 1790515406445,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "fmt-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "taplo-comment",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "codespell-comment",
+            "value": 2,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "ruff-format-excludes",
+            "value": 0,
+            "unit": "count",
+            "extra": "formatting"
+          },
+          {
+            "name": "noqa-comment",
+            "value": 61,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "ruff-ignores",
+            "value": 4,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "ruff-per-file-ignores",
+            "value": 15,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "pylint-comment",
+            "value": 5,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "pylint-rcfile-disables",
+            "value": 3,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "long-files",
+            "value": 0,
+            "unit": "count",
+            "extra": "linting"
+          },
+          {
+            "name": "type-ignores",
+            "value": 4,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "type-ignore-spread",
+            "value": 3,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "mypy-overrides",
+            "value": 1,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "any-uses",
+            "value": 1,
+            "unit": "count",
+            "extra": "typing"
+          },
+          {
+            "name": "deferred-import-contracts",
+            "value": 0,
+            "unit": "count",
+            "extra": "architecture"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "radoslaw@ganczarek.in",
+            "name": "Radosław Ganczarek",
+            "username": "fancysnake"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b862e70769bd4547f9123ccb8d24a4045d3b7089",
+          "message": "Merge pull request #66 from fancysnake/tingle-config-plugin\n\nAdd the tingle-config Claude Code plugin",
+          "timestamp": "2026-09-28T22:51:14+02:00",
+          "tree_id": "5bacabb8d587d45318bf085bbe7ad353febf0840",
+          "url": "https://github.com/fancysnake/tingle/commit/b862e70769bd4547f9123ccb8d24a4045d3b7089"
+        },
+        "date": 1790628715405,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
