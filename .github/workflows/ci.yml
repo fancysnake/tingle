@@ -47,6 +47,7 @@ jobs:
       - run: mise run lint:py
       - run: mise run lint:markdown
       - run: mise run lint:strict
+      - run: mise run lint:versions
 
   # advisory: reports the branch's debt without blocking the merge
   tingle:

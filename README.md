@@ -120,6 +120,8 @@ $ echo $?
 - [History](https://tingle.fancysnake.dev/history/) — recording a point per
   commit and publishing a chart per group, like
   [tingle's own](https://tingle.fancysnake.dev/history/chart/).
+- [Claude Code plugin](https://tingle.fancysnake.dev/claude-plugin/) — the
+  `tingle-config` skill, which writes a project's config for you.
 - [CLI reference](https://tingle.fancysnake.dev/cli/) — every command and
   flag.
 - [Changelog](https://tingle.fancysnake.dev/changelog/) — what each release

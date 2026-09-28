@@ -75,6 +75,7 @@ nav:
       - diff.md
       - check.md
       - history.md
+      - claude-plugin.md
   - Reference:
       - cli.md
       - changelog.md
