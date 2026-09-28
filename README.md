@@ -15,8 +15,8 @@ uses of a legacy class during a strangler-fig migration, lines of code in a
 package that should disappear.
 
 It runs once, prints the numbers, and stores nothing. To watch a number over
-months, the [metrics-history action](https://tingle.fancysnake.dev/history/)
-records a point per commit that lands and publishes a chart of them.
+months, the metrics-history action records a point per commit that lands and
+publishes a chart of them.
 <!-- --8<-- [end:intro] -->
 
 ## Install
@@ -81,16 +81,15 @@ See the [template library](https://tingle.fancysnake.dev/library/).
 <!-- --8<-- [start:what-it-does] -->
 Three things, in rising order of opinion:
 
-- **[Measure](https://tingle.fancysnake.dev/metrics/).** `tingle stat` counts
-  what you told it to count and prints the numbers. Metric values never
-  affect the exit code — tingle measures, it does not judge.
-- **[Attribute](https://tingle.fancysnake.dev/diff/).** `tingle stat
-  --diff` measures only what the current branch changed, against the
-  merge-base with a base branch, so commits that landed on the base after
-  you branched don't pollute your numbers.
-- **[Judge](https://tingle.fancysnake.dev/check/).** `tingle check` is
-  the CI gate: the same branch measurement, but it exits 1 if the branch
-  made things worse, so a pull request that takes on debt fails the build.
+- **Measure.** `tingle stat` counts what you told it to count and prints the
+  numbers. Metric values never affect the exit code — tingle measures, it
+  does not judge.
+- **Attribute.** `tingle stat --diff` measures only what the current branch
+  changed, against the merge-base with a base branch, so commits that landed
+  on the base after you branched don't pollute your numbers.
+- **Judge.** `tingle check` is the CI gate: the same branch measurement, but
+  it exits 1 if the branch made things worse, so a pull request that takes
+  on debt fails the build.
 
 ```console
 $ tingle check
@@ -104,6 +103,9 @@ $ echo $?
 <!-- --8<-- [end:what-it-does] -->
 
 ## Documentation
+
+<!-- Hand-written, not shared with the site's own list: these have to be
+     absolute, the site's have to be relative. -->
 
 - [Configuration](https://tingle.fancysnake.dev/configuration/) —
   `tingle.toml`, ranges, groups.
@@ -120,6 +122,10 @@ $ echo $?
   [tingle's own](https://tingle.fancysnake.dev/history/chart/).
 - [CLI reference](https://tingle.fancysnake.dev/cli/) — every command and
   flag.
+- [Changelog](https://tingle.fancysnake.dev/changelog/) — what each release
+  changed.
+- [Contributing](https://tingle.fancysnake.dev/contributing/) — setup, the
+  checks, and the layout of the source.
 
 ## Development
 

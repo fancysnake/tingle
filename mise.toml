@@ -51,13 +51,17 @@ run = "markdownlint-cli2 --fix docs/**/*.md CHANGELOG.md CLAUDE.md README.md"
 # `--only docs --no-root` because mkdocs.yml declares no plugins: nothing here
 # imports the package, so neither the package nor the dev group is worth
 # installing. `--only` alone still installs the root project.
+[tasks."site:_install"]
+hide = true
+run = "poetry install --only docs --no-root --quiet"
+
 [tasks."site:dev"]
 description = "Serve the documentation site with live reload"
-run = "poetry install --only docs --no-root --quiet && mkdocs serve"
+run = [{ task = "site:_install" }, "mkdocs serve"]
 
 [tasks."site:build"]
 description = "Build the documentation site into site/"
-run = "poetry install --only docs --no-root --quiet && mkdocs build"
+run = [{ task = "site:_install" }, "mkdocs build"]
 
 # Two checks the shared lint:py cannot express, because an included task
 # cannot be overridden by name: it runs mypy on source only, and it runs
@@ -83,18 +87,21 @@ run = [{ task = "lint:py" }, { task = "lint:markdown" }, { task = "lint:strict" 
 description = "Linters, types and the test suite, changing nothing"
 run = [{ task = "lint:all" }, { task = "test:py" }]
 
-# the gate a human commits behind: the formatters as well, coverage of the
-# lines this branch changed, and — in `fullcheck` alone, since CI has it
-# continue-on-error — tingle's own debt report
+# the gate a human commits behind: the formatters as well, the strict docs
+# build, coverage of the lines this branch changed, and — in `fullcheck`
+# alone, since CI has it continue-on-error — tingle's own debt report.
+# `gate` stays without these: it is the unattended-cast task and wants to
+# stay fast and write nothing.
 [tasks.check]
 description = "Run every check but tingle's own debt report"
 run = [
     { task = "format:py" },
     { task = "format:markdown" },
     { task = "lint:all" },
+    { task = "site:build" },
     { task = "test:py:cov:diff" },
 ]
 
 [tasks.fullcheck]
-description = "Run every check: formatters, linters, diff coverage, tingle"
+description = "Run every check: formatters, linters, docs, diff coverage, tingle"
 run = [{ task = "check" }, { task = "lint:tingle" }]

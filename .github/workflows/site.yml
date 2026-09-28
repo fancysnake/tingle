@@ -5,22 +5,23 @@ on:
   push:
     branches: ["main"]
 
-concurrency:
-  group: site-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Keyed on the ref, so a newer push to main cancels the older build
+    # before it can reach the deploy. Workflow-level, this would cut off an
+    # in-flight deploy instead, which the group below deliberately avoids.
+    concurrency:
+      group: site-build-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
-      - run: mise install
       # Pages serves this site, so the recorded history has no branch of its
       # own to be served from: fetch its chart over the placeholder committed
       # at that path. Before the build, not after, so MkDocs carries it into
@@ -34,7 +35,10 @@ jobs:
           data-branch: metrics-data
           into: docs/history/chart
       - run: mise run site:build
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+      # Nothing consumes the artifact on a pull request, since `deploy` is
+      # gated the same way; the strict build above is the whole review.
+      - if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: site/
 

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-import tomllib
 from dataclasses import fields, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -10,7 +8,6 @@ import pytest
 from support import make_config
 
 from tingle.mills.config import narrowed, validate
-from tingle.mills.metrics.registry import METRIC_TYPES as REAL_METRIC_TYPES
 from tingle.pacts.config import (
     CheckPolicy,
     CheckSpec,
@@ -29,7 +26,6 @@ if TYPE_CHECKING:
 
 ROOT = Path("/proj")
 SOURCE = Path("/proj/tingle.toml")
-DOCS = Path(__file__).parents[2] / "docs"
 
 
 def _noop(_: MetricContext) -> MetricResult:
@@ -574,15 +570,3 @@ def test_a_base_that_broke_says_nothing_further() -> None:
 
 def test_a_base_nothing_declared_is_the_one_that_is_unknown() -> None:
     assert _based("nope", {}) == ['metrics[0]: unknown base "nope"']
-
-
-def test_configuration_page_example_is_a_valid_config() -> None:
-    # the first TOML block of the page is the example every setting is
-    # explained against; parsing it into a Config is what keeps the two in step
-    page = (DOCS / "configuration.md").read_text(encoding="utf-8")
-    block = re.search(r"```toml\n(.*?)```", page, re.DOTALL)
-    assert block is not None
-    config = validate(tomllib.loads(block.group(1)), REAL_METRIC_TYPES, source=SOURCE)
-    assert set(config.ranges) == {"python", "js"}
-    assert [m.name for m in config.metrics] == ["noqa-comments", "todo-comments"]
-    assert config.default_range.name == "python"

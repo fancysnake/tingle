@@ -22,14 +22,19 @@ theme:
   name: material
   logo: assets/logo.png
   favicon: assets/favicon.png
-  # the two schemes are tingle's own, defined in stylesheets/tingle.css;
-  # Material's named colours cannot express a three-colour palette
+  # Material's own two schemes, recoloured in stylesheets/tingle.css: its
+  # named colours cannot express a three-colour palette, and `custom` keeps
+  # its per-colour rules from outranking ours on specificity
   palette:
     - media: "(prefers-color-scheme: light)"
-      scheme: tingle
+      scheme: default
+      primary: custom
+      accent: custom
       toggle: {icon: material/spider-web, name: Go on night patrol}
     - media: "(prefers-color-scheme: dark)"
-      scheme: tingle-night
+      scheme: slate
+      primary: custom
+      accent: custom
       toggle: {icon: material/weather-sunny, name: Back to daylight}
   features:
     - content.code.copy
