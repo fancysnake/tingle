@@ -7,12 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-28
+
 ### Added
 
-- **`tingle-config` is a Claude Code plugin.** A skill that surveys a
-  project's languages and tools for the debt markers they leave behind and
-  writes the config that counts them, in Python and beyond. Install it from
-  this repository's marketplace — see
+- `tingle-config`, a Claude Code plugin: a skill that surveys a project's
+  languages and tools for the debt markers they leave behind and writes the
+  `tingle.toml` that counts them, in Python and beyond. Install it from this
+  repository's marketplace — see
   [Claude Code plugin](https://tingle.fancysnake.dev/claude-plugin/).
 
 ## [0.7.2] - 2026-08-28
