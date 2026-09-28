@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from importlib import metadata
+from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
 
 import pytest
 from conftest import SETTLE_STEP, SETTLE_TRIES
 from textual_support import column
+from typer.main import get_group
 from typer.testing import CliRunner
 
 from tingle.gates.cli import typer as typer_gate
@@ -17,9 +19,6 @@ from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.pacts.metrics import MetricContext, MetricResult, MetricType
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 runner = CliRunner()
 app = CliGate(Services()).app
@@ -354,3 +353,33 @@ def test_a_pipe_gets_the_summary_table_instead(
     assert result.exit_code == 0
     assert not interactive
     assert "lint-escapes" in result.output
+
+
+DOCS = Path(__file__).parents[4] / "docs"
+
+
+def _documented_options(body: str) -> set[str]:
+    # a command documents its options as a table, `| `--flag` | ... |`; the
+    # bare `tingle` has them in one "Options:" paragraph instead
+    if rows := [line for line in body.splitlines() if line.startswith("| `--")]:
+        return set(re.findall(r"`(--[a-z-]+)", "\n".join(rows)))
+    if (start := body.find("Options:")) == -1:
+        return set()
+    end = body.find("\n\n", start)
+    return set(re.findall(r"`(--[a-z-]+)", body[start : end if end != -1 else None]))
+
+
+def test_cli_page_documents_every_command_and_option() -> None:
+    page = (DOCS / "cli.md").read_text(encoding="utf-8")
+    documented = {
+        match.group(1): _documented_options(match.group(2))
+        for match in re.finditer(
+            r"^## `tingle ?(\w*)`\n(.*?)(?=^## |\Z)", page, re.MULTILINE | re.DOTALL
+        )
+    }
+    group = get_group(app)
+    exposed = {
+        name: {opt for param in command.params for opt in param.opts if opt[:2] == "--"}
+        for name, command in (("", group), *group.commands.items())
+    }
+    assert documented == exposed

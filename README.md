@@ -1,5 +1,8 @@
 # tingle
 
+Documentation is at [https://tingle.fancysnake.dev](https://tingle.fancysnake.dev).
+
+<!-- --8<-- [start:intro] -->
 > *Spider-sense for refactoring: you know that tingle — the itch that says
 > the codebase isn't right yet. This tool puts a number on it, so you can
 > watch it drop.*
@@ -14,17 +17,19 @@ package that should disappear.
 It runs once, prints the numbers, and stores nothing. To watch a number over
 months, the [metrics-history action](https://tingle.fancysnake.dev/history/)
 records a point per commit that lands and publishes a chart of them.
-
-**📖 Documentation: <https://tingle.fancysnake.dev/>**
+<!-- --8<-- [end:intro] -->
 
 ## Install
 
+<!-- --8<-- [start:install] -->
 ```console
 pip install tingle
 ```
+<!-- --8<-- [end:install] -->
 
 ## Quick start
 
+<!-- --8<-- [start:quickstart] -->
 ```console
 tingle init                                    # starter tingle.toml
 tingle library                                 # ready-made metrics for known tools
@@ -39,6 +44,7 @@ tingle report                                  # every occurrence, file:line
 tingle report --diff                           # what the branch added/removed
 tingle report --group linting                  # one group, or --metric NAME
 ```
+<!-- --8<-- [end:quickstart] -->
 
 Metrics are declared in `tingle.toml` (or a `[tool.tingle]` section in
 `pyproject.toml`):
@@ -72,11 +78,12 @@ See the [template library](https://tingle.fancysnake.dev/library/).
 
 ## What it does
 
+<!-- --8<-- [start:what-it-does] -->
 Three things, in rising order of opinion:
 
-- **Measure.** `tingle stat` counts what you told it to count and prints the
-  numbers. Metric values never affect the exit code — tingle measures, it
-  does not judge.
+- **[Measure](https://tingle.fancysnake.dev/metrics/).** `tingle stat` counts
+  what you told it to count and prints the numbers. Metric values never
+  affect the exit code — tingle measures, it does not judge.
 - **[Attribute](https://tingle.fancysnake.dev/diff/).** `tingle stat
   --diff` measures only what the current branch changed, against the
   merge-base with a base branch, so commits that landed on the base after
@@ -94,6 +101,7 @@ noqa-comment (regex_count): +2
 $ echo $?
 1
 ```
+<!-- --8<-- [end:what-it-does] -->
 
 ## Documentation
 
@@ -123,7 +131,7 @@ mise install
 poetry install
 mise run test:py      # tests
 mise run lint:py      # ruff, mypy, pylint, import-linter
-mise run docs:serve   # preview the docs site
+mise run site:dev     # preview the docs site
 ```
 
 See [contributing](https://tingle.fancysnake.dev/contributing/) for

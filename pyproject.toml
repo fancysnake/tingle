@@ -60,12 +60,13 @@ ruff = ">=0.12"
 taplo = "^0.9.3"
 vulture = "^2.16"
 
+# Only `site:*` and the site workflow install this one -- nothing else needs a
+# static-site generator to run the tests.
 [tool.poetry.group.docs]
 optional = true
 
 [tool.poetry.group.docs.dependencies]
-mkdocs = "^1.6"
-mkdocs-material = "^9.5"
+mkdocs-material = ">=9.6,<10.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

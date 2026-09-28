@@ -1,0 +1,297 @@
+/*
+ * tingle — red carries structure (header, nav, rules), blue carries anything
+ * the reader can act on (links, hover, focus), yellow only ever appears as a
+ * surface behind dark text, since it fails contrast as a foreground.
+ *
+ * Every pairing below clears WCAG AA against the surface it sits on, because
+ * a palette nobody can read is just a mood. Measured, not asserted: the
+ * tightest pairing is the light special-token pink on the code surface at
+ * 4.53:1, then the dark page title red on the dark page at 4.62:1.
+ *
+ * The scheme names are the two in mkdocs.yml's palette; there is no
+ * `primary` or `accent` there, this file is the only source of each colour.
+ */
+
+:root {
+  --tingle-paper: #ffffff;
+  --tingle-ink: #000000de;
+  --tingle-red: #c62828;
+  --tingle-red-light: #ef5350;
+  --tingle-red-dark: #8c1d1d;
+  --tingle-blue: #1565c0;
+  --tingle-blue-light: #42a5f5;
+  --tingle-yellow: #f9a825;
+  --tingle-yellow-surface: #fff8e1;
+}
+
+/* ---- Light ---- */
+
+[data-md-color-scheme="tingle"] {
+  color-scheme: light;
+
+  --md-default-bg-color: var(--tingle-paper);
+  --md-default-fg-color: var(--tingle-ink);
+
+  --md-primary-fg-color: var(--tingle-red);
+  --md-primary-fg-color--light: var(--tingle-red-light);
+  --md-primary-fg-color--dark: var(--tingle-red-dark);
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffffb3;
+
+  --md-accent-fg-color: var(--tingle-blue);
+  --md-accent-fg-color--transparent: #1565c01a;
+  --md-accent-bg-color: #ffffff;
+  --md-accent-bg-color--light: #ffffffb3;
+
+  --md-typeset-a-color: var(--tingle-blue);
+  --md-typeset-mark-color: #f9a82566;
+
+  --md-footer-bg-color: var(--tingle-red-dark);
+  --md-footer-bg-color--dark: #6d1616;
+}
+
+/* ---- Dark ---- */
+
+[data-md-color-scheme="tingle-night"] {
+  color-scheme: dark;
+
+  --tingle-red: #ef5350;
+  --tingle-red-light: #ff8a80;
+  --tingle-red-dark: #b71c1c;
+  --tingle-blue: #64b5f6;
+  --tingle-blue-light: #90caf9;
+  --tingle-yellow: #ffca28;
+  --tingle-yellow-surface: #ffca2824;
+
+  /* Material only ships a dark surface set for its own `slate`; a scheme
+     with another name starts from the light one, so the set is restated. */
+  --md-default-fg-color: hsla(var(--md-hue), 15%, 90%, 0.82);
+  --md-default-fg-color--light: hsla(var(--md-hue), 15%, 90%, 0.56);
+  --md-default-fg-color--lighter: hsla(var(--md-hue), 15%, 90%, 0.32);
+  --md-default-fg-color--lightest: hsla(var(--md-hue), 15%, 90%, 0.12);
+  --md-default-bg-color: hsla(var(--md-hue), 15%, 14%, 1);
+  --md-default-bg-color--light: hsla(var(--md-hue), 15%, 14%, 0.54);
+  --md-default-bg-color--lighter: hsla(var(--md-hue), 15%, 14%, 0.26);
+  --md-default-bg-color--lightest: hsla(var(--md-hue), 15%, 14%, 0.07);
+  --md-code-fg-color: hsla(var(--md-hue), 18%, 86%, 0.82);
+  --md-code-bg-color: hsla(var(--md-hue), 15%, 18%, 1);
+  --md-code-bg-color--light: hsla(var(--md-hue), 15%, 18%, 0.9);
+  --md-code-bg-color--lighter: hsla(var(--md-hue), 15%, 18%, 0.54);
+  --md-typeset-color: var(--md-default-fg-color);
+  --md-typeset-kbd-color: hsla(var(--md-hue), 15%, 90%, 0.12);
+  --md-typeset-kbd-accent-color: hsla(var(--md-hue), 15%, 90%, 0.2);
+  --md-typeset-kbd-border-color: hsla(var(--md-hue), 15%, 14%, 1);
+  --md-typeset-table-color: hsla(var(--md-hue), 15%, 95%, 0.12);
+  --md-typeset-table-color--light: hsla(var(--md-hue), 15%, 95%, 0.035);
+  --md-admonition-fg-color: var(--md-default-fg-color);
+  --md-admonition-bg-color: var(--md-default-bg-color);
+  --md-shadow-z1: 0 0.2rem 0.5rem #0000000d, 0 0 0.05rem #0000001a;
+  --md-shadow-z2: 0 0.2rem 0.5rem #00000040, 0 0 0.05rem #00000040;
+  --md-shadow-z3: 0 0.2rem 0.5rem #0006, 0 0 0.05rem #00000059;
+
+  --md-primary-fg-color: #a51f1f;
+  --md-primary-fg-color--light: var(--tingle-red);
+  --md-primary-fg-color--dark: #7f1616;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffffb3;
+
+  --md-accent-fg-color: var(--tingle-blue);
+  --md-accent-fg-color--transparent: #64b5f624;
+
+  --md-typeset-a-color: var(--tingle-blue);
+  --md-typeset-mark-color: #ffca2859;
+
+  --md-footer-bg-color: #16181d;
+  --md-footer-bg-color--dark: #101216;
+}
+
+[data-md-color-scheme="tingle-night"] img[src$="#only-light"] {
+  display: none;
+}
+
+/*
+ * Syntax highlighting, both schemes. Material ships a sensible default; what
+ * it does not do is agree with a palette it has never heard of, and a code
+ * block is most of what these pages are: keywords in the structural red,
+ * functions in the interaction blue, the rest as Material had them.
+ */
+
+[data-md-color-scheme="tingle"] {
+  --md-code-hl-color: #4287ff;
+  --md-code-hl-color--light: #4287ff1a;
+  --md-code-hl-keyword-color: #c62828;
+  --md-code-hl-function-color: #1565c0;
+  --md-code-hl-string-color: #1c7d4d;
+  --md-code-hl-number-color: #d52a2a;
+  --md-code-hl-comment-color: #6b6b6b;
+  --md-code-hl-name-color: var(--md-code-fg-color);
+  --md-code-hl-operator-color: var(--md-default-fg-color--light);
+  --md-code-hl-punctuation-color: var(--md-default-fg-color--light);
+  --md-code-hl-constant-color: #6e59d9;
+  --md-code-hl-special-color: #db1457;
+}
+
+[data-md-color-scheme="tingle-night"] {
+  --md-code-hl-color: #2977ff;
+  --md-code-hl-color--light: #2977ff1a;
+  --md-code-hl-keyword-color: #ff7b72;
+  --md-code-hl-function-color: #64b5f6;
+  --md-code-hl-string-color: #2fb170;
+  --md-code-hl-number-color: #f0826f;
+  --md-code-hl-comment-color: #9a9fab;
+  --md-code-hl-name-color: var(--md-code-fg-color);
+  --md-code-hl-operator-color: var(--md-default-fg-color--light);
+  --md-code-hl-punctuation-color: var(--md-default-fg-color--light);
+  --md-code-hl-constant-color: #9383e2;
+  --md-code-hl-special-color: #f06090;
+  --md-code-hl-generic-color: var(--md-default-fg-color--light);
+  --md-code-hl-variable-color: var(--md-default-fg-color--light);
+}
+
+/* Structure — red: the page title, and where the reader is in the nav. */
+
+.md-typeset h1 {
+  color: var(--tingle-red);
+  font-weight: 700;
+}
+
+.md-typeset h2 {
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  padding-bottom: 0.2em;
+}
+
+.md-nav__link--active,
+.md-nav__item .md-nav__link--active {
+  color: var(--tingle-red);
+}
+
+.md-typeset .md-button--primary {
+  background-color: var(--tingle-red);
+  border-color: var(--tingle-red);
+  color: var(--md-primary-bg-color);
+}
+
+.md-typeset .md-button--primary:hover,
+.md-typeset .md-button--primary:focus {
+  background-color: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+}
+
+/* Interaction — blue: anything under the pointer. */
+
+.md-typeset a:hover,
+.md-typeset a:focus {
+  color: var(--tingle-blue-light);
+}
+
+.md-typeset .headerlink:hover,
+.md-typeset :target > .headerlink {
+  color: var(--md-accent-fg-color);
+}
+
+.md-search-result__link:focus,
+.md-search-result__link:hover {
+  background-color: var(--md-accent-fg-color--transparent);
+}
+
+/* Highlight — yellow, always as a surface under dark text. */
+
+.md-typeset mark,
+.md-search-result__link mark {
+  background-color: var(--md-typeset-mark-color);
+  color: inherit;
+  box-shadow: none;
+}
+
+.md-typeset .highlight .hll,
+.md-typeset .highlighttable .hll {
+  background-color: var(--tingle-yellow-surface);
+}
+
+.md-typeset blockquote {
+  border-left: 0.2rem solid var(--tingle-yellow);
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset kbd {
+  box-shadow:
+    0 0.1rem 0 0.05rem var(--tingle-yellow),
+    0 0.1rem 0 var(--md-default-fg-color--lighter),
+    0 -0.1rem 0.2rem var(--md-default-fg-color--lightest) inset;
+}
+
+/* Admonitions — the three colours split by intent, everything else default. */
+
+.md-typeset .admonition.danger,
+.md-typeset details.danger,
+.md-typeset .admonition.failure,
+.md-typeset details.failure {
+  border-color: var(--tingle-red);
+}
+
+.md-typeset .danger > .admonition-title,
+.md-typeset .danger > summary,
+.md-typeset .failure > .admonition-title,
+.md-typeset .failure > summary {
+  background-color: #c628281a;
+}
+
+.md-typeset .danger > .admonition-title::before,
+.md-typeset .danger > summary::before,
+.md-typeset .failure > .admonition-title::before,
+.md-typeset .failure > summary::before {
+  background-color: var(--tingle-red);
+}
+
+.md-typeset .admonition.note,
+.md-typeset details.note,
+.md-typeset .admonition.info,
+.md-typeset details.info {
+  border-color: var(--tingle-blue);
+}
+
+.md-typeset .note > .admonition-title,
+.md-typeset .note > summary,
+.md-typeset .info > .admonition-title,
+.md-typeset .info > summary {
+  background-color: var(--md-accent-fg-color--transparent);
+}
+
+.md-typeset .note > .admonition-title::before,
+.md-typeset .note > summary::before,
+.md-typeset .info > .admonition-title::before,
+.md-typeset .info > summary::before {
+  background-color: var(--tingle-blue);
+}
+
+.md-typeset .admonition.warning,
+.md-typeset details.warning,
+.md-typeset .admonition.tip,
+.md-typeset details.tip {
+  border-color: var(--tingle-yellow);
+}
+
+.md-typeset .warning > .admonition-title,
+.md-typeset .warning > summary,
+.md-typeset .tip > .admonition-title,
+.md-typeset .tip > summary {
+  background-color: var(--tingle-yellow-surface);
+}
+
+.md-typeset .warning > .admonition-title::before,
+.md-typeset .warning > summary::before,
+.md-typeset .tip > .admonition-title::before,
+.md-typeset .tip > summary::before {
+  background-color: var(--tingle-yellow);
+}
+
+/* Tables — a red rule under the head, blue on row hover. */
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-default-fg-color--lightest);
+  border-bottom: 2px solid var(--tingle-red);
+}
+
+.md-typeset table:not([class]) tr:hover {
+  background-color: var(--md-accent-fg-color--transparent);
+}

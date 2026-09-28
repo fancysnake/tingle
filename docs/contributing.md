@@ -59,8 +59,8 @@ The documentation site is MkDocs + Material, built from `docs/` and
 published to GitHub Pages from `main`.
 
 ```console
-mise run docs:serve   # live-reloading preview on localhost:8000
-mise run docs:build   # strict build; fails on broken internal links
+mise run site:dev     # live-reloading preview on localhost:8000
+mise run site:build   # build into site/; strict, so a broken link fails it
 ```
 
 The docs dependency group is optional, so a plain `poetry install` does not
