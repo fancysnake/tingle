@@ -239,8 +239,8 @@ testing = ["pytest (>=6,!=7.0.0)", "pytest-xdist (>=2)"]
 
 [[package]]
 name = "cabinet"
-version = "0.3.0"
-description = "A vekna tome: pull request maintenance rituals for GitHub and GitLab"
+version = "1.0.1"
+description = "A vekna tome: pull request and issue maintenance rituals for GitHub and GitLab"
 optional = false
 python-versions = ">=3.11,<3.15"
 groups = ["dev"]
@@ -251,13 +251,13 @@ develop = false
 claude-agent-sdk = ">=0.2,<1.0"
 pydantic = ">=2.12.5,<3.0.0"
 typing-extensions = ">=4.4,<5.0"
-vekna = {version = ">=0.7.0,<1.0.0", extras = ["trial"]}
+vekna = {version = ">=0.10.0,<1.0.0", extras = ["trial"]}
 
 [package.source]
 type = "git"
 url = "https://github.com/fancysnake/cabinet.git"
-reference = "v0.3.0"
-resolved_reference = "2a402b608fe4c555d18298a31ba2245e0bcd8e41"
+reference = "9c8cc056f43e148ea5cf89b891ff2b81139285fb"
+resolved_reference = "9c8cc056f43e148ea5cf89b891ff2b81139285fb"
 
 [[package]]
 name = "cachecontrol"
@@ -3685,4 +3685,4 @@ watchmedo = ["PyYAML (>=3.10)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "44568f2cb4026d1c7ce064a4b33161989f6e98924b0d1ab90b5195f642495086"
+content-hash = "9d890a218692a9212c636c2cdabd152f08b17b0c70d918904a8da08653247d64"
