@@ -43,7 +43,7 @@ packages = [{ include = "tingle", from = "src" }]
 [tool.poetry.group.dev.dependencies]
 black = "^26.5.1"
 # cabinet is not on PyPI and is not going there; git is its only source.
-cabinet = { git = "https://github.com/fancysnake/cabinet.git", rev = "v0.3.0" }
+cabinet = { git = "https://github.com/fancysnake/cabinet.git", rev = "f74b4fa419240d01436f5d603306d0e2addafc44" }
 codespell = "^2.4.2"
 deptry = "^0.25.1"
 diff-cover = "^10.4.1"
