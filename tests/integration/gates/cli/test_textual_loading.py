@@ -19,19 +19,18 @@ from textual_support import RUN_REPORT, collecting, labels, metrics_app
 
 from tingle.gates.cli.textual.browse import MetricsApp
 from tingle.gates.cli.textual.loading import LoadingScreen, plainly
-from tingle.gates.cli.textual.run import AbandonedError
 from tingle.inits.services import Services
 from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import SelectionError
 from tingle.pacts.diff import DiffSourceError
-from tingle.pacts.metrics import RunPhase, RunProgress
+from tingle.pacts.metrics import RunPhase, RunProgress, RunStoppedError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from textual.pilot import Pilot
 
-    from tingle.pacts.metrics import ProgressSink
+    from tingle.pacts.metrics import Checkpoint, ProgressSink
     from tingle.pacts.report import RunReport
 
 #: Longer than the app waits before drawing the screen, so that a test
@@ -93,7 +92,7 @@ def held_app(
     which is what a slow run does and what the screen is there for.
     """
 
-    def collect(progress: ProgressSink) -> RunReport:
+    def collect(progress: ProgressSink, _: Checkpoint) -> RunReport:
         if during is not None:
             during(progress)
         hold.wait(timeout=5)
@@ -107,7 +106,7 @@ def held_app(
 def failing_app(error: Exception) -> MetricsApp:
     """Build an app whose run raises instead of measuring anything."""
 
-    def collect(_: ProgressSink) -> RunReport:
+    def collect(_: ProgressSink, __: Checkpoint) -> RunReport:
         raise error
 
     return MetricsApp(
@@ -283,25 +282,25 @@ def test_a_cancelled_run_stops_itself_rather_than_finishing() -> None:
     `test_a_quit_during_the_run_leaves_no_report_and_no_failure` covers
     the quit itself.
 
-    The run reports the way a walk does -- every so often, from the
-    worker thread -- so what it notices here, a walk notices in the same
-    place.
+    The run passes its checkpoint the way a walk does -- every file, from
+    the worker thread -- so what it notices here, a walk notices in the
+    same place.
     """
     reporting = threading.Event()
     stopped = threading.Event()
 
-    def walking(progress: ProgressSink) -> None:
+    def walking(checkpoint: Checkpoint) -> None:
         # bounded, so that a run which never notices fails this test
         # rather than hanging the suite on it
         for _ in range(int(SETTLE_TIMEOUT / SETTLE_STEP)):
             reporting.set()
-            progress(RunProgress(RunPhase.SCANNING, done=500))
+            checkpoint()
             time.sleep(SETTLE_STEP)
 
-    def collect(progress: ProgressSink) -> RunReport:
+    def collect(_: ProgressSink, checkpoint: Checkpoint) -> RunReport:
         try:
-            walking(progress)
-        except AbandonedError:
+            walking(checkpoint)
+        except RunStoppedError:
             stopped.set()
             raise
         return RUN_REPORT
@@ -357,7 +356,7 @@ def test_collecting_hands_the_report_straight_back() -> None:
     """The helper the other suites lean on is a run that is already over."""
     collect = collecting(RUN_REPORT)
 
-    assert collect(lambda _: None) is RUN_REPORT
+    assert collect(lambda _: None, lambda: None) is RUN_REPORT
 
 
 def test_progress_arriving_after_the_screen_reaches_it_too() -> None:
@@ -365,7 +364,7 @@ def test_progress_arriving_after_the_screen_reaches_it_too() -> None:
     up, hold = threading.Event(), threading.Event()
     doing: list[str] = []
 
-    def collect(progress: ProgressSink) -> RunReport:
+    def collect(progress: ProgressSink, _: Checkpoint) -> RunReport:
         up.wait(timeout=5)
         progress(RunProgress(RunPhase.MEASURING, done=2, total=4, label="later"))
         hold.wait(timeout=5)

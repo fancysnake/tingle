@@ -21,7 +21,6 @@ from textual.widgets import DataTable, Footer, Header, Input, Static
 from tingle.gates.cli.textual.loading import LoadingScreen
 from tingle.gates.cli.textual.run import (
     REVEAL_AFTER,
-    AbandonedError,
     Measured,
     RunFailed,
     RunFinished,
@@ -32,6 +31,7 @@ from tingle.pacts.browse import RowKind, SortKey
 from tingle.pacts.config import SelectionError
 from tingle.pacts.diff import DiffSourceError
 from tingle.pacts.editor import EditorError
+from tingle.pacts.metrics import RunStoppedError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -236,8 +236,8 @@ class MetricsApp(App[None]):
         and nothing went wrong, so the gate has nothing to print.
         """
         try:
-            report = self._collect(self._note)
-        except AbandonedError:
+            report = self._collect(self._note, abandon_if_cancelled)
+        except RunStoppedError:
             return
         except (SelectionError, DiffSourceError) as exc:
             self.post_message(RunFailed(exc))
@@ -249,13 +249,7 @@ class MetricsApp(App[None]):
 
         `post_message` is thread-safe, so the walk hands over its count
         without bouncing every report through a call into the loop.
-
-        This is also where the run notices it has been abandoned: the
-        sink is the one point it passes through regularly, so checking
-        here costs a run nothing and saves a quit from waiting out the
-        whole walk.
         """
-        abandon_if_cancelled()
         self.post_message(RunProgressed(progress))
 
     def on_run_progressed(self, event: RunProgressed) -> None:

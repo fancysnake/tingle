@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from itertools import count
+from typing import TYPE_CHECKING
+
+import pytest
 from support import FakeProject, make_config
 
 from tingle.mills import runner as runner_module
@@ -13,7 +17,11 @@ from tingle.pacts.metrics import (
     MetricType,
     RunPhase,
     RunProgress,
+    RunStoppedError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _file_count(ctx: MetricContext) -> MetricResult:
@@ -87,3 +95,56 @@ def test_a_run_with_no_sink_reports_the_same_thing() -> None:
 
     assert seen
     assert watched == unwatched
+
+
+def _stopping_after(calls: int) -> Callable[[], None]:
+    """Build a checkpoint that lets `calls` through and stops the next."""
+    passed = count()
+
+    def checkpoint() -> None:
+        if next(passed) == calls:
+            raise RunStoppedError
+
+    return checkpoint
+
+
+def test_a_walk_shorter_than_the_interval_is_stoppable_all_the_same() -> None:
+    """Stopped on the second of three files, long before any report."""
+    with pytest.raises(RunStoppedError):
+        run(
+            make_config(MetricSpec(name="one", type="counter")),
+            FakeProject({"a.py": "", "b.py": "", "c.py": ""}),
+            metric_types=COUNTER,
+            checkpoint=_stopping_after(1),
+        )
+
+
+def test_a_metric_is_stoppable_between_two_reads_of_cached_text() -> None:
+    """Stopped inside the second metric: by then every read is a cache hit."""
+    files = {"a.py": "", "b.py": ""}
+    read: list[str] = []
+
+    def reading(ctx: MetricContext) -> MetricResult:
+        for path in ctx.files:
+            ctx.read(path)
+            read.append(str(path))
+        return MetricResult(value=0)
+
+    def checkpoint() -> None:
+        if len(read) == len(files) + 1:
+            raise RunStoppedError
+
+    config = make_config(
+        MetricSpec(name="first", type="reading"),
+        MetricSpec(name="second", type="reading"),
+    )
+
+    with pytest.raises(RunStoppedError):
+        run(
+            config,
+            FakeProject(files),
+            metric_types={"reading": MetricType("reading", reading)},
+            checkpoint=checkpoint,
+        )
+
+    assert read == ["a.py", "b.py", "a.py"]

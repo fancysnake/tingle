@@ -15,6 +15,7 @@ from tingle.pacts.metrics import (
     ProjectFiles,
     RunPhase,
     RunProgress,
+    uninterrupted,
     unwatched,
 )
 from tingle.pacts.report import MetricOutcome, RunReport
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
     from pathlib import PurePath
 
     from tingle.pacts.config import Config, MetricSpec, RangeSpec
-    from tingle.pacts.metrics import ProgressSink
+    from tingle.pacts.metrics import Checkpoint, ProgressSink
 
 #: What `announced` is counting through. It reports on anything a caller
 #: can name, so the runner and the diff runner share it over the two
@@ -59,12 +60,13 @@ def run(
     *,
     metric_types: Mapping[str, MetricType],
     progress: ProgressSink = unwatched,
+    checkpoint: Checkpoint = uninterrupted,
 ) -> RunReport:
     """Run every configured metric, isolating failures per metric."""
-    walked = scanned(project, progress)
+    walked = scanned(project, progress, checkpoint=checkpoint)
     # the port hands over bytes; what counts as readable text is decided
     # here, once, and every metric is given the same reader
-    read = text_reader(project.read)
+    read = text_reader(project.read, checkpoint)
     ranges = ResolvedRanges(walked)
     context = _RunContext(
         config=config,
@@ -83,7 +85,9 @@ def run(
     )
 
 
-def scanned(project: ProjectFiles, note: ProgressSink) -> tuple[PurePath, ...]:
+def scanned(
+    project: ProjectFiles, note: ProgressSink, *, checkpoint: Checkpoint
+) -> tuple[PurePath, ...]:
     """Walk the tree, saying how far it has got as it goes.
 
     Every so many files rather than every file: a tree is the one part of
@@ -97,12 +101,19 @@ def scanned(project: ProjectFiles, note: ProgressSink) -> tuple[PurePath, ...]:
 
     Shared with the diff runner, which walks the same tree the same way.
     """
-    return tuple(sorted(_counted(project.walk(), note)))
+    return tuple(sorted(_counted(project.walk(), note, checkpoint=checkpoint)))
 
 
-def _counted(walk: Iterable[PurePath], note: ProgressSink) -> Iterator[PurePath]:
-    """Pass the walk through, reporting the count every so many files."""
+def _counted(
+    walk: Iterable[PurePath], note: ProgressSink, *, checkpoint: Checkpoint
+) -> Iterator[PurePath]:
+    """Pass the walk through, reporting the count every so many files.
+
+    Stoppable at every file rather than every report: a walk shorter than
+    the interval reports nothing, and a quit cannot wait for it to end.
+    """
     for count, path in enumerate(walk, start=1):
+        checkpoint()
         if count % PROGRESS_EVERY == 0:
             note(RunProgress(RunPhase.SCANNING, done=count))
         yield path
