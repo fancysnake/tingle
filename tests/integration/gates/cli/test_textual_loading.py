@@ -19,12 +19,11 @@ from textual_support import RUN_REPORT, collecting, labels, metrics_app
 
 from tingle.gates.cli.textual.browse import MetricsApp
 from tingle.gates.cli.textual.loading import LoadingScreen, plainly
-from tingle.gates.cli.textual.run import AbandonedError
 from tingle.inits.services import Services
 from tingle.links.editor import VsCodeCli
 from tingle.pacts.config import SelectionError
 from tingle.pacts.diff import DiffSourceError
-from tingle.pacts.metrics import RunPhase, RunProgress
+from tingle.pacts.metrics import RunPhase, RunProgress, RunStoppedError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -301,7 +300,7 @@ def test_a_cancelled_run_stops_itself_rather_than_finishing() -> None:
     def collect(_: ProgressSink, checkpoint: Checkpoint) -> RunReport:
         try:
             walking(checkpoint)
-        except AbandonedError:
+        except RunStoppedError:
             stopped.set()
             raise
         return RUN_REPORT

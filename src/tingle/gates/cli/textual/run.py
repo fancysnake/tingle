@@ -3,7 +3,7 @@
 Collecting a report before the app started would be a wait with nothing
 drawn to explain it, so the run happens on a worker thread underneath a
 live app. That costs a way in (`Collect`), a way back (three messages and
-`Measured`), and a way out (`AbandonedError`); all of it lives here, leaving
+`Measured`), and a way out (`abandon_if_cancelled`); all of it lives here, leaving
 the view module to turn `Row`s into cells.
 """
 
@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, TypeAlias
 
 from textual.message import Message
 from textual.worker import get_current_worker
+
+from tingle.pacts.metrics import RunStoppedError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -32,21 +34,6 @@ Collect: TypeAlias = "Callable[[ProgressSink, Checkpoint], RunReport | DiffRepor
 #: happening. A screen that flashes up and vanishes is worse than a beat
 #: of stillness, and on a small project the whole run fits in here.
 REVEAL_AFTER = 0.25
-
-
-class AbandonedError(BaseException):
-    """Raised inside the worker to unwind a run nobody is waiting for.
-
-    Textual asks a worker to stop when the app exits, but a thread cannot
-    be made to; it has to notice and return. Nothing joins the walk in
-    the meantime, so the interpreter waits on it after the app is gone --
-    the terminal comes back and the shell does not.
-
-    Noticing happens at the run's checkpoint, on every file walked and
-    every file read. A `BaseException` because reads happen inside
-    metrics, whose isolation would catch an `Exception` as that metric
-    failing and carry on with the next.
-    """
 
 
 @dataclass
@@ -70,9 +57,15 @@ class Measured:
 
 
 def abandon_if_cancelled() -> None:
-    """Raise `AbandonedError` once the app has asked this worker to stop."""
+    """Stop the run once the app has asked this worker to stop.
+
+    Textual asks a worker to stop when the app exits, but a thread cannot
+    be made to; it has to notice and return. Nothing joins the walk in
+    the meantime, so the interpreter waits on it after the app is gone --
+    the terminal comes back and the shell does not.
+    """
     if get_current_worker().is_cancelled:
-        raise AbandonedError
+        raise RunStoppedError
 
 
 class RunProgressed(Message):

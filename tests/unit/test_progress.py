@@ -17,6 +17,7 @@ from tingle.pacts.metrics import (
     MetricType,
     RunPhase,
     RunProgress,
+    RunStoppedError,
 )
 
 if TYPE_CHECKING:
@@ -96,24 +97,20 @@ def test_a_run_with_no_sink_reports_the_same_thing() -> None:
     assert watched == unwatched
 
 
-class _Stopped(BaseException):
-    """What a checkpoint raises: past metric isolation, the way a quit is."""
-
-
 def _stopping_after(calls: int) -> Callable[[], None]:
     """Build a checkpoint that lets `calls` through and stops the next."""
     passed = count()
 
     def checkpoint() -> None:
         if next(passed) == calls:
-            raise _Stopped
+            raise RunStoppedError
 
     return checkpoint
 
 
 def test_a_walk_shorter_than_the_interval_is_stoppable_all_the_same() -> None:
     """Stopped on the second of three files, long before any report."""
-    with pytest.raises(_Stopped):
+    with pytest.raises(RunStoppedError):
         run(
             make_config(MetricSpec(name="one", type="counter")),
             FakeProject({"a.py": "", "b.py": "", "c.py": ""}),
@@ -135,14 +132,14 @@ def test_a_metric_is_stoppable_between_two_reads_of_cached_text() -> None:
 
     def checkpoint() -> None:
         if len(read) == len(files) + 1:
-            raise _Stopped
+            raise RunStoppedError
 
     config = make_config(
         MetricSpec(name="first", type="reading"),
         MetricSpec(name="second", type="reading"),
     )
 
-    with pytest.raises(_Stopped):
+    with pytest.raises(RunStoppedError):
         run(
             config,
             FakeProject(files),

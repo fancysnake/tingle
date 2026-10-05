@@ -85,14 +85,21 @@ def unwatched(_: RunProgress) -> None:
 #: it. Apart from the sink because the sink is throttled: a run reports
 #: every so many files, but has to be stoppable at any one of them.
 #:
-#: Must be cheap, and must stop the run with a `BaseException`: it is
-#: called from inside metrics, where an `Exception` is caught as that one
-#: metric failing and the run goes on to the next.
+#: Must be cheap, and must stop the run with `RunStoppedError`.
 Checkpoint: TypeAlias = Callable[[], None]
 
 
 def uninterrupted() -> None:
     """Let a run that nobody can stop carry on."""
+
+
+class RunStoppedError(BaseException):
+    """Raised by a checkpoint to stop the run it is called from.
+
+    A `BaseException` because checkpoints are called from inside metrics,
+    whose isolation would catch an `Exception` as that one metric failing
+    and carry on with the next.
+    """
 
 
 @dataclass(frozen=True)

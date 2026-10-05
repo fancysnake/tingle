@@ -21,7 +21,6 @@ from textual.widgets import DataTable, Footer, Header, Input, Static
 from tingle.gates.cli.textual.loading import LoadingScreen
 from tingle.gates.cli.textual.run import (
     REVEAL_AFTER,
-    AbandonedError,
     Measured,
     RunFailed,
     RunFinished,
@@ -32,6 +31,7 @@ from tingle.pacts.browse import RowKind, SortKey
 from tingle.pacts.config import SelectionError
 from tingle.pacts.diff import DiffSourceError
 from tingle.pacts.editor import EditorError
+from tingle.pacts.metrics import RunStoppedError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -237,7 +237,7 @@ class MetricsApp(App[None]):
         """
         try:
             report = self._collect(self._note, abandon_if_cancelled)
-        except AbandonedError:
+        except RunStoppedError:
             return
         except (SelectionError, DiffSourceError) as exc:
             self.post_message(RunFailed(exc))

@@ -86,7 +86,7 @@ def run(
 
 
 def scanned(
-    project: ProjectFiles, note: ProgressSink, *, checkpoint: Checkpoint = uninterrupted
+    project: ProjectFiles, note: ProgressSink, *, checkpoint: Checkpoint
 ) -> tuple[PurePath, ...]:
     """Walk the tree, saying how far it has got as it goes.
 
