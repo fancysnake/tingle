@@ -24,7 +24,7 @@ from tingle.links.editor import VsCodeCli
 from tingle.mills.display import outcome_emoji, sections
 from tingle.pacts.config import MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
-from tingle.pacts.metrics import MetricResult, Occurrence, ProgressSink
+from tingle.pacts.metrics import Checkpoint, MetricResult, Occurrence, ProgressSink
 from tingle.pacts.report import MetricOutcome, RunReport
 
 if TYPE_CHECKING:
@@ -169,7 +169,7 @@ def metrics_app(
 def collecting(report: RunReport | DiffReport) -> Collect:
     """Hand back a run that is already over, reporting nothing on the way."""
 
-    def collect(_: ProgressSink) -> RunReport | DiffReport:
+    def collect(_: ProgressSink, __: Checkpoint) -> RunReport | DiffReport:
         return report
 
     return collect

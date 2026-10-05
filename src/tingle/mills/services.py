@@ -19,7 +19,7 @@ from tingle.pacts.config import (
     LibraryEntry,
     Selection,
 )
-from tingle.pacts.metrics import unwatched
+from tingle.pacts.metrics import uninterrupted, unwatched
 from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     )
     from tingle.pacts.diff import DiffReport, DiffSourceFactory
     from tingle.pacts.metrics import (
+        Checkpoint,
         MetricType,
         ProgressSink,
         ProjectFiles,
@@ -158,6 +159,7 @@ class MetricsService:
         selection: Selection = EVERY_METRIC,
         *,
         progress: ProgressSink = unwatched,
+        checkpoint: Checkpoint = uninterrupted,
     ) -> RunReport:
         """Measure every selected metric over the whole project."""
         return run(
@@ -165,6 +167,7 @@ class MetricsService:
             self._files_of(config),
             metric_types=self.metric_types,
             progress=progress,
+            checkpoint=checkpoint,
         )
 
     def diff(
@@ -174,6 +177,7 @@ class MetricsService:
         *,
         selection: Selection = EVERY_METRIC,
         progress: ProgressSink = unwatched,
+        checkpoint: Checkpoint = uninterrupted,
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
         runner = DiffRunner(
@@ -182,7 +186,7 @@ class MetricsService:
             diff_source=self.diff_source(config.root),
             metric_types=self.metric_types,
         )
-        return runner.run(base, progress=progress)
+        return runner.run(base, progress=progress, checkpoint=checkpoint)
 
     def check(
         self,

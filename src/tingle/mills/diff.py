@@ -24,6 +24,7 @@ from tingle.pacts.metrics import (
     ProjectFiles,
     RunPhase,
     RunProgress,
+    uninterrupted,
     unwatched,
 )
 
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
 
     from tingle.pacts.config import Config, MetricSpec, RangeSpec
     from tingle.pacts.diff import DiffMetricFunction
-    from tingle.pacts.metrics import ProgressSink
+    from tingle.pacts.metrics import Checkpoint, ProgressSink
 
 
 @dataclass(frozen=True)
@@ -67,17 +68,23 @@ class DiffRunner:
     diff_source: DiffSource
     metric_types: Mapping[str, MetricType]
 
-    def run(self, base: str, *, progress: ProgressSink = unwatched) -> DiffReport:
+    def run(
+        self,
+        base: str,
+        *,
+        progress: ProgressSink = unwatched,
+        checkpoint: Checkpoint = uninterrupted,
+    ) -> DiffReport:
         """Measure the branch impact against merge-base(base, HEAD)."""
         progress(RunProgress(RunPhase.DIFFING, label=base))
         branch_diff = self.diff_source.branch_diff(base)
         # both ports hand over bytes; what counts as readable text is
         # decided here, once per side, and never at a call site
         readers = _Readers(
-            current=text_reader(self.project.read),
-            base=text_reader(self.diff_source.read_base),
+            current=text_reader(self.project.read, checkpoint),
+            base=text_reader(self.diff_source.read_base, checkpoint),
         )
-        ranges = ResolvedRanges(scanned(self.project, progress))
+        ranges = ResolvedRanges(scanned(self.project, progress, checkpoint=checkpoint))
         context = _DiffContext(
             branch_diff=branch_diff,
             readers=readers,

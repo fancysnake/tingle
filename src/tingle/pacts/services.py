@@ -6,7 +6,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
 from tingle.pacts.config import EVERY_METRIC, Selection
-from tingle.pacts.metrics import unwatched
+from tingle.pacts.metrics import uninterrupted, unwatched
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from tingle.pacts.config import CheckPolicy, Config, Library, MetricDraft
     from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
-    from tingle.pacts.metrics import MetricType, ProgressSink
+    from tingle.pacts.metrics import Checkpoint, MetricType, ProgressSink
     from tingle.pacts.report import MetricOutcome, ReportSection, RunReport
 
 
@@ -59,11 +59,13 @@ class MetricsServiceProtocol(Protocol):
         selection: Selection = EVERY_METRIC,
         *,
         progress: ProgressSink = unwatched,
+        checkpoint: Checkpoint = uninterrupted,
     ) -> RunReport:
         """Measure every selected metric over the whole project.
 
         `progress` is told how far the run has got, for a caller with
         somewhere to show it. Leaving it out is the same run, unwatched.
+        `checkpoint` is how a caller stops it; leaving it out, nobody can.
         """
 
     @abstractmethod
@@ -74,6 +76,7 @@ class MetricsServiceProtocol(Protocol):
         *,
         selection: Selection = EVERY_METRIC,
         progress: ProgressSink = unwatched,
+        checkpoint: Checkpoint = uninterrupted,
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric."""
 

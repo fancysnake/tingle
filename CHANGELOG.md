@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Quitting the TUI while it measures now stops the run at the next file it
+  walks or reads, rather than after the walk or the metric in progress.
+
 ### Changed
 
 - The docs tasks are `site:dev` and `site:build`, replacing `docs:serve` and

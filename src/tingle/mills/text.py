@@ -13,7 +13,7 @@ from functools import cache
 from pathlib import PurePath
 from typing import TypeAlias
 
-from tingle.pacts.metrics import sniffed_binary
+from tingle.pacts.metrics import Checkpoint, sniffed_binary, uninterrupted
 
 #: What a metric is handed in place of a port's raw bytes: the same lookup,
 #: with the readability rule already applied to what comes back.
@@ -41,7 +41,9 @@ def decode_text(data: bytes | None) -> str | None:
         return None
 
 
-def text_reader(read: Callable[[PurePath], bytes | None]) -> TextReader:
+def text_reader(
+    read: Callable[[PurePath], bytes | None], checkpoint: Checkpoint = uninterrupted
+) -> TextReader:
     """Adapt a port's byte reader into the text reader a metric is given.
 
     Called at the seam, where the port is picked up, and never at a call
@@ -52,10 +54,18 @@ def text_reader(read: Callable[[PurePath], bytes | None]) -> TextReader:
     every metric of a run, and each would otherwise re-read the whole tree.
     The cache is unbounded on purpose: it holds at most one run's readable
     text, and the run reads all of it anyway.
+
+    The checkpoint is called on every read, cached or not: a metric reading
+    what an earlier one already decoded is still where a run spends its
+    time.
     """
 
     @cache
     def read_text(path: PurePath) -> str | None:
         return decode_text(read(path))
 
-    return read_text
+    def checked(path: PurePath) -> str | None:
+        checkpoint()
+        return read_text(path)
+
+    return checked

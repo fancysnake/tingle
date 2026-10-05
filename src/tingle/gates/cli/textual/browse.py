@@ -236,7 +236,7 @@ class MetricsApp(App[None]):
         and nothing went wrong, so the gate has nothing to print.
         """
         try:
-            report = self._collect(self._note)
+            report = self._collect(self._note, abandon_if_cancelled)
         except AbandonedError:
             return
         except (SelectionError, DiffSourceError) as exc:
@@ -249,13 +249,7 @@ class MetricsApp(App[None]):
 
         `post_message` is thread-safe, so the walk hands over its count
         without bouncing every report through a call into the loop.
-
-        This is also where the run notices it has been abandoned: the
-        sink is the one point it passes through regularly, so checking
-        here costs a run nothing and saves a quit from waiting out the
-        whole walk.
         """
-        abandon_if_cancelled()
         self.post_message(RunProgressed(progress))
 
     def on_run_progressed(self, event: RunProgressed) -> None:

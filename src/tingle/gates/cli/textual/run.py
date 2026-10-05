@@ -19,14 +19,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from tingle.pacts.diff import DiffReport
-    from tingle.pacts.metrics import ProgressSink, RunProgress
+    from tingle.pacts.metrics import Checkpoint, ProgressSink, RunProgress
     from tingle.pacts.report import RunReport
 
 #: Starts the run and hands back what it came to, reporting its progress
-#: to the sink it is given. The gate binds the selection and the base
-#: before handing it over, so the app starts a run without knowing what
-#: kind of run it is.
-Collect: TypeAlias = "Callable[[ProgressSink], RunReport | DiffReport]"
+#: to the sink it is given and stopping when the checkpoint raises. The
+#: gate binds the selection and the base before handing it over, so the
+#: app starts a run without knowing what kind of run it is.
+Collect: TypeAlias = "Callable[[ProgressSink, Checkpoint], RunReport | DiffReport]"
 
 #: How long the run gets to finish before anything is drawn to say it is
 #: happening. A screen that flashes up and vanishes is worse than a beat
@@ -34,7 +34,7 @@ Collect: TypeAlias = "Callable[[ProgressSink], RunReport | DiffReport]"
 REVEAL_AFTER = 0.25
 
 
-class AbandonedError(Exception):
+class AbandonedError(BaseException):
     """Raised inside the worker to unwind a run nobody is waiting for.
 
     Textual asks a worker to stop when the app exits, but a thread cannot
@@ -42,9 +42,10 @@ class AbandonedError(Exception):
     the meantime, so the interpreter waits on it after the app is gone --
     the terminal comes back and the shell does not.
 
-    Noticing happens in the progress sink because that is already the one
-    point the run passes through regularly: every so many files while the
-    tree is read, and once before each metric.
+    Noticing happens at the run's checkpoint, on every file walked and
+    every file read. A `BaseException` because reads happen inside
+    metrics, whose isolation would catch an `Exception` as that metric
+    failing and carry on with the next.
     """
 
 

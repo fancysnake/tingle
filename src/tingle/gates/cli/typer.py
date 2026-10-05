@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from tingle.gates.cli.textual.run import Collect
     from tingle.pacts.check import CheckVerdict
     from tingle.pacts.config import LibraryEntry
-    from tingle.pacts.metrics import MetricType, ProgressSink
+    from tingle.pacts.metrics import Checkpoint, MetricType, ProgressSink
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ServicesProtocol
 
@@ -404,16 +404,22 @@ class CliGate:
         if request.diff:
             base = self._base_of(config, request)
 
-            def collect_diff(progress: ProgressSink) -> DiffReport:
+            def collect_diff(
+                progress: ProgressSink, checkpoint: Checkpoint
+            ) -> DiffReport:
                 return self._services.metrics.diff(
-                    config, base, selection=request.selection, progress=progress
+                    config,
+                    base,
+                    selection=request.selection,
+                    progress=progress,
+                    checkpoint=checkpoint,
                 )
 
             return collect_diff
 
-        def collect_run(progress: ProgressSink) -> RunReport:
+        def collect_run(progress: ProgressSink, checkpoint: Checkpoint) -> RunReport:
             return self._services.metrics.run(
-                config, request.selection, progress=progress
+                config, request.selection, progress=progress, checkpoint=checkpoint
             )
 
         return collect_run
