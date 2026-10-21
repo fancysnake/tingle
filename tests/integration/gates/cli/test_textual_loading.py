@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
     from textual.pilot import Pilot
 
+    from tingle.gates.cli.textual.run import Measured
     from tingle.pacts.metrics import Checkpoint, ProgressSink
     from tingle.pacts.report import RunReport
 
@@ -44,7 +45,7 @@ SETTLE_TIMEOUT = 5.0
 SETTLE_STEP = 0.02
 
 
-async def until(check: Callable[[], bool], pilot: Pilot[None]) -> None:
+async def until(check: Callable[[], bool], pilot: Pilot[Measured]) -> None:
     """Wait for something to become true, rather than for a length of time.
 
     A fixed pause is a guess about how slow the machine is, and under
@@ -65,7 +66,7 @@ def _drawn(app: MetricsApp) -> bool:
     return isinstance(screen, LoadingScreen) and bool(screen.query("#flavour"))
 
 
-async def loading(app: MetricsApp, pilot: Pilot[None]) -> LoadingScreen:
+async def loading(app: MetricsApp, pilot: Pilot[Measured]) -> LoadingScreen:
     """Wait for the loading screen to be drawn, and hand it over."""
     await until(lambda: _drawn(app), pilot)
     screen = app.screen
@@ -73,7 +74,7 @@ async def loading(app: MetricsApp, pilot: Pilot[None]) -> LoadingScreen:
     return screen
 
 
-async def settled(app: MetricsApp, pilot: Pilot[None]) -> None:
+async def settled(app: MetricsApp, pilot: Pilot[Measured]) -> None:
     """Wait until the run inside the app has landed, one way or the other.
 
     Waiting on the worker itself is no good here: an app that exits on a
@@ -221,8 +222,9 @@ def test_a_failed_run_leaves_the_error_for_the_gate(error: Exception) -> None:
 
     asyncio.run(scenario())
 
-    assert app.measured.failure is error
-    assert app.measured.report is None
+    assert app.return_value is not None
+    assert app.return_value.failure is error
+    assert app.return_value.report is None
 
 
 def test_the_flavour_line_turns_over_when_the_phase_does() -> None:
@@ -259,13 +261,32 @@ def test_a_quit_during_the_run_leaves_no_report_and_no_failure() -> None:
     async def scenario() -> None:
         async with app.run_test() as pilot:
             await loading(app, pilot)
-            app.exit()
+            await pilot.press("q")
         hold.set()
 
     asyncio.run(scenario())
 
-    assert app.measured.report is None
-    assert app.measured.failure is None
+    assert app.return_value is not None
+    assert app.return_value.report is None
+    assert app.return_value.failure is None
+
+
+def test_a_quit_after_the_run_hands_its_report_out() -> None:
+    """The reader leaves once they have read it; the gate still judges it."""
+    hold = threading.Event()
+    hold.set()
+    app = held_app(hold)
+
+    async def scenario() -> None:
+        async with app.run_test() as pilot:
+            await settled(app, pilot)
+            await pilot.press("q")
+
+    asyncio.run(scenario())
+
+    assert app.return_value is not None
+    assert app.return_value.report is RUN_REPORT
+    assert app.return_value.failure is None
 
 
 def test_a_cancelled_run_stops_itself_rather_than_finishing() -> None:

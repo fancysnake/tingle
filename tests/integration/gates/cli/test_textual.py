@@ -58,6 +58,8 @@ if TYPE_CHECKING:
 
     from textual.pilot import Pilot
 
+    from tingle.gates.cli.textual.run import Measured
+
 
 def test_a_report_measuring_nothing_draws_no_rows_and_survives_the_keys() -> None:
     """Every gesture reaches for the row under a cursor that is not on one."""
@@ -604,7 +606,7 @@ def test_pressing_p_opens_the_command_palette() -> None:
     asyncio.run(scenario())
 
 
-async def _palette_options(pilot: Pilot[None], query: str) -> CommandList:
+async def _palette_options(pilot: Pilot[Measured], query: str) -> CommandList:
     """Open the palette, search, and wait for its result list to fill."""
     await pilot.press("p")
     assert isinstance(pilot.app.screen, CommandPalette)

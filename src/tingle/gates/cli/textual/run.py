@@ -42,8 +42,8 @@ class Measured:
 
     One object rather than three attributes because they are one fact
     read at three moments: what the run last said, what it finally came
-    to, and why it could not. The gate reads the last two after the app
-    has closed, which is the only way a report leaves a terminal.
+    to, and why it could not. The app exits with it, so the gate gets the
+    last two back from `run()` -- the only way a report leaves a terminal.
     """
 
     latest: RunProgress | None = None

@@ -126,7 +126,7 @@ class SearchBar(Input):
     BINDINGS: ClassVar = [Binding("escape", "app.end_search", "Leave search")]
 
 
-class MetricsApp(App[None]):
+class MetricsApp(App[Measured]):
     """Everything a run measured, as one foldable table.
 
     Group headers, the metrics under them and -- once a metric is
@@ -272,7 +272,15 @@ class MetricsApp(App[None]):
         """Leave, carrying the failure out to the gate that can report it."""
         self.measured.failure = event.error
         self._hide_loading()
-        self.exit()
+        self.exit(self.measured)
+
+    async def action_quit(self) -> None:
+        """Leave with whatever the run has come to, finished or not.
+
+        Every way out the reader has -- the binding, ctrl+q, the palette --
+        lands here, so the report leaves through `run()` on all of them.
+        """
+        self.exit(self.measured)
 
     def _hide_loading(self) -> None:
         """Take the loading screen down, if one ever went up."""
