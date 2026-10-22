@@ -29,7 +29,8 @@ def test_metrics_service_builds_the_local_and_git_adapters(tmp_path: Path) -> No
 
 def test_service_leaves_are_cached_per_container() -> None:
     services = Services()
+    config, metrics = services.config, services.metrics
 
-    assert services.config is services.config
-    assert services.metrics is services.metrics
-    assert Services().config is not services.config
+    assert services.config is config
+    assert services.metrics is metrics
+    assert Services().config is not config

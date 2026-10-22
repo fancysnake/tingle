@@ -20,6 +20,8 @@ from tingle.gates.cli.textual.browse import MetricsApp
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tingle.gates.cli.textual.run import Measured
+
 CONFIG = """
 [ranges.python]
 include = ["src/**/*.py"]
@@ -117,8 +119,9 @@ def interactive(monkeypatch: pytest.MonkeyPatch) -> list[MetricsApp]:
     """
     built: list[MetricsApp] = []
 
-    def record(self: MetricsApp) -> None:
+    def record(self: MetricsApp) -> Measured:
         built.append(self)
+        return self.measured
 
     monkeypatch.setattr(
         typer_gate, "sys", SimpleNamespace(stdout=SimpleNamespace(isatty=lambda: True))
@@ -138,11 +141,13 @@ def headless(monkeypatch: pytest.MonkeyPatch) -> None:
     and exit paths.
     """
 
-    def run(self: MetricsApp) -> None:
+    def run(self: MetricsApp) -> Measured | None:
         async def drive() -> None:
             async with self.run_test() as pilot:
                 for _ in range(SETTLE_TRIES):
                     if self.measured.over:
+                        if self.return_value is None:
+                            await pilot.press("q")
                         return
                     await pilot.pause(SETTLE_STEP)
                 # without this an unfinished run leaves no report and no
@@ -151,6 +156,7 @@ def headless(monkeypatch: pytest.MonkeyPatch) -> None:
                 pytest.fail("the TUI run did not finish before the settle timeout")
 
         asyncio.run(drive())
+        return self.return_value
 
     monkeypatch.setattr(
         typer_gate, "sys", SimpleNamespace(stdout=SimpleNamespace(isatty=lambda: True))

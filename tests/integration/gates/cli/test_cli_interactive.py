@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import pytest
 from typer.testing import CliRunner
 
+from tingle.gates.cli.textual.browse import MetricsApp
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 from tingle.mills.metrics.registry import METRIC_TYPES
@@ -94,3 +95,14 @@ def test_an_interactive_diff_reports_its_notes_after_the_table() -> None:
     # the config carries a metric with no diff variant, which is skipped
     assert "note: ruff-ignores" not in result.output
     assert "lint-escapes" not in result.output
+
+
+@pytest.mark.usefixtures("repo", "interactive")
+def test_a_tui_that_crashed_does_not_exit_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Textual closes a crashed app with code 1 and no result to hand back."""
+    monkeypatch.setattr(MetricsApp, "run", lambda _: None)
+    monkeypatch.setattr(MetricsApp, "return_code", 1)
+
+    result = runner.invoke(app, [])
+
+    assert result.exit_code == 1

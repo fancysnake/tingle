@@ -445,10 +445,11 @@ class CliGate:
             opener=self._services.editor,
             browse=self._services.browse,
         )
-        app.run()
-        if app.measured.failure is not None:
-            self._reported(app.measured.failure)
-        return app.measured.report
+        if (measured := app.run()) is None:
+            raise typer.Exit(app.return_code or 1)
+        if measured.failure is not None:
+            self._reported(measured.failure)
+        return measured.report
 
     def _reported(self, exc: Exception) -> NoReturn:
         """Report a failure collection raised, the way a command would.
