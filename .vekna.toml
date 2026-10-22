@@ -33,4 +33,4 @@ gate_checks = ["quality", "tests"]
 # The integration suite is left out — it is the slow half the cover prompt
 # tells the agent to stay out of, and the sweeps stay the ritual's.
 [cabinet.agent]
-may_run = ["mise run test:unit"]
+may_run = ["mise run fullcheck"]
