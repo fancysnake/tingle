@@ -119,8 +119,9 @@ def interactive(monkeypatch: pytest.MonkeyPatch) -> list[MetricsApp]:
     """
     built: list[MetricsApp] = []
 
-    def record(self: MetricsApp) -> None:
+    def record(self: MetricsApp) -> Measured:
         built.append(self)
+        return self.measured
 
     monkeypatch.setattr(
         typer_gate, "sys", SimpleNamespace(stdout=SimpleNamespace(isatty=lambda: True))
@@ -145,9 +146,7 @@ def headless(monkeypatch: pytest.MonkeyPatch) -> None:
             async with self.run_test() as pilot:
                 for _ in range(SETTLE_TRIES):
                     if self.measured.over:
-                        # a failed run has left on its own; a finished one
-                        # waits for the reader, who quits the way they would
-                        if self.measured.failure is None:
+                        if self.return_value is None:
                             await pilot.press("q")
                         return
                     await pilot.pause(SETTLE_STEP)

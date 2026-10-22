@@ -445,9 +445,8 @@ class CliGate:
             opener=self._services.editor,
             browse=self._services.browse,
         )
-        # None when textual closed the app itself rather than through a quit
         if (measured := app.run()) is None:
-            return None
+            raise typer.Exit(app.return_code or 1)
         if measured.failure is not None:
             self._reported(measured.failure)
         return measured.report
