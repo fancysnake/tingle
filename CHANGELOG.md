@@ -7,16 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Quitting the TUI while it measures now stops the run at the next file it
-  walks or reads, rather than after the walk or the metric in progress.
+## [0.9.0] - 2026-10-23
 
 ### Changed
 
-- The docs tasks are `site:dev` and `site:build`, replacing `docs:serve` and
-  `docs:build`; the strict build is now set in `mkdocs.yml`, so `site:dev`
-  fails on a broken link the same way.
+- `requires-python` is `>=3.11,<4`, so tingle installs on Python 3.15 and
+  later; CI still tests 3.11 through 3.14.
+
+### Fixed
+
+- Quitting the TUI while it measures stops the run at the next file it walks
+  or reads, rather than after the walk or the metric in progress.
 
 ## [0.8.0] - 2026-09-28
 

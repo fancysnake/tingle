@@ -131,7 +131,7 @@ $ echo $?
 
 ## Development
 
-Python 3.11–3.14 are supported (CI runs the full matrix). The project uses
+Python 3.11–3.15 are supported (CI runs the full matrix). The project uses
 [mise](https://mise.jdx.dev/) + Poetry.
 
 ```console
