@@ -1,6 +1,6 @@
 # Contributing
 
-Python 3.11–3.14 are supported, and CI runs the full matrix.
+Python 3.11–3.15 are supported, and CI runs the full matrix.
 
 ## Setup
 
