@@ -6,7 +6,7 @@ authors = [{ name = "Radosław Ganczarek", email = "radoslaw@ganczarek.in" }]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.11,<3.16"
+requires-python = ">=3.11,<4"
 keywords = ["metrics", "refactoring", "technical-debt", "code-quality", "linting", "ci"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -44,6 +44,8 @@ packages = [{ include = "tingle", from = "src" }]
 [tool.poetry.group.dev.dependencies]
 black = "^26.5.1"
 # cabinet is not on PyPI and is not going there; git is its only source.
+# cabinet 3.0.0 and vekna 0.13.0 declare <3.15, so 3.15 dev environments have
+# no `vekna cast`; drop the marker once both support 3.15.
 cabinet = { git = "https://github.com/fancysnake/cabinet.git", rev = "v3.0.0", python = "<3.15" }
 codespell = "^2.4.2"
 deptry = "^0.25.1"

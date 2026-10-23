@@ -12,7 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `requires-python` is `>=3.11,<4`, so tingle installs on Python 3.15 and
-  later; CI still tests 3.11 through 3.14.
+  later; CI tests 3.11 through 3.15.
+- The docs tasks are `site:dev` and `site:build`, replacing `docs:serve` and
+  `docs:build`; the strict build is now set in `mkdocs.yml`, so `site:dev`
+  fails on a broken link the same way.
 
 ### Fixed
 
