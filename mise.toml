@@ -50,7 +50,7 @@ run = [
 # whose pins are not the ones this project resolves
 [tasks."lint:trivy"]
 description = "Scan the project's lockfiles for known vulnerabilities with Trivy"
-run = "trivy fs --scanners vuln --skip-dirs .venv --exit-code 1 --quiet ."
+run = "trivy fs --scanners vuln --include-dev-deps --skip-dirs .venv --exit-code 1 --quiet ."
 
 # split the way the shared config splits black, ruff and taplo: the checking
 # half is what a gate may run, since the fixing half rewrites the files

@@ -58,6 +58,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: jdx/mise-action@94c60b39bc2d90ab2f9bab27f38d3cc4812c1834 # v5
+        with:
+          install_args: trivy
       - run: mise run lint:trivy
 
   # advisory: reports the branch's debt without blocking the merge
