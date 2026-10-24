@@ -12,6 +12,7 @@ node = "26.12.0"
 pipx = "1.18.2"
 "pipx:poetry" = "2.5.1"
 python = "3.11"
+trivy = "0.76.1"
 
 [env]
 _.python.venv = { path = ".venv", create = true }
@@ -33,10 +34,23 @@ TOML_PATHS = "*.toml .*.toml"
 [task_config]
 includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"]
 
+# the shared dep:upgrade:py, with lint:trivy in place of its `pip-audit .`;
+# an included task cannot be overridden by name
 [tasks.update]
 run = [
-    { task = "dep:upgrade:py" },
+    "mise upgrade --bump --exclude python --minimum-release-age=7d --local",
+    "pip install -U pip",
+    "poetry update",
+    "deptry {{ env.SRC_PATHS }} {{ env.SCRIPT_PATHS }} {{ env.TEST_PATHS }}",
+    { task = "lint:trivy" },
+    "poetry show -o",
 ]
+
+# .venv is skipped because a git dependency installs with its own lockfile,
+# whose pins are not the ones this project resolves
+[tasks."lint:trivy"]
+description = "Scan the project's lockfiles for known vulnerabilities with Trivy"
+run = "trivy fs --scanners vuln --skip-dirs .venv --exit-code 1 --quiet ."
 
 # split the way the shared config splits black, ruff and taplo: the checking
 # half is what a gate may run, since the fixing half rewrites the files
@@ -104,6 +118,8 @@ run = [{ task = "lint:all" }, { task = "lint:versions" }, { task = "test:py" }]
 # the gate a human commits behind: the formatters as well, the strict docs
 # build, coverage of the lines this branch changed, and — in `fullcheck`
 # alone, since CI has it continue-on-error — tingle's own debt report.
+# The Trivy scan is here and not in `gate`: a newly published advisory would
+# fail a cast whose diff never touched a dependency.
 # `gate` stays without these: it is the unattended-cast task and wants to
 # stay fast and write nothing.
 [tasks.check]
@@ -113,6 +129,7 @@ run = [
     { task = "format:markdown" },
     { task = "lint:all" },
     { task = "lint:versions" },
+    { task = "lint:trivy" },
     { task = "site:build" },
     { task = "test:py:cov:diff" },
 ]

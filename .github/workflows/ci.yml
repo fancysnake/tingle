@@ -49,6 +49,17 @@ jobs:
       - run: mise run lint:strict
       - run: mise run lint:versions
 
+  # its own job, so a newly published advisory reads as that, not as a lint
+  # failure; it scans lockfiles only, so it needs no `poetry install`
+  vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@94c60b39bc2d90ab2f9bab27f38d3cc4812c1834 # v5
+      - run: mise run lint:trivy
+
   # advisory: reports the branch's debt without blocking the merge
   tingle:
     runs-on: ubuntu-latest
