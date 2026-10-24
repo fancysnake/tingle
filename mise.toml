@@ -9,7 +9,7 @@ enter = "poetry install"
 jq = "1.8.2"
 markdownlint-cli2 = "0.23.3"
 node = "26.12.0"
-pipx = "1.18.0"
+pipx = "1.18.2"
 "pipx:poetry" = "2.5.1"
 python = "3.11"
 
@@ -35,8 +35,6 @@ includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"
 
 [tasks.update]
 run = [
-    "mise upgrade --bump --exclude python --minimum-release-age=7d",
-    "mise install",
     { task = "dep:upgrade:py" },
 ]
 
