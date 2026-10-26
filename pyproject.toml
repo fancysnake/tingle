@@ -43,10 +43,6 @@ packages = [{ include = "tingle", from = "src" }]
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.5.1"
-# cabinet is not on PyPI and is not going there; git is its only source.
-# cabinet 3.0.0 and vekna 0.13.0 declare <3.15, so 3.15 dev environments have
-# no `vekna cast`; drop the marker once both support 3.15.
-cabinet = { git = "https://github.com/fancysnake/cabinet.git", rev = "v3.0.0", python = "<3.15" }
 codespell = "^2.4.2"
 deptry = "^0.25.1"
 diff-cover = "^10.4.1"
@@ -69,6 +65,17 @@ optional = true
 
 [tool.poetry.group.docs.dependencies]
 mkdocs-material = ">=9.6,<10.0"
+
+# Only `vekna cast` needs this one, and it brings in an agent runtime of
+# about thirty packages that no test, linter or docs build imports.
+[tool.poetry.group.rituals]
+optional = true
+
+[tool.poetry.group.rituals.dependencies]
+# cabinet is not on PyPI and is not going there; git is its only source.
+# cabinet 3.0.0 and vekna 0.13.0 declare <3.15, so 3.15 dev environments have
+# no `vekna cast`; drop the marker once both support 3.15.
+cabinet = { git = "https://github.com/fancysnake/cabinet.git", rev = "v3.0.0", python = "<3.15" }
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
