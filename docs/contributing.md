@@ -11,7 +11,15 @@ mise install
 poetry install
 ```
 
-`vekna cast` pushes through an https remote, since a cast has no terminal for
+`vekna cast` comes from the optional rituals group, which a plain
+`poetry install` leaves out. On Python 3.11–3.14, cast a ritual through mise,
+which installs the group first:
+
+```console
+mise run cast <ritual>
+```
+
+A cast pushes through an https remote, since it has no terminal for
 an ssh key passphrase. A fresh clone adds one once, substituting its own URL
 on a fork:
 
