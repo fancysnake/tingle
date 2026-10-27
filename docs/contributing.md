@@ -12,11 +12,11 @@ poetry install
 ```
 
 `vekna cast` comes from the optional rituals group, which a plain
-`poetry install` leaves out. A contributor who runs rituals installs it once;
-later installs keep it:
+`poetry install` leaves out. On Python 3.11–3.14, cast a ritual through mise,
+which installs the group first:
 
 ```console
-poetry install --with rituals
+mise run cast <ritual>
 ```
 
 A cast pushes through an https remote, since it has no terminal for

@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lint:trivy`, `check` and a CI job, replacing `pip-audit`.
 - cabinet, and with it `vekna cast`, is in an optional `rituals` group, so
   the default dev install and CI skip its agent runtime;
-  `poetry install --with rituals` opts in.
+  `mise run cast <ritual>` installs it and casts.
 
 ## [0.9.0] - 2026-10-23
 
