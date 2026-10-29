@@ -3,6 +3,7 @@
 [![PyPI][pypi-badge]][pypi]
 [![Python versions][python-badge]][pypi]
 [![CI][ci-badge]][ci]
+[![codecov][codecov-badge]][codecov]
 [![License: MIT][license-badge]](LICENSE)
 [![tech debt: watched by tingle][tingle-badge]](https://tingle.fancysnake.dev)
 
@@ -174,4 +175,6 @@ MIT.
 [python-badge]: https://img.shields.io/pypi/pyversions/tingle
 [ci]: https://github.com/fancysnake/tingle/actions/workflows/ci.yml
 [ci-badge]: https://github.com/fancysnake/tingle/actions/workflows/ci.yml/badge.svg?branch=main
+[codecov]: https://codecov.io/gh/fancysnake/tingle
+[codecov-badge]: https://codecov.io/gh/fancysnake/tingle/branch/main/graph/badge.svg
 [license-badge]: https://img.shields.io/pypi/l/tingle
