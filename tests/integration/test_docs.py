@@ -1,6 +1,6 @@
 """The doc pages that make claims about the code, checked against it.
 
-Both pages read here are files on disk, which is what puts these in the
+Everything read here is a file on disk, which is what puts these in the
 integration suite rather than beside the unit tests for the layers they
 exercise: a docs edit must not break `test:unit`.
 """
@@ -18,7 +18,8 @@ from tingle.inits.services import Services
 from tingle.mills.config import validate
 from tingle.mills.metrics.registry import METRIC_TYPES
 
-DOCS = Path(__file__).parents[2] / "docs"
+ROOT = Path(__file__).parents[2]
+DOCS = ROOT / "docs"
 
 #: Only ever a label in the errors `validate` would raise; nothing is read.
 SOURCE = Path("/proj/tingle.toml")
@@ -62,3 +63,16 @@ def test_configuration_page_example_is_a_valid_config() -> None:
     assert set(config.ranges) == {"python", "js"}
     assert [m.name for m in config.metrics] == ["noqa-comments", "todo-comments"]
     assert config.default_range.name == "python"
+
+
+def test_package_site_and_citation_share_one_description() -> None:
+    # read as text: PyYAML is only in the optional docs group
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    mkdocs = (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+    citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    site = re.search(r'^site_description: "(.*)"$', mkdocs, re.MULTILINE)
+    abstract = re.search(r"^abstract: >-\n((?:  .*\n)+)", citation, re.MULTILINE)
+    assert site is not None
+    assert abstract is not None
+    folded = " ".join(line.strip() for line in abstract.group(1).splitlines())
+    assert site.group(1) == folded == pyproject["project"]["description"]
