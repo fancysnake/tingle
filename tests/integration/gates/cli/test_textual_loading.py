@@ -14,6 +14,7 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+from textual.app import App
 from textual.widgets import Label, ProgressBar
 from textual_support import RUN_REPORT, collecting, labels, metrics_app
 
@@ -407,3 +408,23 @@ def test_progress_arriving_after_the_screen_reaches_it_too() -> None:
     asyncio.run(scenario())
 
     assert doing == ["measuring — later (3/4)"]
+
+
+def test_progress_arriving_before_the_screen_is_drawn_waits_for_it() -> None:
+    """A report can beat the screen's own widgets in; it shows once they are out."""
+    app: App[None] = App()
+    doing: list[str] = []
+
+    async def scenario() -> None:
+        async with app.run_test() as pilot:
+            screen = LoadingScreen()
+            app.push_screen(screen)
+            screen.advance(
+                RunProgress(RunPhase.MEASURING, done=2, total=4, label="early")
+            )
+            await pilot.pause()
+            doing.append(str(screen.query_one("#doing", Label).content))
+
+    asyncio.run(scenario())
+
+    assert doing == ["measuring — early (3/4)"]

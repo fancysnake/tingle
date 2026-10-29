@@ -73,7 +73,13 @@ class LoadingScreen(Screen[None]):
         A change of phase turns the flavour over as well as the sentence,
         so the screen visibly moves at the moments it has real news --
         the timer alone would leave the two out of step.
+
+        A report can land between the push and the compose; it is kept
+        for `on_mount` to show rather than shown to widgets not out yet.
         """
+        self._latest = progress
+        if not self.query(ProgressBar):
+            return
         self.query_one(ProgressBar).update(total=progress.total, progress=progress.done)
         self.query_one("#doing", Label).update(plainly(progress))
         if progress.phase is not self._phase:
