@@ -1,5 +1,11 @@
 # tingle
 
+[![PyPI][pypi-badge]][pypi]
+[![Python versions][python-badge]][pypi]
+[![CI][ci-badge]][ci]
+[![License: MIT][license-badge]](LICENSE)
+[![tech debt: watched by tingle][tingle-badge]](https://tingle.fancysnake.dev)
+
 Documentation is at [https://tingle.fancysnake.dev](https://tingle.fancysnake.dev).
 
 <!-- --8<-- [start:intro] -->
@@ -102,6 +108,20 @@ $ echo $?
 ```
 <!-- --8<-- [end:what-it-does] -->
 
+## Badge
+
+<!-- --8<-- [start:badge] -->
+Show that a repository keeps its debt in check with tingle:
+
+[![tech debt: watched by tingle][tingle-badge]](https://tingle.fancysnake.dev)
+
+```markdown
+[![tech debt: watched by tingle](https://img.shields.io/badge/tech%20debt-watched%20by%20tingle-c62828)](https://tingle.fancysnake.dev)
+```
+
+[tingle-badge]: https://img.shields.io/badge/tech%20debt-watched%20by%20tingle-c62828
+<!-- --8<-- [end:badge] -->
+
 ## Documentation
 
 <!-- Hand-written, not shared with the site's own list: these have to be
@@ -148,3 +168,10 @@ the GLIMPSE source layout and the layer contracts.
 ## License
 
 MIT.
+
+[pypi]: https://pypi.org/project/tingle/
+[pypi-badge]: https://img.shields.io/pypi/v/tingle
+[python-badge]: https://img.shields.io/pypi/pyversions/tingle
+[ci]: https://github.com/fancysnake/tingle/actions/workflows/ci.yml
+[ci-badge]: https://github.com/fancysnake/tingle/actions/workflows/ci.yml/badge.svg?branch=main
+[license-badge]: https://img.shields.io/pypi/l/tingle
