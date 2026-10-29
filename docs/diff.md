@@ -1,3 +1,7 @@
+---
+description: "Measure what a branch changed: tingle stat --diff counts tech-debt markers added and removed against the merge-base, uncommitted and untracked files too."
+---
+
 # Branch impact
 
 Like diff-cover, but for your metrics. `--diff` measures only what the

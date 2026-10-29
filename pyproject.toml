@@ -1,13 +1,24 @@
 [project]
 name = "tingle"
 version = "0.9.0"
-description = "Constant refactoring monitoring tool"
+description = "Code metrics for constant refactoring: count noqa, type: ignore and other tech-debt markers, track them over time, and fail CI when a branch adds more."
 authors = [{ name = "Radosław Ganczarek", email = "radoslaw@ganczarek.in" }]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.11,<4"
-keywords = ["metrics", "refactoring", "technical-debt", "code-quality", "linting", "ci"]
+keywords = [
+    "metrics",
+    "code-metrics",
+    "refactoring",
+    "technical-debt",
+    "code-quality",
+    "static-analysis",
+    "linting",
+    "noqa",
+    "type-ignore",
+    "ci",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",

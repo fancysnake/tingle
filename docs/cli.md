@@ -1,3 +1,7 @@
+---
+description: "tingle command-line reference: every command and option of stat, check, report, library, add, init and list, with metric selection and exit codes."
+---
+
 # CLI reference
 
 Reports go to stdout; warnings and per-metric errors go to stderr, so

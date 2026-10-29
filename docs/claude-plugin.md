@@ -1,3 +1,7 @@
+---
+description: "The tingle-config Claude Code skill writes tingle configuration: it surveys the languages, tools and layout a project uses before adding or reviewing metrics."
+---
+
 # Claude Code plugin
 
 `tingle-config` is a [Claude Code](https://claude.com/claude-code) skill that

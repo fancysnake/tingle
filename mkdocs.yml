@@ -1,6 +1,6 @@
 site_name: tingle
 site_url: https://tingle.fancysnake.dev
-site_description: Code metrics for the era of constant refactoring.
+site_description: "Code metrics for constant refactoring: count noqa, type: ignore and other tech-debt markers, track them over time, and fail CI when a branch adds more."
 repo_url: https://github.com/fancysnake/tingle
 repo_name: fancysnake/tingle
 edit_uri: edit/main/docs/
@@ -20,6 +20,7 @@ validation:
 
 theme:
   name: material
+  custom_dir: overrides
   logo: assets/logo.png
   favicon: assets/favicon.png
   # Material's own two schemes, recoloured in stylesheets/tingle.css: its

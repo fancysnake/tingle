@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{# The 404 page renders with page unset. page.is_homepage is false for an
+   index.md inside a nav group, so test the source path. #}
+{% set is_home = page and page.file.src_uri == "index.md" %}
+{% set home_title = "tingle — count noqa and tech-debt markers, fail CI on new debt" %}
+
+{% block htmltitle %}
+  {% if is_home %}
+    <title>{{ home_title }}</title>
+  {% else %}
+    {{ super() }}
+  {% endif %}
+{% endblock %}
+
+{% block extrahead %}
+{% if page %}
+  {% set description = page.meta.description or config.site_description %}
+  {# Material's <title> formula off the homepage. #}
+  {% set title = home_title if is_home else page.title | striptags ~ " - " ~ config.site_name %}
+  {# No 1200×630 card yet, so the square logo stands in, at summary size.
+     MkDocs ends site_url with a slash, so none here. #}
+  {% set card = config.site_url ~ "assets/logo.png" %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name | e }}">
+  <meta property="og:title" content="{{ title | e }}">
+  <meta property="og:description" content="{{ description | e }}">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:image" content="{{ card }}">
+  <meta property="og:image:alt" content="The tingle logo">
+  {# X reads og:* for title, description and image. #}
+  <meta name="twitter:card" content="summary">
+  {% if is_home %}
+    {# Describes the software as an entity; offers at price 0 marks it free.
+       tojson so a quote in a value cannot break the script. #}
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "tingle",
+        "description": {{ description | tojson }},
+        "url": {{ config.site_url | tojson }},
+        "image": {{ card | tojson }},
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows",
+        "license": "https://opensource.org/licenses/MIT",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}
+      }
+    </script>
+  {% endif %}
+{% endif %}
+{% endblock %}

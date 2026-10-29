@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: If you use tingle in your work, please cite it as below.
+title: tingle
+abstract: >-
+  Code metrics for constant refactoring: count noqa, type: ignore and other
+  tech-debt markers, track them over time, and fail CI when a branch adds
+  more.
+type: software
+authors:
+  - given-names: Radosław
+    family-names: Ganczarek
+    email: radoslaw@ganczarek.in
+license: MIT
+repository-code: https://github.com/fancysnake/tingle
+url: https://tingle.fancysnake.dev
+keywords:
+  - code-metrics
+  - refactoring
+  - technical-debt
+  - static-analysis

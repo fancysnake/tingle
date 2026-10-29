@@ -1,3 +1,7 @@
+---
+description: "Every tingle metric type: regex counts, symbol uses, TOML and INI list lengths, file and line counts, with the params each takes and the limits of each."
+---
+
 # Metric types
 
 Every metric has a `type` from the table below, a `name`, and the params its

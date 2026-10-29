@@ -1,3 +1,7 @@
+---
+description: "tingle counts noqa, type: ignore and other tech-debt markers in your code, tracks the numbers over time, and fails CI when a branch takes on more debt."
+---
+
 # tingle
 
 --8<-- "README.md:intro"
@@ -13,6 +17,10 @@
 ## What it does
 
 --8<-- "README.md:what-it-does"
+
+## Badge
+
+--8<-- "README.md:badge"
 
 ## Where to go next
 
