@@ -1,3 +1,7 @@
+---
+description: "Built-in metric templates for ruff, mypy and pylint: reuse a tested noqa or type: ignore pattern by name, override only what differs, or publish your own."
+---
+
 # Template library
 
 Most projects silence the same tools in the same ways, so most `tingle.toml`

@@ -1,3 +1,7 @@
+---
+description: "Configure tingle in tingle.toml or pyproject.toml: ranges of files to scan, metric groups, and every metric setting with its type and default value."
+---
+
 # Configuration
 
 tingle looks for `tingle.toml` in the current directory first, then for a

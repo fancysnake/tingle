@@ -1,3 +1,7 @@
+---
+description: "tingle check fails CI when a pull request adds tech-debt markers: it measures the branch against its merge-base and exits 1 when any metric grows."
+---
+
 # CI gate
 
 `tingle check` is [`stat --diff`](diff.md) with an opinion. It measures the

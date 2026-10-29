@@ -1,3 +1,7 @@
+---
+description: "Contribute to tingle: set up with mise and Poetry, run the unit and integration suites, and keep the GLIMPSE layer boundaries that import-linter enforces."
+---
+
 # Contributing
 
 Python 3.11–3.15 are supported, and CI runs the full matrix.

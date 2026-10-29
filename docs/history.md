@@ -1,3 +1,7 @@
+---
+description: "Track tech-debt metrics over time on GitHub: store tingle results on a data branch with the metrics-history action and publish one chart per metric group."
+---
+
 # History
 
 tingle stores nothing: every run measures the tree in front of it. To watch
