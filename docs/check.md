@@ -197,14 +197,18 @@ repos:
 pre-commit installs tingle from the tag `rev` names, so the hook needs no
 `pip install`.
 
-To gate the whole branch on push instead, as CI does, run the hook at the push
-stage against your base branch:
+To judge the branch on push instead, run the hook at the push stage and clear
+its `--base HEAD`, so it falls back to `[diff] base`, then `main`:
 
 ```yaml
       - id: tingle
         stages: [pre-push]
-        args: [--base, main]
+        args: []
 ```
+
+The push hook measures your checkout, not the commits you push: the working
+tree and its untracked files against the merge-base, with nothing stashed.
+Push from a clean tree and the two agree.
 
 ### hk
 
