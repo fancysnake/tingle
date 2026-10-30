@@ -36,6 +36,8 @@ description: "tingle counts noqa, type: ignore and other tech-debt markers in yo
   a chart of them. [tingle's own][own] is the shape of the result.
 - **[CLI reference](cli.md)** — every command and flag.
 - **[Changelog](changelog.md)** — what each release changed.
+- **[Mission](mission.md)** — what tingle is for, where it wins, and how to
+  describe it.
 - **[Contributing](contributing.md)** — setup, the checks, and the layout of
   the source.
 

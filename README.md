@@ -10,10 +10,6 @@
 Documentation is at [https://tingle.fancysnake.dev](https://tingle.fancysnake.dev).
 
 <!-- --8<-- [start:intro] -->
-> *Spider-sense for refactoring: you know that tingle — the itch that says
-> the codebase isn't right yet. This tool puts a number on it, so you can
-> watch it drop.*
-
 Code metrics for the era of constant refactoring.
 
 `tingle` measures things you want to shrink (or watch) while refactoring a
@@ -24,6 +20,10 @@ package that should disappear.
 It runs once, prints the numbers, and stores nothing. To watch a number over
 months, the metrics-history action records a point per commit that lands and
 publishes a chart of them.
+
+> *Spider-sense for refactoring: you know that tingle — the itch that says
+> the codebase isn't right yet. This tool puts a number on it, so you can
+> watch it drop.*
 <!-- --8<-- [end:intro] -->
 
 ## Install
@@ -147,6 +147,8 @@ Show that a repository keeps its debt in check with tingle:
   flag.
 - [Changelog](https://tingle.fancysnake.dev/changelog/) — what each release
   changed.
+- [Mission](https://tingle.fancysnake.dev/mission/) — what tingle is for,
+  where it wins, and how to describe it.
 - [Contributing](https://tingle.fancysnake.dev/contributing/) — setup, the
   checks, and the layout of the source.
 

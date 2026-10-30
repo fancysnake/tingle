@@ -80,4 +80,6 @@ nav:
   - Reference:
       - cli.md
       - changelog.md
-  - contributing.md
+  - Project:
+      - mission.md
+      - contributing.md
