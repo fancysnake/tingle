@@ -29,9 +29,10 @@ and lets CI refuse the branch that adds more, so the numbers only go down.
 - **Measure first, judge on request.** `tingle stat` reports, and no number
   changes its exit code. Failing the build is a separate command a team
   chooses to run.
-- **Keep no state.** Every run measures the tree in front of it. The config
-  is the only file in the repository, so there is nothing to merge and
-  nothing to go stale.
+- **Keep no state.** `tingle stat` and `tingle check` measure the tree in
+  front of them, and the config is the only file they read, so there is
+  nothing to merge and nothing to go stale. History is opt-in, and lives on
+  a data branch.
 - **Any marker in any language.** If the code leaves a trace, a regex can
   count it; templates spare the typing for the tools everyone runs.
 - **Say only what is true today.** This documentation describes what the
@@ -39,15 +40,8 @@ and lets CI refuse the branch that adds more, so the numbers only go down.
 
 ## What it does today
 
-| Feature | What tingle does |
-| --- | --- |
-| **[Metric types](metrics.md)** | Regex matches, uses of a Python symbol, entries in a TOML or INI list, files and lines, each counted per file, with every occurrence at `file:line`. |
-| **[Branch impact](diff.md)** | `tingle stat --diff` measures only what the branch changed, against the merge-base, uncommitted and untracked files included. |
-| **[CI gate](check.md)** | `tingle check` exits 1 when the branch makes any metric worse, and lists the lines that did it. |
-| **Migrations** | [`symbol_uses`](metrics.md#symbol_uses) counts uses of a legacy class; [`line_count`](metrics.md#file_count-and-line_count) counts the code in a package meant to disappear. |
-| **[Template library](library.md)** | Ready-made metrics for Ruff, mypy, pylint, black, pytest, codespell, import-linter and TODO comments. A team's own templates ship as an ordinary Python package. |
-| **[History](history.md)** | A GitHub Action records a point per commit on main to a data branch and publishes one chart per metric group. |
-| **[Claude Code plugin](claude-plugin.md)** | The `tingle-config` skill surveys a project's languages, tools and layout, and writes `tingle.toml`. |
+The features, each with its own page, are listed under
+[Where to go next](index.md#where-to-go-next).
 
 ## What it is not
 
@@ -55,5 +49,5 @@ and lets CI refuse the branch that adds more, so the numbers only go down.
   checkers were told to skip.
 - **Not a quality score.** It rates nothing. It counts what you told it to
   count, and nothing else.
-- **Not a service.** Nothing leaves the repository; history is a branch in
-  your own repo.
+- **Not a service.** No third-party service, no account; history is a branch
+  in your own repo.

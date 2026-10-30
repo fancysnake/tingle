@@ -147,8 +147,8 @@ Show that a repository keeps its debt in check with tingle:
   flag.
 - [Changelog](https://tingle.fancysnake.dev/changelog/) — what each release
   changed.
-- [Mission](https://tingle.fancysnake.dev/mission/) — what tingle is for,
-  where it wins, and how to describe it.
+- [Mission](https://tingle.fancysnake.dev/mission/) — why tingle exists,
+  what it stands for, and what it deliberately is not.
 - [Contributing](https://tingle.fancysnake.dev/contributing/) — setup, the
   checks, and the layout of the source.
 
