@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A pre-commit hook, `tingle`, that fails a commit adding tech-debt markers;
+  the CI gate page documents it and the equivalent hk step.
+
 ### Changed
 
 - Dependency vulnerabilities are checked by Trivy against the lockfiles, in

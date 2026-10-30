@@ -1,0 +1,7 @@
+- id: tingle
+  name: tingle check
+  description: Fail a commit that adds tech-debt markers.
+  entry: tingle check --base HEAD
+  language: python
+  pass_filenames: false
+  always_run: true
