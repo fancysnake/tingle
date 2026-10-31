@@ -17,7 +17,7 @@ and keeps its own count, if any. None of them shows the whole of it, or
 whether this branch made it worse.
 
 tingle puts one number on each kind of debt, measures what a branch changed,
-and lets CI refuse the branch that adds more, so the numbers only go down.
+and turns CI red on the branch that adds more, so the numbers only go down.
 
 ## What we believe
 
@@ -29,7 +29,8 @@ and lets CI refuse the branch that adds more, so the numbers only go down.
   suppression it counts. A false positive is fixed in the config, with a
   narrower pattern, an `ignore_lines` entry or a range `exclude`, where the
   whole project can see it. The check stays blind, and a justified change
-  that fails it is meant to hurt.
+  that fails it is meant to hurt: the check goes red and stays red. It does
+  not block the merge, because some of what it flags is not debt.
 - **A branch answers for what it changed.** Work that lands on the base
   after you branch is not yours, and never counts against you.
 - **Measure first, judge on request.** `tingle stat` reports, and no number

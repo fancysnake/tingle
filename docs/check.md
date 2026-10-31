@@ -107,14 +107,36 @@ jobs:
     to find the merge-base with the base branch. Without it the job fails on
     every run.
 
-### Adopting the gate
+### Advisory: report without blocking the merge
 
-There is no advisory mode: `continue-on-error` is a tolerated failure, the
-very thing tingle counts. Settle the config before the gate goes in. Run
-[`tingle report`](cli.md#tingle-report) over the whole tree, fix each false
-positive in the config with a narrower pattern, an `ignore_lines` entry or a
-range `exclude`, and name in `[check] ignore` the metrics that are expected
-to grow. From then on, the gate fails every branch that takes on debt.
+tingle has false positives, so a red check is not always a real problem. To
+show the branch's debt on every pull request without blocking the merge, put
+`check` in its own job with `continue-on-error: true`. The job goes red when
+the branch worsens the metrics, so the failure shows in the checks list, but
+the workflow still passes. tingle's own CI runs it this way.
+
+```yaml
+  tingle:
+    runs-on: ubuntu-latest
+    continue-on-error: true     # report, but never block the merge
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: pip install tingle
+      - run: tingle check
+```
+
+!!! note "Branch protection overrides this"
+
+    `continue-on-error` keeps the *workflow* from failing, but it does not
+    make a check non-required. If the job is listed as a required status
+    check in a branch protection rule, it will still block the merge. Leave
+    it out of that list.
+
+Either way, fix each false positive in the config with a narrower pattern,
+an `ignore_lines` entry or a range `exclude`, and name in `[check] ignore`
+the metrics that are expected to grow.
 
 ### Feedback on the pull request
 

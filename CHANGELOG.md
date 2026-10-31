@@ -30,8 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `check --policy`, `--metric` and `--group`: only the config decides what
   the gate judges and how, so loosening it is a change a review sees.
-- The CI gate page's advisory recipe: `continue-on-error` is a tolerated
-  failure, the very thing tingle counts.
 
 ## [0.9.0] - 2026-10-23
 

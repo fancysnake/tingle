@@ -220,8 +220,8 @@ Ranges first, then metrics, grouped under comment headings the way
 - **Loosening a config already in use** (a new `ignore_lines` entry, an
   `exclude`, a narrowed pattern, a name in `[check] ignore`) goes in its own
   branch, never in the branch whose check it would turn green. tingle has no
-  way to silence a finding in code: no marker, and no `--no-verify` or
-  `continue-on-error` around the check.
+  way to silence a finding in code: no marker, and no `--no-verify` around
+  the check.
 - **`[diff] base`** only if the trunk is not `main`. **`[display]
   loc_range`** when the default range is not the code the derived guide
   should be sized by.
