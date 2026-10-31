@@ -15,7 +15,6 @@ from rich.text import Text
 from tingle.gates.cli import render
 from tingle.pacts.config import (
     BUILTIN_TEMPLATE_PACKAGE,
-    CheckPolicy,
     Config,
     ConfigError,
     ConfigNotFoundError,
@@ -63,14 +62,6 @@ BaseOption = Annotated[
         # rich reads [diff] as a markup tag and swallows it; \[ escapes it
         help="Base branch for --diff (default: \\[diff] base in the config,"
         " then 'main'). Implies --diff.",
-    ),
-]
-PolicyOption = Annotated[
-    str | None,
-    typer.Option(
-        "--policy",
-        help="Override \\[check] policy: 'sum' fails when the metrics grow in"
-        " total, 'any' fails when a single metric grows.",
     ),
 ]
 
@@ -190,7 +181,6 @@ class CliGate:
     def check(
         self,
         *,
-        policy: PolicyOption = None,
         json_out: JsonOption = False,
         github: Annotated[
             bool,
@@ -209,8 +199,6 @@ class CliGate:
         ] = None,
         base: BaseOption = None,
         config: ConfigOption = None,
-        metric: MetricOption = None,
-        group: GroupOption = None,
     ) -> None:
         """Fail (exit 1) if the branch worsened the metrics. For CI.
 
@@ -223,13 +211,7 @@ class CliGate:
                 "usage error: --json and --github both print to stdout", err=True
             )
             raise typer.Exit(2)
-        request = _MetricRequest.of(
-            diff=True, base=base, config=config, metric=metric, group=group
-        )
-        loaded = self._load(config)
-        report, verdict = self._collect_check(
-            loaded, request, policy=self._parse_policy(policy)
-        )
+        report, verdict = self._collect_check(config, base)
         if json_out:
             typer.echo(render.check_json(report, verdict))
         elif github:
@@ -436,7 +418,7 @@ class CliGate:
     def _collector(self, config: Config, request: _MetricRequest) -> Collect:
         """Bind the run the TUI will start once it is on screen."""
         if request.diff:
-            base = self._base_of(config, request)
+            base = self._base_of(config, request.base)
 
             def collect_diff(
                 progress: ProgressSink, checkpoint: Checkpoint
@@ -526,27 +508,23 @@ class CliGate:
         config = self._load(request.config)
         try:
             return self._services.metrics.diff(
-                config, self._base_of(config, request), selection=request.selection
+                config, self._base_of(config, request.base), selection=request.selection
             )
         except (SelectionError, DiffSourceError) as exc:
             self._reported(exc)
 
     def _collect_check(
-        self, config: Config, request: _MetricRequest, *, policy: CheckPolicy | None
+        self, config_path: Path | None, base: str | None
     ) -> tuple[DiffReport, CheckVerdict]:
+        config = self._load(config_path)
         try:
-            return self._services.metrics.check(
-                config,
-                self._base_of(config, request),
-                selection=request.selection,
-                policy=policy,
-            )
-        except (SelectionError, DiffSourceError) as exc:
+            return self._services.metrics.check(config, self._base_of(config, base))
+        except DiffSourceError as exc:
             self._reported(exc)
 
     @staticmethod
-    def _base_of(config: Config, request: _MetricRequest) -> str:
-        return request.base or config.diff_base or "main"
+    def _base_of(config: Config, base: str | None) -> str:
+        return base or config.diff_base or "main"
 
     @staticmethod
     def _diff_failure(exc: DiffSourceError) -> NoReturn:
@@ -592,22 +570,6 @@ class CliGate:
                     typer.echo(f"warning: {outcome.spec.name}: {warning}", err=True)
         if any(outcome.error for outcome in report.outcomes):
             raise typer.Exit(1)
-
-    @staticmethod
-    def _parse_policy(policy: str | None) -> CheckPolicy | None:
-        """Turn --policy into the enum; None leaves the config's policy alone."""
-        if policy is None:
-            return None
-        by_value = {member.value: member for member in CheckPolicy}
-        if policy not in by_value:
-            allowed = ", ".join(by_value)
-            typer.echo(
-                f'usage error: unknown --policy "{policy}"'
-                f" (expected one of: {allowed})",
-                err=True,
-            )
-            raise typer.Exit(2)
-        return by_value[policy]
 
     @staticmethod
     def _parse_params(pairs: list[str]) -> dict[str, str]:

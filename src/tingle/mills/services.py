@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from tingle.mills.add import build_metric
@@ -27,13 +27,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.config import (
-        CheckPolicy,
-        Config,
-        ConfigStore,
-        MetricDraft,
-        TemplateLoader,
-    )
+    from tingle.pacts.config import Config, ConfigStore, MetricDraft, TemplateLoader
     from tingle.pacts.diff import DiffReport, DiffSourceFactory
     from tingle.pacts.metrics import (
         Checkpoint,
@@ -188,15 +182,7 @@ class MetricsService:
         )
         return runner.run(base, progress=progress, checkpoint=checkpoint)
 
-    def check(
-        self,
-        config: Config,
-        base: str,
-        *,
-        selection: Selection = EVERY_METRIC,
-        policy: CheckPolicy | None = None,
-    ) -> tuple[DiffReport, CheckVerdict]:
-        """Measure the branch, then judge it; `policy` overrides the config."""
-        report = self.diff(config, base, selection=selection)
-        spec = config.check if policy is None else replace(config.check, policy=policy)
-        return report, judge(report, spec)
+    def check(self, config: Config, base: str) -> tuple[DiffReport, CheckVerdict]:
+        """Measure the branch, then judge it on every metric the config names."""
+        report = self.diff(config, base)
+        return report, judge(report, config.check)

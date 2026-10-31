@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from tingle.pacts.browse import BrowseState, Row, SortKey
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.config import CheckPolicy, Config, Library, MetricDraft
+    from tingle.pacts.config import Config, Library, MetricDraft
     from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.metrics import Checkpoint, MetricType, ProgressSink
@@ -81,15 +81,8 @@ class MetricsServiceProtocol(Protocol):
         """Measure the branch's impact on every selected metric."""
 
     @abstractmethod
-    def check(
-        self,
-        config: Config,
-        base: str,
-        *,
-        selection: Selection = EVERY_METRIC,
-        policy: CheckPolicy | None = None,
-    ) -> tuple[DiffReport, CheckVerdict]:
-        """Measure the branch, then judge it; `policy` overrides the config."""
+    def check(self, config: Config, base: str) -> tuple[DiffReport, CheckVerdict]:
+        """Measure the branch, then judge it on every metric the config names."""
 
 
 class BrowseServiceProtocol(Protocol):

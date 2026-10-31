@@ -41,7 +41,9 @@ policy = "sum"        # or "any"
 ignore = ["loc"]      # metrics that never fail the check
 ```
 
-`--policy sum|any` overrides the config for a single run.
+Only the config decides what the gate judges and how: `check` takes no
+option that changes the policy or narrows the metrics, so loosening the gate
+is a config change a review can see.
 
 Under `sum`, a metric can grow and the branch still pass. Its added lines
 are still printed, because the trade is worth seeing even when it is
@@ -107,11 +109,11 @@ jobs:
 
 ### Advisory: report without blocking the merge
 
-To see the branch's debt on every pull request without gating it, put
+tingle has false positives, so a red check is not always a real problem. To
+show the branch's debt on every pull request without blocking the merge, put
 `check` in its own job with `continue-on-error: true`. The job goes red when
-the branch worsens the metrics — so the number is visible in the checks list
-— but the workflow's overall conclusion stays green, so the merge is not
-blocked. This is how tingle's own CI runs it.
+the branch worsens the metrics, so the failure shows in the checks list, but
+the workflow still passes. tingle's own CI runs it this way.
 
 ```yaml
   tingle:
@@ -132,9 +134,9 @@ blocked. This is how tingle's own CI runs it.
     check in a branch protection rule, it will still block the merge. Leave
     it out of that list.
 
-This pairs well with `[check] ignore` and `policy = "sum"`: start advisory
-to learn what your branches actually do to the numbers, then drop
-`continue-on-error` once the baseline is honest.
+Either way, fix each false positive in the config with a narrower pattern,
+an `ignore_lines` entry or a range `exclude`, and name in `[check] ignore`
+the metrics that are expected to grow.
 
 ### Feedback on the pull request
 
@@ -166,7 +168,6 @@ It fails the step exactly when `check` does, so it replaces the `check` step:
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `config` | auto-discovered | path to `tingle.toml`; annotations follow it into a subdirectory |
-| `policy` | `[check] policy` | `sum` or `any` for this run |
 | `comment` | `true` | `false` keeps the annotations and posts no comment |
 | `key` | the config path | names the comment a run owns; give each config its own when one pull request runs several |
 | `github-token` | `github.token` | token used to read and write the comments |
@@ -220,14 +221,17 @@ tingle:
 
 ## Git hooks
 
-CI judges the branch; a hook judges the commit before it leaves your machine.
-`tingle check --base HEAD` measures your uncommitted changes against the last
-commit, so it fails a commit that adds debt and stays quiet about the rest of
-the branch.
+CI judges the branch; a hook only reports, before the commit leaves your
+machine. `tingle report --diff --base HEAD` measures your uncommitted changes
+against the last commit and lists what they add and remove; it fails only
+on a config bug: a metric that errors, or a config or diff it cannot load.
+A hook that failed on new debt would leave `--no-verify` as the way past a
+false positive, and that is a suppression; the fix belongs in the config, and
+the gate in CI.
 
 The hook measures the working tree. pre-commit stashes unstaged edits but not
-untracked files, so a stray untracked file with a `# noqa` in it fails the
-commit even though the commit leaves it out.
+untracked files, so a stray untracked file with a `# noqa` in it shows up in
+the report even though the commit leaves it out.
 
 ### pre-commit
 
@@ -240,10 +244,11 @@ repos:
 ```
 
 pre-commit installs tingle from the tag `rev` names, so the hook needs no
-`pip install`.
+`pip install`. The hook is `verbose`, so pre-commit prints its report even
+though it passes.
 
-To judge the branch on push instead, run the hook at the push stage and clear
-its `--base HEAD`, so it falls back to `[diff] base`, then `main`:
+To report on the whole branch at push instead, run the hook at the push stage
+and drop its `--base HEAD`, so it falls back to `[diff] base`, then `main`:
 
 ```yaml
       - id: tingle
@@ -266,7 +271,7 @@ amends "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Config.pk
 hooks {
   ["pre-commit"] {
     steps {
-      ["tingle"] { check = "tingle check --base HEAD" }
+      ["tingle"] { check = "tingle report --diff --base HEAD" }
     }
   }
 }
