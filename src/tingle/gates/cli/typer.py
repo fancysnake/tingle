@@ -191,6 +191,7 @@ class CliGate:
         self,
         *,
         policy: PolicyOption = None,
+        json_out: JsonOption = False,
         base: BaseOption = None,
         config: ConfigOption = None,
         metric: MetricOption = None,
@@ -198,7 +199,8 @@ class CliGate:
     ) -> None:
         """Fail (exit 1) if the branch worsened the metrics. For CI.
 
-        Prints only what the branch added, under the metrics that grew.
+        Prints only what the branch added, under the metrics that grew;
+        --json prints the whole diff and the verdict instead.
         """
         request = _MetricRequest.of(
             diff=True, base=base, config=config, metric=metric, group=group
@@ -207,12 +209,17 @@ class CliGate:
         report, verdict = self._collect_check(
             loaded, request, policy=self._parse_policy(policy)
         )
-        for line in render.check_listing(verdict):
-            self._stdout.print(line)
+        if json_out:
+            typer.echo(render.check_json(report, verdict))
+        else:
+            for line in render.check_listing(verdict):
+                self._stdout.print(line)
         self._finish_diff(report)
         if verdict.failed:
             typer.echo(render.check_reason(verdict), err=True)
             raise typer.Exit(1)
+        if json_out:
+            return
         # say so: silence would be indistinguishable from a step that never ran
         self._stdout.print(render.check_success(verdict, report.base_ref))
 

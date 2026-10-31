@@ -136,6 +136,51 @@ This pairs well with `[check] ignore` and `policy = "sum"`: start advisory
 to learn what your branches actually do to the numbers, then drop
 `continue-on-error` once the baseline is honest.
 
+### Feedback on the pull request
+
+A failing job says the branch took on debt; the reviewer still has to open
+the log to see where. The `pr-feedback` action puts it where review happens.
+It runs `check`, then:
+
+- **annotates** each line the branch added debt on, under the metrics that
+  grew: an error when the check fails, a warning when the policy let it pass;
+- **comments** once on the pull request with the per-metric delta and every
+  addition, and edits that comment on each push rather than adding another.
+
+It fails the step exactly when `check` does, so it replaces the `check` step:
+
+```yaml
+  tingle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write    # the comment
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: pip install tingle
+      - uses: fancysnake/tingle/actions/pr-feedback@main
+```
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `config` | auto-discovered | path to `tingle.toml`; annotations follow it into a subdirectory |
+| `policy` | `[check] policy` | `sum` or `any` for this run |
+| `comment` | `true` | `false` keeps the annotations and posts no comment |
+| `key` | the config path | names the comment a run owns; give each config its own when one pull request runs several |
+| `github-token` | `github.token` | token used to read and write the comments |
+
+!!! note "What GitHub will not show"
+
+    GitHub shows at most ten annotations of each level per step, so a branch
+    adding more is annotated in part; the comment lists every addition. A
+    pull request from a fork gets a read-only token: the annotations still
+    land, the comment is skipped with a warning.
+
+Annotations sit on lines; an addition with no line — a list entry such as a
+new ruff ignore, or a whole new file — annotates the file instead.
+
 ### Publishing the numbers
 
 `check` only judges. To also record the values, add `stat --json` — it is a

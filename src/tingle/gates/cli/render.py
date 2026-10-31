@@ -345,6 +345,23 @@ def diff_json(report: DiffReport) -> str:
     return _diff_json(report, detailed=True)
 
 
+def check_json(report: DiffReport, verdict: CheckVerdict) -> str:
+    """Render the full branch diff, plus the verdict `check` reached on it."""
+    return _diff_json(
+        report,
+        detailed=True,
+        extra={
+            "check": {
+                "policy": verdict.policy.value,
+                "failed": verdict.failed,
+                "net_total": verdict.net_total,
+                "judged": verdict.judged,
+                "worsened": [outcome.spec.name for outcome in verdict.worsened],
+            }
+        },
+    )
+
+
 def _run_json(report: RunReport, *, detailed: bool) -> str:
     return json.dumps(
         {
@@ -370,7 +387,9 @@ def _run_json(report: RunReport, *, detailed: bool) -> str:
     )
 
 
-def _diff_json(report: DiffReport, *, detailed: bool) -> str:
+def _diff_json(
+    report: DiffReport, *, detailed: bool, extra: dict[str, Any] | None = None
+) -> str:
     return json.dumps(
         {
             "root": str(report.root),
@@ -394,6 +413,7 @@ def _diff_json(report: DiffReport, *, detailed: bool) -> str:
                 for outcome in report.outcomes
             ],
             "skipped": list(report.skipped),
+            **(extra or {}),
         },
         indent=2,
     )

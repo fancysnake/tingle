@@ -166,6 +166,7 @@ $ tingle check
 | Option | Meaning |
 | --- | --- |
 | `--policy sum\|any` | override the configured `[check]` policy for this run |
+| `--json` | machine-readable output: the [`report --diff --json`](#tingle-report) payload plus a `check` object holding the policy, `failed`, `net_total`, `judged` and the names of the `worsened` metrics; the exit code is unchanged |
 | `--base REF` | base branch to compare against |
 | `--config PATH` | path to the config file |
 | `--metric NAME` | run only the named metric (repeatable) |

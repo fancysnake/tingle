@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -50,9 +51,7 @@ def test_a_clean_branch_says_so(repo: Path) -> None:
     It printed nothing at all before, which in a CI log cannot be told apart
     from a step that never ran.
     """
-    (repo / "src" / "new.py").unlink()
-    (repo / "src" / "a.py").write_text("x = 1  # noqa\n")
-    (repo / "pyproject.toml").write_text('[tool.ruff.lint]\nignore = ["E501"]\n')
+    _clean(repo)
 
     result = runner.invoke(app, ["check"])
 
@@ -61,6 +60,42 @@ def test_a_clean_branch_says_so(repo: Path) -> None:
     assert "against main" in result.output
     # and it still lists nothing: there is no debt to answer for
     assert not any(line.lstrip().startswith("+") for line in result.output.splitlines())
+
+
+@pytest.mark.usefixtures("repo")
+def test_json_carries_the_diff_and_the_verdict() -> None:
+    result = runner.invoke(app, ["check", "--json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["check"] == {
+        "policy": "sum",
+        "failed": True,
+        "net_total": 4,
+        "judged": 2,
+        "worsened": ["lint-escapes", "ruff-ignores"],
+    }
+    escapes = next(m for m in payload["metrics"] if m["name"] == "lint-escapes")
+    assert {"file": "src/new.py", "line": 1, "note": None} in escapes[
+        "added_occurrences"
+    ]
+    assert "check failed" in result.stderr
+
+
+def _clean(repo: Path) -> None:
+    """Put the branch back to the base's debt."""
+    (repo / "src" / "new.py").unlink()
+    (repo / "src" / "a.py").write_text("x = 1  # noqa\n")
+    (repo / "pyproject.toml").write_text('[tool.ruff.lint]\nignore = ["E501"]\n')
+
+
+def test_a_passing_json_check_prints_only_json(repo: Path) -> None:
+    _clean(repo)
+
+    result = runner.invoke(app, ["check", "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["check"]["failed"] is False
 
 
 @pytest.mark.usefixtures("repo")
