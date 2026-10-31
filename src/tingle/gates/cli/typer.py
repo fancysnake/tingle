@@ -211,8 +211,7 @@ class CliGate:
                 "usage error: --json and --github both print to stdout", err=True
             )
             raise typer.Exit(2)
-        loaded = self._load(config)
-        report, verdict = self._collect_check(loaded, base)
+        report, verdict = self._collect_check(config, base)
         if json_out:
             typer.echo(render.check_json(report, verdict))
         elif github:
@@ -515,8 +514,9 @@ class CliGate:
             self._reported(exc)
 
     def _collect_check(
-        self, config: Config, base: str | None
+        self, config_path: Path | None, base: str | None
     ) -> tuple[DiffReport, CheckVerdict]:
+        config = self._load(config_path)
         try:
             return self._services.metrics.check(config, self._base_of(config, base))
         except DiffSourceError as exc:

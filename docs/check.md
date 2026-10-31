@@ -253,7 +253,7 @@ and drop its `--base HEAD`, so it falls back to `[diff] base`, then `main`:
 ```yaml
       - id: tingle
         stages: [pre-push]
-        args: [--diff]
+        args: []
 ```
 
 The push hook measures your checkout, not the commits you push: the working

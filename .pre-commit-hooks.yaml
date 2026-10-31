@@ -1,8 +1,8 @@
 - id: tingle
   name: tingle report
   description: Report the tech-debt markers a commit adds.
-  entry: tingle report
-  args: [--diff, --base, HEAD]
+  entry: tingle report --diff
+  args: [--base, HEAD]
   language: python
   pass_filenames: false
   always_run: true

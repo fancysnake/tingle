@@ -225,7 +225,7 @@ def test_the_command_line_cannot_narrow_the_gate(option: tuple[str, ...]) -> Non
     result = runner.invoke(app, ["check", *option])
 
     assert result.exit_code == 2
-    assert "No such option" in result.output + result.stderr
+    assert "No such option" in result.stderr
 
 
 @pytest.mark.usefixtures("repo")
