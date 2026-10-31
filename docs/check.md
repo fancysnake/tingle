@@ -202,9 +202,10 @@ tingle:
 CI judges the branch; a hook only reports, before the commit leaves your
 machine. `tingle report --diff --base HEAD` measures your uncommitted changes
 against the last commit and lists what they add and remove; it fails only
-when a metric itself errors, which is a config bug. A hook that failed on
-new debt would leave `--no-verify` as the way past a false positive, and that
-is a suppression; the fix belongs in the config, and the gate in CI.
+on a config bug: a metric that errors, or a config or diff it cannot load.
+A hook that failed on new debt would leave `--no-verify` as the way past a
+false positive, and that is a suppression; the fix belongs in the config, and
+the gate in CI.
 
 The hook measures the working tree. pre-commit stashes unstaged edits but not
 untracked files, so a stray untracked file with a `# noqa` in it shows up in
