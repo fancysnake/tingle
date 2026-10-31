@@ -217,6 +217,11 @@ Ranges first, then metrics, grouped under comment headings the way
 - **`[check]`**: `policy = "sum"` (default) lets debt paid off in one metric
   cover debt taken on in another; `"any"` fails on any growth. `ignore`
   names metrics expected to grow; an unknown name is a config error.
+- **Loosening a config already in use** (a new `ignore_lines` entry, an
+  `exclude`, a narrowed pattern, a name in `[check] ignore`) goes in its own
+  branch, never in the branch whose check it would turn green. tingle has no
+  way to silence a finding in code: no marker, and no `--no-verify` or
+  `continue-on-error` around the check.
 - **`[diff] base`** only if the trunk is not `main`. **`[display]
   loc_range`** when the default range is not the code the derived guide
   should be sized by.

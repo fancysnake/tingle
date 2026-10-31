@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A pre-commit hook, `tingle`, that fails a commit adding tech-debt markers;
-  the CI gate page documents it and the equivalent hk step.
+- A pre-commit hook, `tingle`, that reports the tech-debt markers a commit
+  adds without failing it; the CI gate page documents it and the equivalent
+  hk step.
+- `check --warn` prints the same report but exits 0, for git hooks.
 - `check --json`: the `report --diff --json` payload plus the verdict.
 - `check --github` prints a GitHub Actions annotation per addition, and
   `check --markdown PATH` writes the verdict and delta as a comment body.
@@ -25,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - cabinet, and with it `vekna cast`, is in an optional `rituals` group, so
   the default dev install and CI skip its agent runtime;
   `mise run cast <ritual>` installs it and casts.
+
+### Removed
+
+- `check --policy`, `--metric` and `--group`: only the config decides what
+  the gate judges and how, so loosening it is a change a review sees.
+- The CI gate page's advisory recipe: `continue-on-error` is a tolerated
+  failure, the very thing tingle counts.
 
 ## [0.9.0] - 2026-10-23
 

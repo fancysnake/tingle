@@ -66,10 +66,8 @@ jobs:
           # default, which would undo `install_args`
           MISE_TASK_RUN_AUTO_INSTALL: "false"
 
-  # advisory: reports the branch's debt without blocking the merge
   tingle:
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write # the sticky delta comment

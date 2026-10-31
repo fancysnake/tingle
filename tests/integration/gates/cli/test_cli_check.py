@@ -217,13 +217,24 @@ def test_any_policy_rejects_the_trade_sum_allows(repo: Path) -> None:
 
 
 @pytest.mark.usefixtures("repo")
-def test_policy_flag_overrides_the_config(repo: Path) -> None:
-    _configure(repo, '[check]\npolicy = "sum"')
+def test_warn_reports_a_worsened_branch_but_passes() -> None:
+    result = runner.invoke(app, ["check", "--warn"])
 
-    result = runner.invoke(app, ["check", "--policy", "any"])
+    assert result.exit_code == 0
+    assert "+ src/new.py:1" in result.output
+    assert "warning: check failed: metrics grew by a net +4" in result.stderr
 
-    assert result.exit_code == 1
-    assert "(policy: any)" in result.stderr
+
+@pytest.mark.usefixtures("repo")
+@pytest.mark.parametrize(
+    "option", (("--policy", "any"), ("--metric", "ruff-ignores"), ("--group", "x"))
+)
+def test_the_command_line_cannot_narrow_the_gate(option: tuple[str, ...]) -> None:
+    """Only the config decides what is judged and how, where a review sees it."""
+    result = runner.invoke(app, ["check", *option])
+
+    assert result.exit_code == 2
+    assert "No such option" in result.output + result.stderr
 
 
 @pytest.mark.usefixtures("repo")
@@ -247,34 +258,6 @@ def test_ignoring_every_grown_metric_passes(repo: Path) -> None:
     # nothing to answer for, and the ignored metrics are not even counted
     assert "🎉 no new debt" in result.output
     assert "lint-escapes" not in result.output
-
-
-@pytest.mark.usefixtures("repo")
-def test_metric_filter_narrows_the_verdict() -> None:
-    result = runner.invoke(app, ["check", "--metric", "ruff-ignores"])
-
-    assert result.exit_code == 1
-    assert "ruff-ignores" in result.output
-    assert "lint-escapes" not in result.output
-
-
-@pytest.mark.usefixtures("repo")
-def test_unknown_check_selection_is_a_usage_error() -> None:
-    result = runner.invoke(app, ["check", "--group", "nope"])
-
-    assert result.exit_code == 2
-    assert 'usage error: unknown group "nope"' in result.stderr
-    # the neighbouring test proves an unknown name in [check] ignore still
-    # reads as a config error: the file is where that one really is wrong
-    assert "config error" not in result.stderr
-
-
-@pytest.mark.usefixtures("repo")
-def test_unknown_policy_exits_2() -> None:
-    result = runner.invoke(app, ["check", "--policy", "every"])
-
-    assert result.exit_code == 2
-    assert 'unknown --policy "every"' in result.stderr
 
 
 @pytest.mark.usefixtures("repo")

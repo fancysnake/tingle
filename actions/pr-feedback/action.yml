@@ -9,9 +9,6 @@ inputs:
   config:
     description: Path to the config file, when it is not auto-discovered.
     default: ""
-  policy:
-    description: Override the configured `[check]` policy, `sum` or `any`.
-    default: ""
   comment:
     description: Post the sticky comment. `false` keeps the annotations only.
     default: "true"
@@ -32,7 +29,6 @@ runs:
       shell: bash
       env:
         CONFIG: ${{ inputs.config }}
-        POLICY: ${{ inputs.policy }}
       run: |
         # the annotations print as the check runs, and the comment body is
         # written beside them. 1 is a verdict (or a metric that raised, named
@@ -40,7 +36,7 @@ runs:
         # report
         status=0
         tingle check --github --markdown "$RUNNER_TEMP/tingle-comment.md" \
-          ${POLICY:+--policy "$POLICY"} ${CONFIG:+--config "$CONFIG"} || status=$?
+          ${CONFIG:+--config "$CONFIG"} || status=$?
         [ "$status" -le 1 ] || exit "$status"
         echo "status=$status" >> "$GITHUB_OUTPUT"
 

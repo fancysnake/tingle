@@ -43,6 +43,10 @@ configuring:
 4. **Verifies** — `tingle list`, `tingle stat` and `tingle report` over what
    it wrote, excusing false positives with `ignore_lines`.
 
+On a config already in use, the skill puts any loosening (an excusal, an
+exclude, a metric moved to `[check] ignore`) in a branch of its own, never in
+the branch whose failing check it would turn green.
+
 The skill is a compressed form of [Configuration](configuration.md) and
 [Metric types](metrics.md), which stay authoritative where the two disagree.
 

@@ -15,7 +15,6 @@ from rich.text import Text
 from tingle.gates.cli import render
 from tingle.pacts.config import (
     BUILTIN_TEMPLATE_PACKAGE,
-    CheckPolicy,
     Config,
     ConfigError,
     ConfigNotFoundError,
@@ -63,14 +62,6 @@ BaseOption = Annotated[
         # rich reads [diff] as a markup tag and swallows it; \[ escapes it
         help="Base branch for --diff (default: \\[diff] base in the config,"
         " then 'main'). Implies --diff.",
-    ),
-]
-PolicyOption = Annotated[
-    str | None,
-    typer.Option(
-        "--policy",
-        help="Override \\[check] policy: 'sum' fails when the metrics grow in"
-        " total, 'any' fails when a single metric grows.",
     ),
 ]
 
@@ -190,7 +181,6 @@ class CliGate:
     def check(
         self,
         *,
-        policy: PolicyOption = None,
         json_out: JsonOption = False,
         github: Annotated[
             bool,
@@ -207,10 +197,14 @@ class CliGate:
                 " markdown, for a pull request comment.",
             ),
         ] = None,
+        warn: Annotated[
+            bool,
+            typer.Option(
+                "--warn", help="Report a worsened branch, but exit 0. For git hooks."
+            ),
+        ] = False,
         base: BaseOption = None,
         config: ConfigOption = None,
-        metric: MetricOption = None,
-        group: GroupOption = None,
     ) -> None:
         """Fail (exit 1) if the branch worsened the metrics. For CI.
 
@@ -224,12 +218,10 @@ class CliGate:
             )
             raise typer.Exit(2)
         request = _MetricRequest.of(
-            diff=True, base=base, config=config, metric=metric, group=group
+            diff=True, base=base, config=config, metric=None, group=None
         )
         loaded = self._load(config)
-        report, verdict = self._collect_check(
-            loaded, request, policy=self._parse_policy(policy)
-        )
+        report, verdict = self._collect_check(loaded, request)
         if json_out:
             typer.echo(render.check_json(report, verdict))
         elif github:
@@ -246,7 +238,9 @@ class CliGate:
                 render.check_markdown(report, verdict), encoding="utf-8"
             )
         self._finish_diff(report)
-        if verdict.failed:
+        if verdict.failed and warn:
+            typer.echo(f"warning: {render.check_reason(verdict)}", err=True)
+        elif verdict.failed:
             typer.echo(render.check_reason(verdict), err=True)
             raise typer.Exit(1)
 
@@ -532,16 +526,11 @@ class CliGate:
             self._reported(exc)
 
     def _collect_check(
-        self, config: Config, request: _MetricRequest, *, policy: CheckPolicy | None
+        self, config: Config, request: _MetricRequest
     ) -> tuple[DiffReport, CheckVerdict]:
         try:
-            return self._services.metrics.check(
-                config,
-                self._base_of(config, request),
-                selection=request.selection,
-                policy=policy,
-            )
-        except (SelectionError, DiffSourceError) as exc:
+            return self._services.metrics.check(config, self._base_of(config, request))
+        except DiffSourceError as exc:
             self._reported(exc)
 
     @staticmethod
@@ -592,22 +581,6 @@ class CliGate:
                     typer.echo(f"warning: {outcome.spec.name}: {warning}", err=True)
         if any(outcome.error for outcome in report.outcomes):
             raise typer.Exit(1)
-
-    @staticmethod
-    def _parse_policy(policy: str | None) -> CheckPolicy | None:
-        """Turn --policy into the enum; None leaves the config's policy alone."""
-        if policy is None:
-            return None
-        by_value = {member.value: member for member in CheckPolicy}
-        if policy not in by_value:
-            allowed = ", ".join(by_value)
-            typer.echo(
-                f'usage error: unknown --policy "{policy}"'
-                f" (expected one of: {allowed})",
-                err=True,
-            )
-            raise typer.Exit(2)
-        return by_value[policy]
 
     @staticmethod
     def _parse_params(pairs: list[str]) -> dict[str, str]:

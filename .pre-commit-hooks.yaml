@@ -1,10 +1,11 @@
 - id: tingle
   name: tingle check
-  description: Fail a commit that adds tech-debt markers.
+  description: Report the tech-debt markers a commit adds, without failing it.
   entry: tingle check
-  args: [--base, HEAD]
+  args: [--warn, --base, HEAD]
   language: python
   pass_filenames: false
   always_run: true
+  verbose: true
   stages: [pre-commit]
   minimum_pre_commit_version: 3.2.0
