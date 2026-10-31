@@ -192,6 +192,21 @@ class CliGate:
         *,
         policy: PolicyOption = None,
         json_out: JsonOption = False,
+        github: Annotated[
+            bool,
+            typer.Option(
+                "--github",
+                help="GitHub workflow commands: an annotation on each addition.",
+            ),
+        ] = False,
+        markdown: Annotated[
+            Path | None,
+            typer.Option(
+                "--markdown",
+                help="Also write the verdict and the delta to this file as"
+                " markdown, for a pull request comment.",
+            ),
+        ] = None,
         base: BaseOption = None,
         config: ConfigOption = None,
         metric: MetricOption = None,
@@ -200,8 +215,14 @@ class CliGate:
         """Fail (exit 1) if the branch worsened the metrics. For CI.
 
         Prints only what the branch added, under the metrics that grew;
-        --json prints the whole diff and the verdict instead.
+        --json prints the whole diff and the verdict instead, --github an
+        annotation per addition.
         """
+        if json_out and github:
+            typer.echo(
+                "usage error: --json and --github both print to stdout", err=True
+            )
+            raise typer.Exit(2)
         request = _MetricRequest.of(
             diff=True, base=base, config=config, metric=metric, group=group
         )
@@ -211,17 +232,23 @@ class CliGate:
         )
         if json_out:
             typer.echo(render.check_json(report, verdict))
+        elif github:
+            for command in render.check_annotations(report, verdict, cwd=Path.cwd()):
+                typer.echo(command)
         else:
             for line in render.check_listing(verdict):
                 self._stdout.print(line)
+            if not verdict.failed:
+                # silence would be indistinguishable from a step that never ran
+                self._stdout.print(render.check_success(verdict, report.base_ref))
+        if markdown is not None:
+            markdown.write_text(
+                render.check_markdown(report, verdict), encoding="utf-8"
+            )
         self._finish_diff(report)
         if verdict.failed:
             typer.echo(render.check_reason(verdict), err=True)
             raise typer.Exit(1)
-        if json_out:
-            return
-        # say so: silence would be indistinguishable from a step that never ran
-        self._stdout.print(render.check_success(verdict, report.base_ref))
 
     def report(
         self,

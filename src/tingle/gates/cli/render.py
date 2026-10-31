@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import TYPE_CHECKING, Any, TypeVar
 
 # cobertura output is built here and written out; nothing parses foreign XML
@@ -16,6 +17,7 @@ from tingle.pacts.report import ERROR_STAT, UNGROUPED, net_text, stat_text
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
     from tingle.pacts.check import CheckVerdict
     from tingle.pacts.config import LibraryEntry
@@ -325,6 +327,114 @@ def check_reason(verdict: CheckVerdict) -> str:
     return f"check failed: {grown} grew (policy: any)"
 
 
+# a comment holds at most 65536 characters; past this the list is cut
+_ADDITIONS_SHOWN = 200
+
+
+def check_markdown(report: DiffReport, verdict: CheckVerdict) -> str:
+    """Render the pull request comment: the verdict, what moved, what was added.
+
+    Every metric that changed or errored gets a row, so a reviewer sees what
+    the branch paid off too; the additions list only the worsened metrics,
+    as `check_listing` does.
+    """
+    summary = (
+        f"❌ {check_reason(verdict)}"
+        if verdict.failed
+        else check_success(verdict, f"`{report.base_ref}`").plain
+    )
+    lines = ["### tingle", "", summary, ""]
+    rows = [
+        row
+        for outcome in report.outcomes
+        if (row := _markdown_row(outcome)) is not None
+    ]
+    if rows:
+        lines += [
+            "| Metric | Added | Removed | Net | Total |",
+            "| --- | ---: | ---: | ---: | ---: |",
+            *rows,
+        ]
+    else:
+        lines.append("No metric changed.")
+    added = [
+        f"- `{outcome.spec.name}` `{occurrence}`"
+        for outcome in verdict.worsened
+        if outcome.result is not None
+        for occurrence in outcome.result.added_occurrences
+    ]
+    if added:
+        lines += [
+            "",
+            f"<details><summary>Added ({len(added)})</summary>",
+            "",
+            *added[:_ADDITIONS_SHOWN],
+        ]
+        if len(added) > _ADDITIONS_SHOWN:
+            lines.append(f"- …and {len(added) - _ADDITIONS_SHOWN} more")
+        lines += ["", "</details>"]
+    return "\n".join(lines) + "\n"
+
+
+def _markdown_row(outcome: DiffOutcome) -> str | None:
+    """One table row, or None for a metric the branch left alone."""
+    name = outcome.spec.name
+    if (result := outcome.result) is None:
+        return f"| {name} | | | error | |"
+    if not (result.net or result.added or result.removed):
+        return None
+    removed = "" if result.removed is None else result.removed
+    total = "" if outcome.total is None else outcome.total.value
+    return (
+        f"| {name} | {_signed(result.added)} | {removed}"
+        f" | {_signed(result.net)} | {total} |"
+    )
+
+
+def _signed(number: int | None) -> str:
+    if number is None:
+        return ""
+    return f"{number:+d}" if number else "0"
+
+
+def check_annotations(
+    report: DiffReport, verdict: CheckVerdict, *, cwd: Path
+) -> list[str]:
+    """One GitHub workflow command per occurrence a worsened metric added.
+
+    An error when the check failed, a warning when the policy let the branch
+    pass. Occurrence paths are relative to the config root and annotations
+    to the workspace, so each path is rebased onto `cwd`.
+    """
+    level = "error" if verdict.failed else "warning"
+    lines: list[str] = []
+    for outcome in verdict.worsened:
+        if (result := outcome.result) is None:  # pragma: no cover - never worsened
+            continue
+        name = outcome.spec.name
+        title = _command_property(f"tingle: {name}")
+        for occurrence in result.added_occurrences:
+            path = os.path.relpath(report.root / occurrence.path, cwd)
+            where = f"file={_command_property(path)}"
+            if occurrence.line is not None:
+                where += f",line={occurrence.line}"
+            message = f"{name} +1"
+            if occurrence.note is not None:
+                message += f": {occurrence.note}"
+            lines.append(f"::{level} {where},title={title}::{_command_data(message)}")
+    return lines
+
+
+def _command_data(text: str) -> str:
+    """Escape a workflow command's message, so a newline cannot end it early."""
+    return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _command_property(text: str) -> str:
+    """Escape a workflow command property, where `:` and `,` are delimiters."""
+    return _command_data(text).replace(":", "%3A").replace(",", "%2C")
+
+
 def stat_json(report: RunReport) -> str:
     """Machine-readable run summary: values only, as the stat table."""
     return _run_json(report, detailed=False)
@@ -337,29 +447,25 @@ def run_json(report: RunReport) -> str:
 
 def stat_diff_json(report: DiffReport) -> str:
     """Machine-readable branch diff summary: values only."""
-    return _diff_json(report, detailed=False)
+    return json.dumps(_diff_payload(report, detailed=False), indent=2)
 
 
 def diff_json(report: DiffReport) -> str:
     """Machine-readable branch diff, occurrences and details included."""
-    return _diff_json(report, detailed=True)
+    return json.dumps(_diff_payload(report, detailed=True), indent=2)
 
 
 def check_json(report: DiffReport, verdict: CheckVerdict) -> str:
     """Render the full branch diff, plus the verdict `check` reached on it."""
-    return _diff_json(
-        report,
-        detailed=True,
-        extra={
-            "check": {
-                "policy": verdict.policy.value,
-                "failed": verdict.failed,
-                "net_total": verdict.net_total,
-                "judged": verdict.judged,
-                "worsened": [outcome.spec.name for outcome in verdict.worsened],
-            }
-        },
-    )
+    payload = _diff_payload(report, detailed=True)
+    payload["check"] = {
+        "policy": verdict.policy.value,
+        "failed": verdict.failed,
+        "net_total": verdict.net_total,
+        "judged": verdict.judged,
+        "worsened": [outcome.spec.name for outcome in verdict.worsened],
+    }
+    return json.dumps(payload, indent=2)
 
 
 def _run_json(report: RunReport, *, detailed: bool) -> str:
@@ -387,36 +493,30 @@ def _run_json(report: RunReport, *, detailed: bool) -> str:
     )
 
 
-def _diff_json(
-    report: DiffReport, *, detailed: bool, extra: dict[str, Any] | None = None
-) -> str:
-    return json.dumps(
-        {
-            "root": str(report.root),
-            "config": str(report.source),
-            "base": report.base_ref,
-            "merge_base": report.merge_base,
-            "metrics": [
-                {
-                    "name": outcome.spec.name,
-                    "type": outcome.spec.type,
-                    "group": outcome.spec.group,
-                    "description": outcome.spec.description,
-                    "guide": outcome.guide,
-                    "ranges": list(outcome.range_names),
-                    **_diff_values(outcome),
-                    **(_diff_details(outcome) if detailed else {}),
-                    "total": outcome.total.value if outcome.total else None,
-                    "warnings": list(outcome.result.warnings) if outcome.result else [],
-                    "error": outcome.error,
-                }
-                for outcome in report.outcomes
-            ],
-            "skipped": list(report.skipped),
-            **(extra or {}),
-        },
-        indent=2,
-    )
+def _diff_payload(report: DiffReport, *, detailed: bool) -> dict[str, Any]:
+    return {
+        "root": str(report.root),
+        "config": str(report.source),
+        "base": report.base_ref,
+        "merge_base": report.merge_base,
+        "metrics": [
+            {
+                "name": outcome.spec.name,
+                "type": outcome.spec.type,
+                "group": outcome.spec.group,
+                "description": outcome.spec.description,
+                "guide": outcome.guide,
+                "ranges": list(outcome.range_names),
+                **_diff_values(outcome),
+                **(_diff_details(outcome) if detailed else {}),
+                "total": outcome.total.value if outcome.total else None,
+                "warnings": list(outcome.result.warnings) if outcome.result else [],
+                "error": outcome.error,
+            }
+            for outcome in report.outcomes
+        ],
+        "skipped": list(report.skipped),
+    }
 
 
 def _run_details(outcome: MetricOutcome) -> dict[str, Any]:

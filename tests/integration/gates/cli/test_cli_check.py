@@ -99,6 +99,80 @@ def test_a_passing_json_check_prints_only_json(repo: Path) -> None:
 
 
 @pytest.mark.usefixtures("repo")
+def test_github_annotates_each_addition() -> None:
+    result = runner.invoke(app, ["check", "--github"])
+
+    assert result.exit_code == 1
+    commands = result.stdout.splitlines()
+    assert (
+        "::error file=src/a.py,line=2,title=tingle%3A lint-escapes::lint-escapes +1"
+        in commands
+    )
+    assert (
+        "::error file=pyproject.toml,title=tingle%3A ruff-ignores"
+        "::ruff-ignores +1: D203" in commands
+    )
+    assert all(command.startswith("::error ") for command in commands)
+
+
+def test_github_paths_follow_the_config_into_a_subdirectory(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(repo.parent)
+
+    result = runner.invoke(
+        app, ["check", "--github", "--config", str(repo / "tingle.toml")]
+    )
+
+    assert f"file={repo.name}/src/a.py,line=2" in result.stdout
+
+
+def test_github_warns_when_the_policy_lets_the_branch_pass(repo: Path) -> None:
+    _trade(repo)
+
+    result = runner.invoke(app, ["check", "--github"])
+
+    assert result.exit_code == 0
+    assert result.stdout.startswith("::warning file=src/a.py,line=2,")
+
+
+@pytest.mark.usefixtures("repo")
+def test_json_and_github_are_a_usage_error() -> None:
+    result = runner.invoke(app, ["check", "--json", "--github"])
+
+    assert result.exit_code == 2
+    assert "usage error" in result.stderr
+
+
+def test_markdown_writes_the_comment_body(repo: Path) -> None:
+    body = repo.parent / "comment.md"
+
+    result = runner.invoke(app, ["check", "--markdown", str(body)])
+
+    assert result.exit_code == 1
+    markdown = body.read_text()
+    assert "❌ check failed: metrics grew by a net +4 (policy: sum)" in markdown
+    assert "| lint-escapes | +3 | 0 | +3 | 4 |" in markdown
+    assert "<summary>Added (4)</summary>" in markdown
+    assert "- `ruff-ignores` `pyproject.toml: D203`" in markdown
+    # the listing still goes to stdout
+    assert "+ src/a.py:2" in result.stdout
+
+
+def test_markdown_says_a_clean_branch_changed_nothing(repo: Path) -> None:
+    _clean(repo)
+    body = repo.parent / "comment.md"
+
+    result = runner.invoke(app, ["check", "--markdown", str(body)])
+
+    assert result.exit_code == 0
+    markdown = body.read_text()
+    assert "🎉 no new debt: 2 metrics against `main`" in markdown
+    assert "No metric changed." in markdown
+    assert "Added" not in markdown
+
+
+@pytest.mark.usefixtures("repo")
 def test_a_failing_check_says_nothing_about_success() -> None:
     result = runner.invoke(app, ["check"])
 

@@ -34,46 +34,47 @@ runs:
         CONFIG: ${{ inputs.config }}
         POLICY: ${{ inputs.policy }}
       run: |
-        # 1 is a verdict (or a metric that raised, named on stderr) and still
-        # writes the payload; above that there is nothing to report
+        # the annotations print as the check runs, and the comment body is
+        # written beside them. 1 is a verdict (or a metric that raised, named
+        # on stderr) and still writes both; above that there is nothing to
+        # report
         status=0
-        tingle check --json ${POLICY:+--policy "$POLICY"} ${CONFIG:+--config "$CONFIG"} \
-          > "$RUNNER_TEMP/tingle-check.json" || status=$?
+        tingle check --github --markdown "$RUNNER_TEMP/tingle-comment.md" \
+          ${POLICY:+--policy "$POLICY"} ${CONFIG:+--config "$CONFIG"} || status=$?
         [ "$status" -le 1 ] || exit "$status"
         echo "status=$status" >> "$GITHUB_OUTPUT"
 
-    - name: Annotate
-      shell: bash
-      env:
-        JQ: ${{ github.action_path }}/annotations.jq
-      run: |
-        result="$RUNNER_TEMP/tingle-check.json"
-        prefix=$(realpath --relative-to="$GITHUB_WORKSPACE" "$(jq -r .root "$result")")
-        jq -r --arg prefix "$prefix" -f "$JQ" "$result"
-
     - name: Comment
-      if: inputs.comment == 'true' && github.event.pull_request
+      if: >-
+        inputs.comment == 'true' && github.event.pull_request
+        && github.event.pull_request.head.repo.full_name == github.repository
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
-        JQ: ${{ github.action_path }}/comment.jq
-        KEY: ${{ inputs.key || inputs.config || 'default' }}
+        MARKER: "<!-- tingle-pr-feedback: ${{ inputs.key || inputs.config || 'default' }} -->"
         PR: ${{ github.event.pull_request.number }}
       run: |
-        marker="<!-- tingle-pr-feedback: $KEY -->"
-        body="$RUNNER_TEMP/tingle-comment.md"
-        jq -r --arg marker "$marker" -f "$JQ" "$RUNNER_TEMP/tingle-check.json" > "$body"
+        body="$RUNNER_TEMP/tingle-comment-body.md"
+        { echo "$MARKER"; cat "$RUNNER_TEMP/tingle-comment.md"; } > "$body"
         comments="repos/$GITHUB_REPOSITORY/issues"
         existing=$(gh api --paginate "$comments/$PR/comments" \
-          | jq -r --arg marker "$marker" '.[] | select(.body | startswith($marker)) | .id' \
-          | head -n 1)
-        # a pull request from a fork gets a read-only token: the annotations
-        # still land, so the comment failing must not fail the step
+          --jq '.[] | select(.body | startswith(env.MARKER)) | .id')
+        # --jq runs once per page, so several pages can each name a match;
+        # cut in bash, since `head` closing the pipe early kills gh by SIGPIPE
+        existing=${existing%%$'\n'*}
         if [ -n "$existing" ]; then
           gh api -X PATCH "$comments/comments/$existing" -F body=@"$body" > /dev/null
         else
           gh api "$comments/$PR/comments" -F body=@"$body" > /dev/null
-        fi || echo "::warning::could not post the tingle comment; a pull request from a fork has a read-only token"
+        fi
+
+    - name: Skip the comment on a fork
+      if: >-
+        inputs.comment == 'true' && github.event.pull_request
+        && github.event.pull_request.head.repo.full_name != github.repository
+      shell: bash
+      run: |
+        echo "::warning::a pull request from a fork gets a read-only token; the annotations landed, the comment did not"
 
     - name: Verdict
       shell: bash
