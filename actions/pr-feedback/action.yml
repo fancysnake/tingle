@@ -1,0 +1,81 @@
+name: tingle pr feedback
+description: >-
+  Run `tingle check` and report it on the pull request: an annotation on each
+  line the branch added debt on, and one comment holding the per-metric delta
+  that every run edits in place. Expects `tingle` on PATH and a checkout with
+  history (`fetch-depth: 0`).
+
+inputs:
+  config:
+    description: Path to the config file, when it is not auto-discovered.
+    default: ""
+  policy:
+    description: Override the configured `[check]` policy, `sum` or `any`.
+    default: ""
+  comment:
+    description: Post the sticky comment. `false` keeps the annotations only.
+    default: "true"
+  key:
+    description: >-
+      Names the comment this run owns. Give each config its own when a pull
+      request runs several; empty means the config path.
+    default: ""
+  github-token:
+    description: Token used to read and write the pull request's comments.
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check
+      id: check
+      shell: bash
+      env:
+        CONFIG: ${{ inputs.config }}
+        POLICY: ${{ inputs.policy }}
+      run: |
+        # the annotations print as the check runs, and the comment body is
+        # written beside them. 1 is a verdict (or a metric that raised, named
+        # on stderr) and still writes both; above that there is nothing to
+        # report
+        status=0
+        tingle check --github --markdown "$RUNNER_TEMP/tingle-comment.md" \
+          ${POLICY:+--policy "$POLICY"} ${CONFIG:+--config "$CONFIG"} || status=$?
+        [ "$status" -le 1 ] || exit "$status"
+        echo "status=$status" >> "$GITHUB_OUTPUT"
+
+    - name: Comment
+      if: >-
+        inputs.comment == 'true' && github.event.pull_request
+        && github.event.pull_request.head.repo.full_name == github.repository
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        MARKER: "<!-- tingle-pr-feedback: ${{ inputs.key || inputs.config || 'default' }} -->"
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        body="$RUNNER_TEMP/tingle-comment-body.md"
+        { echo "$MARKER"; cat "$RUNNER_TEMP/tingle-comment.md"; } > "$body"
+        comments="repos/$GITHUB_REPOSITORY/issues"
+        existing=$(gh api --paginate "$comments/$PR/comments" \
+          --jq '.[] | select(.body | startswith(env.MARKER)) | .id')
+        # --jq runs once per page, so several pages can each name a match;
+        # cut in bash, since `head` closing the pipe early kills gh by SIGPIPE
+        existing=${existing%%$'\n'*}
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "$comments/comments/$existing" -F body=@"$body" > /dev/null
+        else
+          gh api "$comments/$PR/comments" -F body=@"$body" > /dev/null
+        fi
+
+    - name: Skip the comment on a fork
+      if: >-
+        inputs.comment == 'true' && github.event.pull_request
+        && github.event.pull_request.head.repo.full_name != github.repository
+      shell: bash
+      run: |
+        echo "::warning::a pull request from a fork gets a read-only token; the annotations landed, the comment did not"
+
+    - name: Verdict
+      shell: bash
+      run: exit ${{ steps.check.outputs.status }}

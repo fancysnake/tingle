@@ -70,6 +70,9 @@ jobs:
   tingle:
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write # the sticky delta comment
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -77,4 +80,6 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@94c60b39bc2d90ab2f9bab27f38d3cc4812c1834 # v5
       - run: mise exec -- poetry install
-      - run: mise exec -- poetry run tingle check
+      # judge with the build under review, not the released wheel
+      - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - uses: ./actions/pr-feedback

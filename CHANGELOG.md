@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A pre-commit hook, `tingle`, that fails a commit adding tech-debt markers;
   the CI gate page documents it and the equivalent hk step.
+- `check --json`: the `report --diff --json` payload plus the verdict.
+- `check --github` prints a GitHub Actions annotation per addition, and
+  `check --markdown PATH` writes the verdict and delta as a comment body.
+- A `pr-feedback` composite action: it runs `check`, annotates each line a
+  pull request added debt on, and keeps one comment on the pull request
+  holding the per-metric delta, edited on each push.
 
 ### Changed
 
