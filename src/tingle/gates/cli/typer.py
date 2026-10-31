@@ -197,12 +197,6 @@ class CliGate:
                 " markdown, for a pull request comment.",
             ),
         ] = None,
-        warn: Annotated[
-            bool,
-            typer.Option(
-                "--warn", help="Report a worsened branch, but exit 0. For git hooks."
-            ),
-        ] = False,
         base: BaseOption = None,
         config: ConfigOption = None,
     ) -> None:
@@ -217,11 +211,8 @@ class CliGate:
                 "usage error: --json and --github both print to stdout", err=True
             )
             raise typer.Exit(2)
-        request = _MetricRequest.of(
-            diff=True, base=base, config=config, metric=None, group=None
-        )
         loaded = self._load(config)
-        report, verdict = self._collect_check(loaded, request)
+        report, verdict = self._collect_check(loaded, base)
         if json_out:
             typer.echo(render.check_json(report, verdict))
         elif github:
@@ -238,9 +229,7 @@ class CliGate:
                 render.check_markdown(report, verdict), encoding="utf-8"
             )
         self._finish_diff(report)
-        if verdict.failed and warn:
-            typer.echo(f"warning: {render.check_reason(verdict)}", err=True)
-        elif verdict.failed:
+        if verdict.failed:
             typer.echo(render.check_reason(verdict), err=True)
             raise typer.Exit(1)
 
@@ -430,7 +419,7 @@ class CliGate:
     def _collector(self, config: Config, request: _MetricRequest) -> Collect:
         """Bind the run the TUI will start once it is on screen."""
         if request.diff:
-            base = self._base_of(config, request)
+            base = self._base_of(config, request.base)
 
             def collect_diff(
                 progress: ProgressSink, checkpoint: Checkpoint
@@ -520,22 +509,22 @@ class CliGate:
         config = self._load(request.config)
         try:
             return self._services.metrics.diff(
-                config, self._base_of(config, request), selection=request.selection
+                config, self._base_of(config, request.base), selection=request.selection
             )
         except (SelectionError, DiffSourceError) as exc:
             self._reported(exc)
 
     def _collect_check(
-        self, config: Config, request: _MetricRequest
+        self, config: Config, base: str | None
     ) -> tuple[DiffReport, CheckVerdict]:
         try:
-            return self._services.metrics.check(config, self._base_of(config, request))
+            return self._services.metrics.check(config, self._base_of(config, base))
         except DiffSourceError as exc:
             self._reported(exc)
 
     @staticmethod
-    def _base_of(config: Config, request: _MetricRequest) -> str:
-        return request.base or config.diff_base or "main"
+    def _base_of(config: Config, base: str | None) -> str:
+        return base or config.diff_base or "main"
 
     @staticmethod
     def _diff_failure(exc: DiffSourceError) -> NoReturn:

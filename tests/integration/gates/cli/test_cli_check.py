@@ -217,15 +217,6 @@ def test_any_policy_rejects_the_trade_sum_allows(repo: Path) -> None:
 
 
 @pytest.mark.usefixtures("repo")
-def test_warn_reports_a_worsened_branch_but_passes() -> None:
-    result = runner.invoke(app, ["check", "--warn"])
-
-    assert result.exit_code == 0
-    assert "+ src/new.py:1" in result.output
-    assert "warning: check failed: metrics grew by a net +4" in result.stderr
-
-
-@pytest.mark.usefixtures("repo")
 @pytest.mark.parametrize(
     "option", (("--policy", "any"), ("--metric", "ruff-ignores"), ("--group", "x"))
 )

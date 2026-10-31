@@ -168,7 +168,6 @@ $ tingle check
 | `--json` | machine-readable output: the [`report --diff --json`](#tingle-report) payload plus a `check` object holding the policy, `failed`, `net_total`, `judged` and the names of the `worsened` metrics; the exit code is unchanged |
 | `--github` | instead of the listing, one GitHub Actions annotation per addition under a worsened metric: an error when the check fails, a warning when it passes; paths are relative to the working directory |
 | `--markdown PATH` | also write the verdict, the per-metric delta and every addition to `PATH` as markdown, for a pull request comment |
-| `--warn` | print the same listing and the reason on stderr, but exit 0; for [git hooks](check.md#git-hooks), which only report |
 | `--base REF` | base branch to compare against |
 | `--config PATH` | path to the config file |
 

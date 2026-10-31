@@ -200,9 +200,10 @@ tingle:
 ## Git hooks
 
 CI judges the branch; a hook only reports, before the commit leaves your
-machine. `tingle check --warn --base HEAD` measures your uncommitted changes
-against the last commit, lists the debt they add, and exits 0. A hook that
-failed would leave `--no-verify` as the way past a false positive, and that
+machine. `tingle report --diff --base HEAD` measures your uncommitted changes
+against the last commit and lists what they add and remove; it fails only
+when a metric itself errors, which is a config bug. A hook that failed on
+new debt would leave `--no-verify` as the way past a false positive, and that
 is a suppression; the fix belongs in the config, and the gate in CI.
 
 The hook measures the working tree. pre-commit stashes unstaged edits but not
@@ -229,7 +230,7 @@ and drop its `--base HEAD`, so it falls back to `[diff] base`, then `main`:
 ```yaml
       - id: tingle
         stages: [pre-push]
-        args: [--warn]
+        args: [--diff]
 ```
 
 The push hook measures your checkout, not the commits you push: the working
@@ -247,7 +248,7 @@ amends "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Config.pk
 hooks {
   ["pre-commit"] {
     steps {
-      ["tingle"] { check = "tingle check --warn --base HEAD" }
+      ["tingle"] { check = "tingle report --diff --base HEAD" }
     }
   }
 }

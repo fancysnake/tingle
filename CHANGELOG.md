@@ -10,9 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - A pre-commit hook, `tingle`, that reports the tech-debt markers a commit
-  adds without failing it; the CI gate page documents it and the equivalent
-  hk step.
-- `check --warn` prints the same report but exits 0, for git hooks.
+  adds; the CI gate page documents it and the equivalent hk step.
 - `check --json`: the `report --diff --json` payload plus the verdict.
 - `check --github` prints a GitHub Actions annotation per addition, and
   `check --markdown PATH` writes the verdict and delta as a comment body.
