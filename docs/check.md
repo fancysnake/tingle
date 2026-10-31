@@ -172,3 +172,57 @@ tingle:
         coverage_format: cobertura
         path: tingle.xml
 ```
+
+## Git hooks
+
+CI judges the branch; a hook judges the commit before it leaves your machine.
+`tingle check --base HEAD` measures your uncommitted changes against the last
+commit, so it fails a commit that adds debt and stays quiet about the rest of
+the branch.
+
+The hook measures the working tree. pre-commit stashes unstaged edits but not
+untracked files, so a stray untracked file with a `# noqa` in it fails the
+commit even though the commit leaves it out.
+
+### pre-commit
+
+```yaml
+repos:
+  - repo: https://github.com/fancysnake/tingle
+    rev: v0.10.0
+    hooks:
+      - id: tingle
+```
+
+pre-commit installs tingle from the tag `rev` names, so the hook needs no
+`pip install`.
+
+To judge the branch on push instead, run the hook at the push stage and clear
+its `--base HEAD`, so it falls back to `[diff] base`, then `main`:
+
+```yaml
+      - id: tingle
+        stages: [pre-push]
+        args: []
+```
+
+The push hook measures your checkout, not the commits you push: the working
+tree and its untracked files against the merge-base, with nothing stashed.
+Push from a clean tree and the two agree.
+
+### hk
+
+tingle publishes no hk package; the step is one line in your `hk.pkl`, and it
+runs the `tingle` on your `PATH`:
+
+```pkl
+amends "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Config.pkl"
+
+hooks {
+  ["pre-commit"] {
+    steps {
+      ["tingle"] { check = "tingle check --base HEAD" }
+    }
+  }
+}
+```
