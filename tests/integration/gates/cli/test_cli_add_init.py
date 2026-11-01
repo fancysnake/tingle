@@ -165,3 +165,24 @@ def test_init_refuses_overwrite(workdir: Path) -> None:
 
     assert result.exit_code == 2
     assert "already exists" in result.stderr
+
+
+def test_init_refuses_beside_a_tool_tingle_table(workdir: Path) -> None:
+    (workdir / "pyproject.toml").write_text("[tool.tingle]\n")
+
+    result = runner.invoke(app, ["init"])
+
+    assert result.exit_code == 2
+    assert "config error: [tool.tingle] in" in result.stderr
+    assert "pyproject.toml already exists" in result.stderr
+    assert not (workdir / "tingle.toml").exists()
+
+
+def test_init_reports_a_malformed_pyproject(workdir: Path) -> None:
+    (workdir / "pyproject.toml").write_text("[tool.tingle\n")
+
+    result = runner.invoke(app, ["init"])
+
+    assert result.exit_code == 2
+    assert "invalid TOML" in result.stderr
+    assert not (workdir / "tingle.toml").exists()

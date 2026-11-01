@@ -129,10 +129,17 @@ class TomlConfigStore(ConfigStore):
         return tomlkit.dumps(document).strip()
 
     def write_starter(self, root: Path) -> Path:
-        """Create a commented starter tingle.toml; refuse to overwrite."""
+        """Create a commented starter tingle.toml; refuse to overwrite.
+
+        A [tool.tingle] table counts as existing config: a tingle.toml beside
+        it would win and silently shadow it.
+        """
         path = root / TINGLE_FILE
         if path.exists():
             raise FileExistsError(path)
+        if (target := self.edit_target(root)) != path:
+            msg = f"[tool.tingle] in {target}"
+            raise FileExistsError(msg)
         path.write_text(STARTER, encoding="utf-8")
         return path
 

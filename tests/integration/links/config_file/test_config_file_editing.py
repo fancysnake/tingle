@@ -107,6 +107,20 @@ def test_write_starter_creates_and_refuses_overwrite(tmp_path: Path) -> None:
         write_starter(tmp_path)
 
 
+def test_write_starter_refuses_beside_a_tool_tingle_table(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("[tool.tingle]\n")
+
+    with pytest.raises(FileExistsError, match=r"\[tool\.tingle\] in .*pyproject"):
+        write_starter(tmp_path)
+    assert not (tmp_path / "tingle.toml").exists()
+
+
+def test_write_starter_ignores_a_pyproject_without_the_table(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\n')
+
+    assert write_starter(tmp_path) == tmp_path / "tingle.toml"
+
+
 def test_render_metric_writes_the_entry_without_a_file_to_put_it_in() -> None:
     """`library --expand` needs the same TOML, minus anywhere to write it."""
     rendered = render_metric({"name": "files", "type": "file_count", "guide": 200})
