@@ -7,7 +7,13 @@ import pytest
 
 from tingle.mills.config import validate
 from tingle.mills.services import ConfigService, MetricsService
-from tingle.pacts.config import Config, ConfigError, ConfigNotFoundError, MetricDraft
+from tingle.pacts.config import (
+    Config,
+    ConfigError,
+    ConfigNotFoundError,
+    MetricDraft,
+    ToolConfigs,
+)
 from tingle.pacts.metrics import MetricResult, MetricType
 from tingle.specs.ranges import UNREACHABLE_DIRS
 
@@ -87,12 +93,16 @@ def test_add_metric_writes_nothing_when_the_draft_is_invalid() -> None:
     store.append_metric.assert_not_called()
 
 
-def test_write_starter_delegates_to_the_store() -> None:
+def test_write_starter_starts_on_the_tools_the_project_configures() -> None:
     store = MagicMock()
+    store.tool_configs.return_value = ToolConfigs(sections=frozenset({"tool.ty"}))
     store.write_starter.return_value = SOURCE
 
     assert _config_service(store).write_starter(CWD) == SOURCE
-    store.write_starter.assert_called_once_with(CWD)
+    store.tool_configs.assert_called_once_with(CWD)
+    store.write_starter.assert_called_once_with(
+        CWD, ("tingle.builtins.ty.ignore_comment",)
+    )
 
 
 def test_list_metric_types_orders_by_name() -> None:

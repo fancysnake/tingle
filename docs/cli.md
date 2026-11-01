@@ -273,6 +273,14 @@ Types with no positional param (`ini_list_length`, `file_count`,
 Create a commented starter `tingle.toml` in the current directory. Refuses
 to overwrite an existing one. No options.
 
+The starter holds a metric for the inline suppression comments of each tool
+the project configures: ruff, black, pylint, bandit, codespell, mypy,
+pyright or basedpyright, ty, pytest and coverage.py. A tool counts as
+configured when its own config file sits in the current directory, or when
+`pyproject.toml`, `setup.cfg` or `tox.ini` holds its section. With none of
+them found, the starter holds commented examples instead. `init` runs no
+tool and reads no dependency list.
+
 ## `tingle list`
 
 List the configured metrics with their group, type and ranges — the groups

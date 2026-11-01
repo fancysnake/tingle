@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import configparser
 import tomllib
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 import tomlkit
 
-from tingle.pacts.config import ConfigError, ConfigNotFoundError, ConfigStore
+from tingle.pacts.config import (
+    ConfigError,
+    ConfigNotFoundError,
+    ConfigStore,
+    ToolConfigs,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from tomlkit.items import Table
@@ -18,7 +25,9 @@ if TYPE_CHECKING:
 TINGLE_FILE = "tingle.toml"
 PYPROJECT_FILE = "pyproject.toml"
 
-STARTER = r"""# tingle configuration
+INI_FILES = ("setup.cfg", "tox.ini")
+
+STARTER_HEAD = """# tingle configuration
 # Ranges are named file sets; each metric measures the files of its ranges.
 
 [ranges.python]
@@ -28,7 +37,13 @@ default = true
 # [ranges.js]
 # include = ["frontend/**/*.js", "frontend/**/*.ts"]
 
-# A metric states what it counts...
+"""
+
+STARTER_DETECTED = """# Ready-made metrics for the tools this project configures.
+# Run `tingle library` to see them all.
+"""
+
+STARTER_EXAMPLES = r"""# A metric states what it counts...
 [[metrics]]
 name = "noqa-comments"
 type = "regex_count"
@@ -128,12 +143,39 @@ class TomlConfigStore(ConfigStore):
         document["metrics"] = metrics
         return tomlkit.dumps(document).strip()
 
-    def write_starter(self, root: Path) -> Path:
+    def tool_configs(self, root: Path) -> ToolConfigs:
+        """Read the root's file names and the tool sections they declare.
+
+        A file that does not parse declares nothing: this is a guess at a
+        starter, and the tool it belongs to will report the file itself.
+        """
+        files = frozenset(p.name for p in root.iterdir() if p.is_file())
+        sections: set[str] = set()
+        if PYPROJECT_FILE in files:
+            with suppress(ConfigError):
+                tools = _parse(root / PYPROJECT_FILE).get("tool")
+                if isinstance(tools, dict):
+                    sections.update(f"tool.{name}" for name in tools)
+        for name in INI_FILES:
+            if name in files:
+                parser = configparser.ConfigParser(interpolation=None)
+                with suppress(configparser.Error, UnicodeDecodeError):
+                    parser.read(root / name, encoding="utf-8")
+                sections.update(parser.sections())
+        return ToolConfigs(files=files, sections=frozenset(sections))
+
+    def write_starter(self, root: Path, bases: Sequence[str]) -> Path:
         """Create a commented starter tingle.toml; refuse to overwrite."""
         path = root / TINGLE_FILE
         if path.exists():
             raise FileExistsError(path)
-        path.write_text(STARTER, encoding="utf-8")
+        body = (
+            STARTER_DETECTED
+            + "\n\n".join(self.render_metric({"base": base}) for base in bases)
+            if bases
+            else STARTER_EXAMPLES
+        )
+        path.write_text(f"{STARTER_HEAD}{body.rstrip()}\n", encoding="utf-8")
         return path
 
 

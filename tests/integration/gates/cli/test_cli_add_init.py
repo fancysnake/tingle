@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from typer.testing import CliRunner
 
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 runner = CliRunner()
 app = CliGate(Services()).app
+
+#: Every suppression the bundled templates count, kept out of the project's
+#: own measurement by its suffix.
+SUPPRESSIONS = Path(__file__).parents[2] / "fixtures" / "suppressions.py.txt"
 
 
 def test_add_creates_config_and_round_trips(workdir: Path) -> None:
@@ -156,6 +157,22 @@ def test_init_creates_starter(workdir: Path) -> None:
 
     ran = runner.invoke(app, ["stat", "--json"])
     assert ran.exit_code == 0
+
+
+def test_init_starts_on_the_templates_of_the_tools_configured(workdir: Path) -> None:
+    (workdir / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\n\n[tool.ruff]\n\n[tool.basedpyright]\n'
+    )
+    (workdir / "src").mkdir()
+    (workdir / "src" / "a.py").write_text(SUPPRESSIONS.read_text())
+
+    result = runner.invoke(app, ["init"])
+
+    assert result.exit_code == 0
+    ran = runner.invoke(app, ["stat", "--json"])
+    assert ran.exit_code == 0
+    metrics = {m["name"]: m["value"] for m in json.loads(ran.stdout)["metrics"]}
+    assert metrics == {"noqa-comment": 2, "pyright-ignores": 1}
 
 
 def test_init_refuses_overwrite(workdir: Path) -> None:

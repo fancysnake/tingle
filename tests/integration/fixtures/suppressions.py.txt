@@ -27,3 +27,17 @@ def test_it(value: str) -> Any:  # pragma: no cover
     x = 1  # noqa: F841
     y = 2  # noqa
     return cast(int, value)
+
+
+class Legacy:  # pragma: no branch
+    @deprecated("use New")
+    def old(self) -> None:
+        ...  # pragma: allowlist secret
+
+    @warnings.deprecated("use New")
+    def older(self) -> None:
+        assert self  # nosec B101
+        x = 1  # pyright: ignore[reportUnusedVariable]
+        y = 2  # ty: ignore[unused-variable]
+        z = 3  # type: ignore
+        # deprecated, but not a decorator
