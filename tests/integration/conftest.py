@@ -4,20 +4,23 @@
 because two suites need it -- the CLI gate's and the git link's -- and a
 copy in each is a copy that can drift. The template packs are here for the
 same reason, and because a test asking for `pack: str` must not shadow a
-fixture function of that name in its own module.
+fixture function of that name in its own module. So is the suppressions
+source, which the bundled templates' tests and the CLI's both measure.
 """
 
 from __future__ import annotations
 
 import sys
 import textwrap
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 #: A template package the way somebody else would write one: a module that
 #: states what it publishes, and things that are not templates at all.
@@ -78,6 +81,15 @@ def broken_pack(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str
     """Write a template package whose templates do not verify."""
     monkeypatch.syspath_prepend(str(tmp_path))
     yield from _installed(tmp_path, "broken_templates", body=BROKEN_PACK)
+
+
+@pytest.fixture
+def suppressions() -> str:
+    """Every suppression the bundled templates count, as one Python source.
+
+    Read from a `.txt` so the project does not measure its own test data.
+    """
+    return (FIXTURES / "suppressions.py.txt").read_text()
 
 
 @pytest.fixture(autouse=True)

@@ -15,7 +15,7 @@ append_metric = _store.append_metric
 render_metric = _store.render_metric
 edit_target = _store.edit_target
 write_starter = _store.write_starter
-tool_configs = _store.tool_configs
+write_examples = _store.write_examples
 
 # Deliberately not the config the CLI tests use: this suite only cares that
 # whatever was already in the file survives being appended to.
@@ -98,14 +98,21 @@ def test_edit_target_defaults_to_new_tingle_toml(tmp_path: Path) -> None:
     assert edit_target(tmp_path) == tmp_path / "tingle.toml"
 
 
-def test_write_starter_creates_and_refuses_overwrite(tmp_path: Path) -> None:
-    path = write_starter(tmp_path, ())
+def test_write_examples_creates_and_refuses_overwrite(tmp_path: Path) -> None:
+    path = write_examples(tmp_path)
 
     assert path == tmp_path / "tingle.toml"
     assert "[ranges.python]" in path.read_text()
 
     with pytest.raises(FileExistsError):
-        write_starter(tmp_path, ())
+        write_examples(tmp_path)
+
+
+def test_write_starter_refuses_overwrite(tmp_path: Path) -> None:
+    (tmp_path / "tingle.toml").write_text("")
+
+    with pytest.raises(FileExistsError):
+        write_starter(tmp_path, ("tingle.builtins.ruff.noqa_comment",))
 
 
 def test_write_starter_lists_a_metric_per_base_in_place_of_the_examples(
@@ -118,30 +125,6 @@ def test_write_starter_lists_a_metric_per_base_in_place_of_the_examples(
     parsed = tomllib.loads(path.read_text())
     assert parsed["ranges"]["python"]["default"] is True
     assert parsed["metrics"] == [{"base": base} for base in bases]
-
-
-def test_tool_configs_reads_files_and_sections_from_each_config_file(
-    tmp_path: Path,
-) -> None:
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\n\n[tool.ruff]\n[tool.basedpyright]\n'
-    )
-    (tmp_path / "setup.cfg").write_text("[mypy]\nstrict = True\n")
-    (tmp_path / "tox.ini").write_text("[coverage:run]\nbranch = true\n")
-    (tmp_path / ".bandit").write_text("")
-    (tmp_path / "src").mkdir()
-
-    found = tool_configs(tmp_path)
-
-    assert found.files == {"pyproject.toml", "setup.cfg", "tox.ini", ".bandit"}
-    assert found.sections == {"tool.ruff", "tool.basedpyright", "mypy", "coverage:run"}
-
-
-def test_tool_configs_skips_a_file_that_does_not_parse(tmp_path: Path) -> None:
-    (tmp_path / "pyproject.toml").write_text("[tool.ruff\n")
-    (tmp_path / "setup.cfg").write_text("no section header\n")
-
-    assert tool_configs(tmp_path).sections == frozenset()
 
 
 def test_render_metric_writes_the_entry_without_a_file_to_put_it_in() -> None:

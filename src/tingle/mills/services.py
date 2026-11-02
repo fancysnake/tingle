@@ -47,6 +47,7 @@ class ConfigService:
     store: ConfigStore
     metric_types: Mapping[str, MetricType]
     templates: TemplateLoader
+    project_files: ProjectFilesFactory
 
     def load(self, cwd: Path, override: Path | None = None) -> Config:
         """Discover, parse, and validate the configuration."""
@@ -128,9 +129,9 @@ class ConfigService:
         It starts on the templates of the tools the project configures,
         or on the generic examples when it configures none tingle knows.
         """
-        return self.store.write_starter(
-            cwd, starter_bases(self.store.tool_configs(cwd))
-        )
+        if not (bases := starter_bases(self.project_files(cwd))):
+            return self.store.write_examples(cwd)
+        return self.store.write_starter(cwd, bases)
 
     def list_metric_types(self) -> tuple[MetricType, ...]:
         """Every metric type a config may name, in name order."""

@@ -28,6 +28,7 @@ class Services:
             store=TomlConfigStore(),
             metric_types=METRIC_TYPES,
             templates=PythonTemplateLoader(),
+            project_files=LocalProjectFiles,
         )
 
     @cached_property

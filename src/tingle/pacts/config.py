@@ -250,20 +250,6 @@ class MetricDraft:
     description: str | None = None
 
 
-@dataclass(frozen=True)
-class ToolConfigs:
-    """What a project root says about the tools it configures.
-
-    Names only, read without judgement: `files` are the root's file names,
-    `sections` are the `tool.*` tables of `pyproject.toml` (as `tool.ruff`)
-    and the section names of `setup.cfg` and `tox.ini`. Which of them
-    means a tool is in use is decided upstream.
-    """
-
-    files: frozenset[str] = frozenset()
-    sections: frozenset[str] = frozenset()
-
-
 class ConfigStore(Protocol):
     """Reads and edits the file tingle's own configuration lives in."""
 
@@ -286,13 +272,15 @@ class ConfigStore(Protocol):
         """Write a metric entry out as the text a reader could paste."""
 
     @abstractmethod
-    def tool_configs(self, root: Path) -> ToolConfigs:
-        """Read which tool configuration the project root holds."""
+    def write_starter(self, root: Path, bases: Sequence[str]) -> Path:
+        """Create a starter config of a metric built on each base.
+
+        Raises FileExistsError if a config is present.
+        """
 
     @abstractmethod
-    def write_starter(self, root: Path, bases: Sequence[str]) -> Path:
-        """Create the starter config; raises FileExistsError if present.
+    def write_examples(self, root: Path) -> Path:
+        """Create the generic starter config of commented examples.
 
-        With no bases it is the generic starter; with some, a metric
-        built on each one in place of the examples.
+        Raises FileExistsError if a config is present.
         """

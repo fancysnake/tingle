@@ -6,20 +6,25 @@ from dataclasses import dataclass
 
 from tingle.pacts.config import BUILTIN_TEMPLATE_PACKAGE
 
+#: Where tools other than tingle keep their sections: `[tool.X]` tables in
+#: the first, INI sections in the rest.
+PYPROJECT_FILE = "pyproject.toml"
+INI_FILES = ("setup.cfg", "tox.ini")
+
 
 @dataclass(frozen=True)
 class StarterTool:
     """A tool, the configuration that gives it away, and its starter metrics.
 
-    A file name or a section name is enough, and nothing else counts: a
-    tool someone installed but never configured leaves no markers worth a
-    metric. The bases are the inline comments only, since those count the
-    same wherever the tool keeps its own config.
+    Its own file or a section under its name is enough, and nothing else
+    counts: a tool someone installed but never configured leaves no markers
+    worth a metric. The bases are the inline comments only, since those
+    count the same wherever the tool keeps its own config.
     """
 
-    files: frozenset[str] = frozenset()
-    sections: frozenset[str] = frozenset()
-    bases: tuple[str, ...] = ()
+    name: str
+    files: frozenset[str]
+    bases: tuple[str, ...]
 
 
 def _bases(*paths: str) -> tuple[str, ...]:
@@ -29,54 +34,53 @@ def _bases(*paths: str) -> tuple[str, ...]:
 #: In the order the starter lists their metrics.
 STARTER_TOOLS = (
     StarterTool(
+        name="ruff",
         files=frozenset({"ruff.toml", ".ruff.toml"}),
-        sections=frozenset({"tool.ruff"}),
         bases=_bases("ruff.noqa_comment"),
     ),
     StarterTool(
-        files=frozenset({"black.toml"}),
-        sections=frozenset({"tool.black"}),
-        bases=_bases("black.fmt_comment"),
+        name="black", files=frozenset({"black.toml"}), bases=_bases("black.fmt_comment")
     ),
     StarterTool(
+        name="pylint",
         files=frozenset({".pylintrc", "pylintrc"}),
-        sections=frozenset({"tool.pylint"}),
         bases=_bases("pylint.disable_comment"),
     ),
     StarterTool(
+        name="bandit",
         files=frozenset({".bandit"}),
-        sections=frozenset({"tool.bandit"}),
         bases=_bases("bandit.nosec_comment"),
     ),
     StarterTool(
+        name="codespell",
         files=frozenset({".codespellrc"}),
-        sections=frozenset({"tool.codespell", "codespell"}),
         bases=_bases("codespell.ignore_comment"),
     ),
     StarterTool(
+        name="mypy",
         files=frozenset({"mypy.ini", ".mypy.ini"}),
-        sections=frozenset({"tool.mypy", "mypy"}),
         bases=_bases("mypy.type_ignore_comment"),
     ),
-    # basedpyright reads pyright's file and section as well as its own
     StarterTool(
+        name="pyright",
         files=frozenset({"pyrightconfig.json"}),
-        sections=frozenset({"tool.pyright", "tool.basedpyright"}),
         bases=_bases("pyright.ignore_comment"),
     ),
+    # basedpyright reads pyright's file and section too, and shares its comment
     StarterTool(
-        files=frozenset({"ty.toml"}),
-        sections=frozenset({"tool.ty"}),
-        bases=_bases("ty.ignore_comment"),
+        name="basedpyright", files=frozenset(), bases=_bases("pyright.ignore_comment")
     ),
     StarterTool(
+        name="ty", files=frozenset({"ty.toml"}), bases=_bases("ty.ignore_comment")
+    ),
+    StarterTool(
+        name="pytest",
         files=frozenset({"pytest.ini"}),
-        sections=frozenset({"tool.pytest", "pytest", "tool:pytest"}),
         bases=_bases("pytest.skip_marks", "pytest.xfail_marks"),
     ),
     StarterTool(
+        name="coverage",
         files=frozenset({".coveragerc"}),
-        sections=frozenset({"tool.coverage", "coverage:run", "coverage:report"}),
         bases=_bases("coverage.pragma_comment"),
     ),
 )

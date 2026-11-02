@@ -4,16 +4,11 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from support import FakeProject
 
 from tingle.mills.config import validate
 from tingle.mills.services import ConfigService, MetricsService
-from tingle.pacts.config import (
-    Config,
-    ConfigError,
-    ConfigNotFoundError,
-    MetricDraft,
-    ToolConfigs,
-)
+from tingle.pacts.config import Config, ConfigError, ConfigNotFoundError, MetricDraft
 from tingle.pacts.metrics import MetricResult, MetricType
 from tingle.specs.ranges import UNREACHABLE_DIRS
 
@@ -34,8 +29,15 @@ RAW = {
 }
 
 
-def _config_service(store: MagicMock) -> ConfigService:
-    return ConfigService(store=store, metric_types=METRIC_TYPES, templates=MagicMock())
+def _config_service(
+    store: MagicMock, project_files: MagicMock | None = None
+) -> ConfigService:
+    return ConfigService(
+        store=store,
+        metric_types=METRIC_TYPES,
+        templates=MagicMock(),
+        project_files=project_files or MagicMock(),
+    )
 
 
 def test_load_validates_the_raw_config_against_the_resolved_source() -> None:
@@ -95,14 +97,25 @@ def test_add_metric_writes_nothing_when_the_draft_is_invalid() -> None:
 
 def test_write_starter_starts_on_the_tools_the_project_configures() -> None:
     store = MagicMock()
-    store.tool_configs.return_value = ToolConfigs(sections=frozenset({"tool.ty"}))
     store.write_starter.return_value = SOURCE
+    project_files = MagicMock(return_value=FakeProject({"ty.toml": ""}))
 
-    assert _config_service(store).write_starter(CWD) == SOURCE
-    store.tool_configs.assert_called_once_with(CWD)
+    assert _config_service(store, project_files).write_starter(CWD) == SOURCE
+    project_files.assert_called_once_with(CWD)
     store.write_starter.assert_called_once_with(
         CWD, ("tingle.builtins.ty.ignore_comment",)
     )
+    store.write_examples.assert_not_called()
+
+
+def test_write_starter_writes_the_examples_when_no_tool_is_known() -> None:
+    store = MagicMock()
+    store.write_examples.return_value = SOURCE
+    project_files = MagicMock(return_value=FakeProject({"README.md": ""}))
+
+    assert _config_service(store, project_files).write_starter(CWD) == SOURCE
+    store.write_examples.assert_called_once_with(CWD)
+    store.write_starter.assert_not_called()
 
 
 def test_list_metric_types_orders_by_name() -> None:
@@ -112,7 +125,10 @@ def test_list_metric_types_orders_by_name() -> None:
         for name in ("regex_count", "file_count", "line_count")
     }
     service = ConfigService(
-        store=MagicMock(), metric_types=unordered, templates=MagicMock()
+        store=MagicMock(),
+        metric_types=unordered,
+        templates=MagicMock(),
+        project_files=MagicMock(),
     )
 
     names = [metric_type.name for metric_type in service.list_metric_types()]
