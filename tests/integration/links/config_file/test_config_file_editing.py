@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from tingle.links.config_file.toml import TomlConfigStore
+from tingle.pacts.config import ConfigError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -98,20 +99,35 @@ def test_edit_target_defaults_to_new_tingle_toml(tmp_path: Path) -> None:
     assert edit_target(tmp_path) == tmp_path / "tingle.toml"
 
 
+def test_edit_target_rejects_a_tool_tingle_that_is_not_a_table(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text('[tool]\ntingle = "x"\n')
+
+    with pytest.raises(ConfigError, match=r"\[tool\.tingle\] must be a table"):
+        edit_target(tmp_path)
+
+
+def test_write_examples_refuses_beside_a_broken_tool_tingle(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text('[tool]\ntingle = "x"\n')
+
+    with pytest.raises(ConfigError, match=r"\[tool\.tingle\] must be a table"):
+        write_examples(tmp_path)
+    assert not (tmp_path / "tingle.toml").exists()
+
+
 def test_write_examples_creates_and_refuses_overwrite(tmp_path: Path) -> None:
     path = write_examples(tmp_path)
 
     assert path == tmp_path / "tingle.toml"
     assert "[ranges.python]" in path.read_text()
 
-    with pytest.raises(FileExistsError):
+    with pytest.raises(ConfigError, match="already holds the tingle config"):
         write_examples(tmp_path)
 
 
 def test_write_starter_refuses_overwrite(tmp_path: Path) -> None:
     (tmp_path / "tingle.toml").write_text("")
 
-    with pytest.raises(FileExistsError):
+    with pytest.raises(ConfigError, match="already holds the tingle config"):
         write_starter(tmp_path, ("tingle.builtins.ruff.noqa_comment",))
 
 
@@ -130,7 +146,7 @@ def test_write_starter_lists_a_metric_per_base_in_place_of_the_examples(
 def test_write_starter_refuses_beside_a_tool_tingle_table(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text("[tool.tingle]\n")
 
-    with pytest.raises(FileExistsError, match=r"\[tool\.tingle\] in .*pyproject"):
+    with pytest.raises(ConfigError, match=r"pyproject\.toml already holds"):
         write_starter(tmp_path, ("tingle.builtins.ruff.noqa_comment",))
     assert not (tmp_path / "tingle.toml").exists()
 
@@ -138,7 +154,7 @@ def test_write_starter_refuses_beside_a_tool_tingle_table(tmp_path: Path) -> Non
 def test_write_examples_refuses_beside_a_tool_tingle_table(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text("[tool.tingle]\n")
 
-    with pytest.raises(FileExistsError, match=r"\[tool\.tingle\] in .*pyproject"):
+    with pytest.raises(ConfigError, match=r"pyproject\.toml already holds"):
         write_examples(tmp_path)
     assert not (tmp_path / "tingle.toml").exists()
 

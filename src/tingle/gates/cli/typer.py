@@ -393,9 +393,6 @@ class CliGate:
         """Create a starter tingle.toml in the current directory."""
         try:
             path = self._services.config.write_starter(Path.cwd())
-        except FileExistsError as exc:
-            typer.echo(f"config error: {exc.args[0]} already exists", err=True)
-            raise typer.Exit(2) from None
         except ConfigError as exc:
             self._config_failure(exc)
         typer.echo(f"Created {path}")

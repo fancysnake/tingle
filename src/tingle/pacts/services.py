@@ -38,7 +38,7 @@ class ConfigServiceProtocol(Protocol):
 
     @abstractmethod
     def write_starter(self, cwd: Path) -> Path:
-        """Create the starter config; raises FileExistsError if present."""
+        """Create the starter config; raises ConfigError if present or unreadable."""
 
     @abstractmethod
     def list_metric_types(self) -> tuple[MetricType, ...]:

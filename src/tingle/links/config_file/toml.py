@@ -83,12 +83,8 @@ class TomlConfigStore(ConfigStore):
             return tingle, _parse(tingle)
 
         pyproject = root / PYPROJECT_FILE
-        if pyproject.is_file():
-            section = _parse(pyproject).get("tool", {}).get("tingle")
-            if isinstance(section, dict):
-                return pyproject, section
-            if section is not None:
-                raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
+        if pyproject.is_file() and (section := _tool_tingle(pyproject)) is not None:
+            return pyproject, section
 
         msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
         raise ConfigNotFoundError(msg)
@@ -103,10 +99,8 @@ class TomlConfigStore(ConfigStore):
         if tingle.is_file():
             return tingle
         pyproject = root / PYPROJECT_FILE
-        if pyproject.is_file():
-            section = _parse(pyproject).get("tool", {}).get("tingle")
-            if isinstance(section, dict):
-                return pyproject
+        if pyproject.is_file() and _tool_tingle(pyproject) is not None:
+            return pyproject
         return tingle
 
     def append_metric(self, path: Path, metric: Mapping[str, Any]) -> None:
@@ -149,14 +143,10 @@ class TomlConfigStore(ConfigStore):
         A [tool.tingle] table counts as existing config: a tingle.toml beside
         it would win and silently shadow it.
         """
-        path = root / TINGLE_FILE
-        if path.exists():
-            raise FileExistsError(path)
-        if (target := self.edit_target(root)) != path:
-            msg = f"[tool.tingle] in {target}"
-            raise FileExistsError(msg)
-        path.write_text(f"{STARTER_HEAD}{body.rstrip()}\n", encoding="utf-8")
-        return path
+        if (target := self.edit_target(root)).exists():
+            raise ConfigError([f"{target} already holds the tingle config"])
+        target.write_text(f"{STARTER_HEAD}{body.rstrip()}\n", encoding="utf-8")
+        return target
 
 
 def _metric_table(metric: Mapping[str, Any]) -> Table:
@@ -181,6 +171,14 @@ def _value(value: object) -> object:
         except ValueError:
             return tomlkit.string(value)
     return value
+
+
+def _tool_tingle(pyproject: Path) -> dict[str, Any] | None:
+    """Return the [tool.tingle] table of a pyproject.toml, None if it has none."""
+    section = _parse(pyproject).get("tool", {}).get("tingle")
+    if section is None or isinstance(section, dict):
+        return section
+    raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
 
 
 def _parse(path: Path) -> dict[str, Any]:

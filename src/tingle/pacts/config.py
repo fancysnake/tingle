@@ -275,12 +275,12 @@ class ConfigStore(Protocol):
     def write_starter(self, root: Path, bases: Sequence[str]) -> Path:
         """Create a starter config of a metric built on each base.
 
-        Raises FileExistsError if a config is present.
+        Raises ConfigError if a config is present or unreadable.
         """
 
     @abstractmethod
     def write_examples(self, root: Path) -> Path:
         """Create the generic starter config of commented examples.
 
-        Raises FileExistsError if a config is present.
+        Raises ConfigError if a config is present or unreadable.
         """
