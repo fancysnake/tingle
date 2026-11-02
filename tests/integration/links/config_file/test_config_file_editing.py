@@ -15,6 +15,7 @@ append_metric = _store.append_metric
 render_metric = _store.render_metric
 edit_target = _store.edit_target
 write_starter = _store.write_starter
+write_examples = _store.write_examples
 
 # Deliberately not the config the CLI tests use: this suite only cares that
 # whatever was already in the file survives being appended to.
@@ -97,14 +98,33 @@ def test_edit_target_defaults_to_new_tingle_toml(tmp_path: Path) -> None:
     assert edit_target(tmp_path) == tmp_path / "tingle.toml"
 
 
-def test_write_starter_creates_and_refuses_overwrite(tmp_path: Path) -> None:
-    path = write_starter(tmp_path)
+def test_write_examples_creates_and_refuses_overwrite(tmp_path: Path) -> None:
+    path = write_examples(tmp_path)
 
     assert path == tmp_path / "tingle.toml"
     assert "[ranges.python]" in path.read_text()
 
     with pytest.raises(FileExistsError):
-        write_starter(tmp_path)
+        write_examples(tmp_path)
+
+
+def test_write_starter_refuses_overwrite(tmp_path: Path) -> None:
+    (tmp_path / "tingle.toml").write_text("")
+
+    with pytest.raises(FileExistsError):
+        write_starter(tmp_path, ("tingle.builtins.ruff.noqa_comment",))
+
+
+def test_write_starter_lists_a_metric_per_base_in_place_of_the_examples(
+    tmp_path: Path,
+) -> None:
+    bases = ("tingle.builtins.ruff.noqa_comment", "tingle.builtins.ty.ignore_comment")
+
+    path = write_starter(tmp_path, bases)
+
+    parsed = tomllib.loads(path.read_text())
+    assert parsed["ranges"]["python"]["default"] is True
+    assert parsed["metrics"] == [{"base": base} for base in bases]
 
 
 def test_render_metric_writes_the_entry_without_a_file_to_put_it_in() -> None:

@@ -37,8 +37,9 @@ disagrees with them; what follows is the compressed form.
   problems reported at once), then `tingle stat` shows the numbers and any
   `ranges matched no files` warning on stderr. Read the file before editing;
   keep its comments, order and grouping.
-- No config: `tingle init` writes a commented starter, or write the file from
-  scratch — the starter is only a scaffold.
+- No config: `tingle init` writes a starter with the comment templates of
+  the Python tools the project configures, or write the file from scratch —
+  the starter is only a scaffold, and the survey below still applies.
 - `tingle list --types` and `tingle library` print what the installed
   version supports. They are the authority over the catalog below.
 

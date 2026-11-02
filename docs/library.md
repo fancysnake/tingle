@@ -190,14 +190,17 @@ tingle library tingle.builtins --expand
 
 | Pack | What it counts |
 | --- | --- |
+| `bandit` | `# nosec` comments |
 | `black` | `# fmt` comments |
 | `codespell` | `# codespell:ignore` comments |
-| `coverage` | `# pragma` comments |
+| `coverage` | `# pragma: no cover` and `no branch` comments |
 | `import_linter` | commented-out contracts, `ignore_imports` |
 | `mypy` | `# type: ignore`, overrides, disabled codes, `disallow_*` holes |
 | `pylint` | `# pylint:` comments, rcfile and pyproject disables |
+| `pyright` | `# pyright: ignore` comments (pyright and basedpyright) |
 | `pytest` | `skip` and `xfail` marks |
-| `python` | `typing.Any`, `typing.cast`, `TODO`/`FIXME`, long files |
+| `python` | `typing.Any`, `typing.cast`, `TODO`/`FIXME`, `@deprecated`, long files |
 | `ruff` | `# noqa`, `# ruff: ignore`/`disable`, file exemptions, ignores |
 | `taplo` | `# taplo:` comments |
+| `ty` | `# ty: ignore` comments |
 | `unittest_mock` | `ANY` placeholders, `patch` uses |
