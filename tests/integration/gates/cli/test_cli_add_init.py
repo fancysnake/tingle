@@ -158,6 +158,24 @@ def test_init_creates_starter(workdir: Path) -> None:
     assert ran.exit_code == 0
 
 
+def test_init_starts_on_the_templates_of_the_tools_configured(
+    workdir: Path, suppressions: str
+) -> None:
+    (workdir / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\n\n[tool.ruff]\n\n[tool.basedpyright]\n'
+    )
+    (workdir / "src").mkdir()
+    (workdir / "src" / "a.py").write_text(suppressions)
+
+    result = runner.invoke(app, ["init"])
+
+    assert result.exit_code == 0
+    ran = runner.invoke(app, ["stat", "--json"])
+    assert ran.exit_code == 0
+    metrics = {m["name"]: m["value"] for m in json.loads(ran.stdout)["metrics"]}
+    assert metrics == {"noqa-comment": 2, "pyright-ignores": 1}
+
+
 def test_init_refuses_overwrite(workdir: Path) -> None:
     (workdir / "tingle.toml").write_text("")
 

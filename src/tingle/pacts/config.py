@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, final
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
 
@@ -272,5 +272,15 @@ class ConfigStore(Protocol):
         """Write a metric entry out as the text a reader could paste."""
 
     @abstractmethod
-    def write_starter(self, root: Path) -> Path:
-        """Create the starter config; raises FileExistsError if present."""
+    def write_starter(self, root: Path, bases: Sequence[str]) -> Path:
+        """Create a starter config of a metric built on each base.
+
+        Raises FileExistsError if a config is present.
+        """
+
+    @abstractmethod
+    def write_examples(self, root: Path) -> Path:
+        """Create the generic starter config of commented examples.
+
+        Raises FileExistsError if a config is present.
+        """

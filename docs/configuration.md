@@ -9,8 +9,9 @@ tingle looks for `tingle.toml` in the current directory first, then for a
 exist. `--config PATH` overrides discovery. The project root — where files
 are scanned from — is the config file's directory.
 
-`tingle init` writes a commented starter `tingle.toml` (it refuses when a
-`tingle.toml` or a `[tool.tingle]` table already exists).
+`tingle init` writes a commented starter `tingle.toml`, with a metric for
+each tool the project configures (it refuses when a `tingle.toml` or a
+`[tool.tingle]` table already exists).
 
 ```toml
 [ranges.python]

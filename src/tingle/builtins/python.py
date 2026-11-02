@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tingle.pacts.config import MetricTemplate
 
-__all__ = ["any_used", "cast_used", "long_files", "todo_comments"]
+__all__ = ["any_used", "cast_used", "deprecated_marks", "long_files", "todo_comments"]
 
 any_used = MetricTemplate(
     type="symbol_uses",
@@ -36,4 +36,14 @@ long_files = MetricTemplate(
     group="linting",
     description="Files over 1000 lines.",
     params={"over_lines": 1000},
+)
+
+# a regex, not `symbol_uses`: `warnings`, `typing_extensions` and the
+# `deprecated` package each ship the decorator, and a project may use any
+deprecated_marks = MetricTemplate(
+    type="regex_count",
+    name="deprecated-marks",
+    group="architecture",
+    description="`@deprecated` decorators: code marked for removal, not removed.",
+    params={"pattern": r"^\s*@(?:\w+\.)*deprecated\b", "flags": ["MULTILINE"]},
 )

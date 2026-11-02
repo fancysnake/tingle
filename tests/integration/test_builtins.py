@@ -8,7 +8,7 @@ that it is not a special case.
 
 from __future__ import annotations
 
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from typing import TYPE_CHECKING
 
 import pytest
@@ -19,12 +19,14 @@ from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.mills.templates import resolve
 from tingle.pacts.config import BUILTIN_TEMPLATE_PACKAGE, ConfigError, MetricTemplate
 from tingle.pacts.metrics import MetricContext
+from tingle.specs.starter import STARTER_TOOLS
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from tingle.pacts.metrics import MetricResult
 
 PATHS = sorted(PythonTemplateLoader().catalogue(BUILTIN_TEMPLATE_PACKAGE))
-FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _measure(path: str, source: str, *, filename: str = "test_it.py") -> MetricResult:
@@ -71,6 +73,22 @@ def test_every_template_makes_a_valid_metric_on_its_own(
     )
 
     assert len(config.metrics) == 1
+
+
+@pytest.mark.parametrize(
+    "base", sorted({base for tool in STARTER_TOOLS for base in tool.bases})
+)
+def test_every_base_tingle_init_writes_resolves(base: str) -> None:
+    errors: list[str] = []
+    templates = resolve(
+        {"metrics": [{"base": base}]},
+        PythonTemplateLoader(),
+        metric_types=METRIC_TYPES,
+        errors=errors,
+    )
+
+    assert not errors
+    assert templates.get(base) is not None
 
 
 @pytest.mark.parametrize("path", PATHS)
@@ -166,11 +184,6 @@ def test_a_toml_template_points_at_the_key_the_tool_actually_writes(
     assert result.value == expected
 
 
-#: Every suppression form ruff documents, plus the ones its neighbours do,
-#: read from a `.txt` so the project does not measure its own test data.
-SUPPRESSIONS = (FIXTURES / "suppressions.py.txt").read_text()
-
-
 @pytest.mark.parametrize(
     ("path", "expected"),
     (
@@ -178,7 +191,11 @@ SUPPRESSIONS = (FIXTURES / "suppressions.py.txt").read_text()
         pytest.param("ruff.ignore_comment", 1, id="ruff-ignore-comment"),
         pytest.param("ruff.suppressed_ranges", 1, id="ruff-suppressed-ranges"),
         pytest.param("ruff.file_exemptions", 2, id="ruff-file-exemptions"),
-        pytest.param("coverage.pragma_comment", 1, id="pragma-comment"),
+        pytest.param("coverage.pragma_comment", 2, id="pragma-comment"),
+        pytest.param("pyright.ignore_comment", 1, id="pyright-ignores"),
+        pytest.param("ty.ignore_comment", 1, id="ty-ignores"),
+        pytest.param("bandit.nosec_comment", 1, id="nosec-comment"),
+        pytest.param("python.deprecated_marks", 2, id="deprecated-marks"),
         pytest.param("pytest.skip_marks", 1, id="pytest-skip"),
         pytest.param("pytest.xfail_marks", 1, id="pytest-xfail"),
         pytest.param("python.todo_comments", 2, id="todo-comments"),
@@ -186,14 +203,14 @@ SUPPRESSIONS = (FIXTURES / "suppressions.py.txt").read_text()
     ),
 )
 def test_a_source_template_matches_the_suppression_it_names(
-    path: str, expected: int
+    path: str, expected: int, *, suppressions: str
 ) -> None:
     """The pattern is the whole template, so a typo in it is the bug.
 
     One shared fixture on purpose: the counts only hold if each pattern
     leaves its neighbours' comments alone, which per-case sources cannot say.
     """
-    result = _measure(path, SUPPRESSIONS)
+    result = _measure(path, suppressions)
 
     assert not result.warnings
     assert result.value == expected

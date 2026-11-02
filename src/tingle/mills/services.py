@@ -10,6 +10,7 @@ from tingle.mills.check import judge
 from tingle.mills.config import narrowed, validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
+from tingle.mills.starter import starter_bases
 from tingle.mills.templates import as_table, resolve, verify
 from tingle.pacts.config import (
     EVERY_METRIC,
@@ -46,6 +47,7 @@ class ConfigService:
     store: ConfigStore
     metric_types: Mapping[str, MetricType]
     templates: TemplateLoader
+    project_files: ProjectFilesFactory
 
     def load(self, cwd: Path, override: Path | None = None) -> Config:
         """Discover, parse, and validate the configuration."""
@@ -122,8 +124,14 @@ class ConfigService:
         )
 
     def write_starter(self, cwd: Path) -> Path:
-        """Create the starter config; raises FileExistsError if present."""
-        return self.store.write_starter(cwd)
+        """Create the starter config; raises FileExistsError if present.
+
+        It starts on the templates of the tools the project configures,
+        or on the generic examples when it configures none tingle knows.
+        """
+        if not (bases := starter_bases(self.project_files(cwd))):
+            return self.store.write_examples(cwd)
+        return self.store.write_starter(cwd, bases)
 
     def list_metric_types(self) -> tuple[MetricType, ...]:
         """Every metric type a config may name, in name order."""

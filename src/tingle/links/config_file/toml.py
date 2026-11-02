@@ -10,7 +10,7 @@ import tomlkit
 from tingle.pacts.config import ConfigError, ConfigNotFoundError, ConfigStore
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from tomlkit.items import Table
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 TINGLE_FILE = "tingle.toml"
 PYPROJECT_FILE = "pyproject.toml"
 
-STARTER = r"""# tingle configuration
+STARTER_HEAD = """# tingle configuration
 # Ranges are named file sets; each metric measures the files of its ranges.
 
 [ranges.python]
@@ -28,7 +28,13 @@ default = true
 # [ranges.js]
 # include = ["frontend/**/*.js", "frontend/**/*.ts"]
 
-# A metric states what it counts...
+"""
+
+STARTER_DETECTED = """# Ready-made metrics for the tools this project configures.
+# Run `tingle library` to see them all.
+"""
+
+STARTER_EXAMPLES = r"""# A metric states what it counts...
 [[metrics]]
 name = "noqa-comments"
 type = "regex_count"
@@ -128,8 +134,17 @@ class TomlConfigStore(ConfigStore):
         document["metrics"] = metrics
         return tomlkit.dumps(document).strip()
 
-    def write_starter(self, root: Path) -> Path:
-        """Create a commented starter tingle.toml; refuse to overwrite.
+    def write_starter(self, root: Path, bases: Sequence[str]) -> Path:
+        """Create a starter tingle.toml of a metric per base; refuse to overwrite."""
+        metrics = "\n\n".join(self.render_metric({"base": base}) for base in bases)
+        return self._create_starter(root, STARTER_DETECTED + metrics)
+
+    def write_examples(self, root: Path) -> Path:
+        """Create the commented generic tingle.toml; refuse to overwrite."""
+        return self._create_starter(root, STARTER_EXAMPLES)
+
+    def _create_starter(self, root: Path, body: str) -> Path:
+        """Write a starter tingle.toml unless config already exists.
 
         A [tool.tingle] table counts as existing config: a tingle.toml beside
         it would win and silently shadow it.
@@ -140,7 +155,7 @@ class TomlConfigStore(ConfigStore):
         if (target := self.edit_target(root)) != path:
             msg = f"[tool.tingle] in {target}"
             raise FileExistsError(msg)
-        path.write_text(STARTER, encoding="utf-8")
+        path.write_text(f"{STARTER_HEAD}{body.rstrip()}\n", encoding="utf-8")
         return path
 
 
