@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `check --policy`, `--metric` and `--group`: only the config decides what
   the gate judges and how, so loosening it is a change a review sees.
 
+### Fixed
+
+- `tingle init` refuses beside a `[tool.tingle]` table in `pyproject.toml`;
+  the `tingle.toml` it wrote would have won and shadowed that config.
+
 ## [0.9.0] - 2026-10-23
 
 ### Changed

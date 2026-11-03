@@ -124,7 +124,7 @@ class ConfigService:
         )
 
     def write_starter(self, cwd: Path) -> Path:
-        """Create the starter config; raises FileExistsError if present.
+        """Create the starter config; raises ConfigError if present or unreadable.
 
         It starts on the templates of the tools the project configures,
         or on the generic examples when it configures none tingle knows.

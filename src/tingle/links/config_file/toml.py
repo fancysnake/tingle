@@ -83,12 +83,8 @@ class TomlConfigStore(ConfigStore):
             return tingle, _parse(tingle)
 
         pyproject = root / PYPROJECT_FILE
-        if pyproject.is_file():
-            section = _parse(pyproject).get("tool", {}).get("tingle")
-            if isinstance(section, dict):
-                return pyproject, section
-            if section is not None:
-                raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
+        if pyproject.is_file() and (section := _tool_tingle(pyproject)) is not None:
+            return pyproject, section
 
         msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
         raise ConfigNotFoundError(msg)
@@ -103,10 +99,8 @@ class TomlConfigStore(ConfigStore):
         if tingle.is_file():
             return tingle
         pyproject = root / PYPROJECT_FILE
-        if pyproject.is_file():
-            section = _parse(pyproject).get("tool", {}).get("tingle")
-            if isinstance(section, dict):
-                return pyproject
+        if pyproject.is_file() and _tool_tingle(pyproject) is not None:
+            return pyproject
         return tingle
 
     def append_metric(self, path: Path, metric: Mapping[str, Any]) -> None:
@@ -137,19 +131,22 @@ class TomlConfigStore(ConfigStore):
     def write_starter(self, root: Path, bases: Sequence[str]) -> Path:
         """Create a starter tingle.toml of a metric per base; refuse to overwrite."""
         metrics = "\n\n".join(self.render_metric({"base": base}) for base in bases)
-        return _create_starter(root, STARTER_DETECTED + metrics)
+        return self._create_starter(root, STARTER_DETECTED + metrics)
 
     def write_examples(self, root: Path) -> Path:
         """Create the commented generic tingle.toml; refuse to overwrite."""
-        return _create_starter(root, STARTER_EXAMPLES)
+        return self._create_starter(root, STARTER_EXAMPLES)
 
+    def _create_starter(self, root: Path, body: str) -> Path:
+        """Write a starter tingle.toml unless config already exists.
 
-def _create_starter(root: Path, body: str) -> Path:
-    path = root / TINGLE_FILE
-    if path.exists():
-        raise FileExistsError(path)
-    path.write_text(f"{STARTER_HEAD}{body.rstrip()}\n", encoding="utf-8")
-    return path
+        A [tool.tingle] table counts as existing config: a tingle.toml beside
+        it would win and silently shadow it.
+        """
+        if (target := self.edit_target(root)).exists():
+            raise ConfigError([f"{target} already holds the tingle config"])
+        target.write_text(f"{STARTER_HEAD}{body.rstrip()}\n", encoding="utf-8")
+        return target
 
 
 def _metric_table(metric: Mapping[str, Any]) -> Table:
@@ -174,6 +171,14 @@ def _value(value: object) -> object:
         except ValueError:
             return tomlkit.string(value)
     return value
+
+
+def _tool_tingle(pyproject: Path) -> dict[str, Any] | None:
+    """Return the [tool.tingle] table of a pyproject.toml, None if it has none."""
+    section = _parse(pyproject).get("tool", {}).get("tingle")
+    if section is None or isinstance(section, dict):
+        return section
+    raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
 
 
 def _parse(path: Path) -> dict[str, Any]:

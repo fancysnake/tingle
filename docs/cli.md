@@ -271,7 +271,8 @@ Types with no positional param (`ini_list_length`, `file_count`,
 ## `tingle init`
 
 Create a commented starter `tingle.toml` in the current directory. Refuses
-to overwrite an existing one. No options.
+when a config already exists: a `tingle.toml`, or a `[tool.tingle]` table in
+`pyproject.toml`. No options.
 
 The starter holds a metric for the inline suppression comments of each tool
 the project configures: ruff, black, pylint, bandit, codespell, mypy,
