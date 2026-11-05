@@ -8,8 +8,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, final
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-    from pathlib import Path
+    from collections.abc import Callable, Mapping, Sequence
+    from pathlib import Path, PurePath
 
 
 #: The template pack shipped with tingle, named as a string like any other
@@ -166,6 +166,10 @@ class TemplateLoader(Protocol):
     def catalogue(self, package: str) -> Mapping[str, object]:
         """Every template-shaped object under a package, by dotted path."""
 
+    @abstractmethod
+    def module_file(self, path: str) -> Path | None:
+        """Return the file of the module a dotted path reaches, if it has one."""
+
 
 @dataclass(frozen=True)
 class Selection:
@@ -211,10 +215,15 @@ class CheckSpec:
 
     `ignore` names metrics that neither fail the check nor appear in its
     output — the ones expected to grow, like lines of code.
+
+    `strict` fails a branch that loosens the gate and changes anything
+    else. It is honoured as the base states it, so a branch cannot drop it
+    to get past it.
     """
 
     policy: CheckPolicy = CheckPolicy.SUM
     ignore: tuple[str, ...] = ()
+    strict: bool = False
 
 
 @dataclass(frozen=True)
@@ -229,6 +238,23 @@ class Config:
     diff_base: str | None = None
     check: CheckSpec = field(default_factory=CheckSpec)
     display: DisplaySpec = field(default_factory=DisplaySpec)
+
+
+@dataclass(frozen=True)
+class BaseConfig:
+    """The configuration a branch started from, as the merge-base holds it.
+
+    `config` is None when there is none to compare with, and `problem` says
+    why. `asked` is whether that base stated `[check] strict` regardless.
+    `modules` are the project's own template modules it names, relative to
+    the root.
+    """
+
+    config: Config | None = None
+    source: PurePath | None = None
+    modules: tuple[PurePath, ...] = ()
+    problem: str | None = None
+    asked: bool = False
 
 
 @dataclass(frozen=True)
@@ -258,6 +284,23 @@ class ConfigStore(Protocol):
         self, root: Path, override: Path | None = None
     ) -> tuple[Path, dict[str, Any]]:
         """Locate and parse the configuration; raises ConfigNotFoundError."""
+
+    @abstractmethod
+    def load_at(
+        self, read: Callable[[PurePath], bytes | None], name: str
+    ) -> tuple[PurePath, dict[str, Any]] | None:
+        """Locate and parse the configuration through `read`; None if absent.
+
+        `name` is the file the current configuration lives in, tried first
+        when it is not one discovery would find. Raises ConfigError on a
+        file that cannot be parsed.
+        """
+
+    @abstractmethod
+    def differs_only_in_config(
+        self, path: PurePath, *, before: bytes | None, after: bytes | None
+    ) -> bool:
+        """Whether a config file's two copies differ in tingle's config alone."""
 
     @abstractmethod
     def edit_target(self, root: Path) -> Path:

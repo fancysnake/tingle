@@ -570,3 +570,15 @@ def test_a_base_that_broke_says_nothing_further() -> None:
 
 def test_a_base_nothing_declared_is_the_one_that_is_unknown() -> None:
     assert _based("nope", {}) == ['metrics[0]: unknown base "nope"']
+
+
+def test_check_strict_is_read() -> None:
+    config = _validate({"check": {"strict": True}, "metrics": []})
+
+    assert config.check.strict
+
+
+def test_check_strict_must_be_a_boolean() -> None:
+    errors = _errors_of({"check": {"strict": "yes"}, "metrics": []})
+
+    assert "[check]: strict must be a boolean" in errors

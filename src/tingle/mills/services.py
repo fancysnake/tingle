@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
+from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
 from tingle.mills.add import build_metric
@@ -11,9 +13,12 @@ from tingle.mills.config import narrowed, validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
 from tingle.mills.starter import starter_bases
-from tingle.mills.templates import as_table, resolve, verify
+from tingle.mills.strict import judged_at_base, loosenings
+from tingle.mills.templates import as_table, imported_paths, resolve, verify
+from tingle.pacts.check import StrictVerdict
 from tingle.pacts.config import (
     EVERY_METRIC,
+    BaseConfig,
     ConfigError,
     ConfigNotFoundError,
     Library,
@@ -24,12 +29,18 @@ from tingle.pacts.metrics import uninterrupted, unwatched
 from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Callable, Iterable
     from pathlib import Path
 
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.config import Config, ConfigStore, MetricDraft, TemplateLoader
-    from tingle.pacts.diff import DiffReport, DiffSourceFactory
+    from tingle.pacts.config import (
+        Config,
+        ConfigStore,
+        MetricDraft,
+        MetricSpec,
+        TemplateLoader,
+    )
+    from tingle.pacts.diff import BranchDiff, DiffReport, DiffSource, DiffSourceFactory
     from tingle.pacts.metrics import (
         Checkpoint,
         MetricType,
@@ -38,6 +49,7 @@ if TYPE_CHECKING:
         ProjectFilesFactory,
     )
     from tingle.pacts.report import RunReport
+    from tingle.pacts.services import ConfigServiceProtocol
 
 
 @dataclass(frozen=True)
@@ -57,6 +69,61 @@ class ConfigService:
         templates = self._templates(raw, errors)
         return validate(
             raw, self.metric_types, source=resolved, templates=templates, errors=errors
+        )
+
+    def at_base(
+        self, config: Config, read: Callable[[PurePath], bytes | None]
+    ) -> BaseConfig:
+        """Return the configuration the branch started from, read through `read`.
+
+        Its templates import from the tree as it stands: nothing else is
+        installed. A base that no longer validates is not an error, because
+        the branch cannot repair it; it only leaves nothing to compare with.
+        """
+        try:
+            found = self.store.load_at(read, config.source.name)
+        except ConfigError:
+            return BaseConfig(problem="the base config cannot be parsed")
+        if found is None:
+            return BaseConfig(problem="the base has no config")
+        name, raw = found
+        asked = isinstance(table := raw.get("check"), Mapping) and (
+            table.get("strict") is True
+        )
+        if not asked and not config.check.strict:
+            return BaseConfig()
+        errors: list[str] = []
+        templates = self._templates(raw, errors)
+        try:
+            base = validate(
+                raw,
+                self.metric_types,
+                source=config.root / name,
+                templates=templates,
+                errors=errors,
+            )
+        except ConfigError:
+            return BaseConfig(problem="the base config does not validate", asked=asked)
+        return BaseConfig(
+            config=base, source=name, modules=self._modules(raw, config.root)
+        )
+
+    def differs_only_in_config(
+        self, path: PurePath, *, before: bytes | None, after: bytes | None
+    ) -> bool:
+        """Whether a config file's two copies differ in tingle's config alone."""
+        return self.store.differs_only_in_config(path, before=before, after=after)
+
+    def _modules(self, raw: Mapping[str, Any], root: Path) -> tuple[PurePath, ...]:
+        """List the project's own files among the modules of a config's templates.
+
+        Only the module itself: what it imports in turn is not followed.
+        """
+        files = (self.templates.module_file(path) for path in imported_paths(raw))
+        return tuple(
+            PurePath(file.resolve().relative_to(root))
+            for file in files
+            if file is not None and file.resolve().is_relative_to(root)
         )
 
     def load_raw(self, cwd: Path) -> dict[str, Any]:
@@ -145,6 +212,7 @@ class MetricsService:
     project_files: ProjectFilesFactory
     diff_source: DiffSourceFactory
     metric_types: Mapping[str, MetricType]
+    configs: ConfigServiceProtocol
 
     def _files_of(self, config: Config) -> ProjectFiles:
         """Build the project tree, leaving what no range reaches unwalked.
@@ -193,4 +261,85 @@ class MetricsService:
     def check(self, config: Config, base: str) -> tuple[DiffReport, CheckVerdict]:
         """Measure the branch, then judge it on every metric the config names."""
         report = self.diff(config, base)
-        return report, judge(report, config.check)
+        verdict = judge(report, config.check)
+        return report, replace(
+            verdict, strict=self._strict(config, base=base, report=report)
+        )
+
+    def _strict(
+        self, config: Config, *, base: str, report: DiffReport
+    ) -> StrictVerdict:
+        """Judge the branch's config against the one it started from."""
+        source = self.diff_source(config.root)
+        branch = source.branch_diff(base)
+        at_base = self.configs.at_base(config, source.read_base)
+        if at_base.config is None:
+            asked = at_base.asked or config.check.strict
+            return StrictVerdict(
+                skipped=f"strict mode skipped: {at_base.problem}" if asked else None
+            )
+        if not at_base.config.check.strict:
+            return StrictVerdict()
+        judged = judged_at_base(at_base.config, self.metric_types)
+        changed = {file.path for file in branch.files}
+        modules = tuple(path for path in at_base.modules if path in changed)
+        loosened = loosenings(
+            at_base.config,
+            config,
+            judged=judged,
+            scores=(self._scores(at_base.config, judged), _totals(report)),
+            modules=modules,
+        )
+        if not loosened:
+            return StrictVerdict()
+        return StrictVerdict(
+            loosened=loosened,
+            alongside=self._alongside(
+                config, source=source, branch=branch, at_base=at_base
+            ),
+        )
+
+    def _scores(self, base: Config, judged: tuple[MetricSpec, ...]) -> dict[str, int]:
+        """Measure the tree as it stands under the base's config."""
+        if not judged:
+            return {}
+        names = tuple(spec.name for spec in judged)
+        report = self.run(base, Selection(metrics=names))
+        return {
+            outcome.spec.name: outcome.stat.value
+            for outcome in report.outcomes
+            if outcome.stat is not None
+        }
+
+    def _alongside(
+        self,
+        config: Config,
+        *,
+        source: DiffSource,
+        branch: BranchDiff,
+        at_base: BaseConfig,
+    ) -> tuple[PurePath, ...]:
+        """Every file the branch changed that is not config."""
+        project = self._files_of(config)
+        files = {PurePath(config.source.name), at_base.source}
+        return tuple(
+            file.path
+            for file in branch.files
+            if file.path not in at_base.modules
+            and not (
+                file.path in files
+                and self.configs.differs_only_in_config(
+                    file.path,
+                    before=source.read_base(file.path),
+                    after=project.read(file.path),
+                )
+            )
+        )
+
+
+def _totals(report: DiffReport) -> dict[str, int]:
+    return {
+        outcome.spec.name: outcome.total.value
+        for outcome in report.outcomes
+        if outcome.total is not None
+    }

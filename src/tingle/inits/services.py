@@ -38,6 +38,7 @@ class Services:
             project_files=LocalProjectFiles,
             diff_source=GitCli,
             metric_types=METRIC_TYPES,
+            configs=self.config,
         )
 
     @cached_property

@@ -33,7 +33,7 @@ _TOP_LEVEL_KEYS = frozenset(
     {"ranges", "metrics", "templates", "diff", "check", "display"}
 )
 _DIFF_KEYS = frozenset({"base"})
-_CHECK_KEYS = frozenset({"policy", "ignore"})
+_CHECK_KEYS = frozenset({"policy", "ignore", "strict"})
 _DISPLAY_KEYS = frozenset({"guide", "loc_range"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
 # `guide` and `description` are tingle's own, so they must not reach a
@@ -443,7 +443,11 @@ def _validate_check(
         for name in ignore or []
         if name not in known
     )
-    return CheckSpec(policy=policy, ignore=tuple(ignore or ()))
+    strict = raw_check.get("strict", False)
+    if not isinstance(strict, bool):
+        errors.append("[check]: strict must be a boolean")
+        strict = False
+    return CheckSpec(policy=policy, ignore=tuple(ignore or ()), strict=strict)
 
 
 def _check_policy(policy: object, errors: list[str]) -> CheckPolicy:

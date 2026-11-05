@@ -115,3 +115,15 @@ def test_a_child_that_will_not_import_is_left_out_rather_than_raising(
         raise ModuleNotFoundError(name=name)
 
     assert not PythonTemplateLoader(importer=importer).catalogue(pack)
+
+
+def test_module_file_is_the_module_a_path_reaches(pack: str) -> None:
+    found = PythonTemplateLoader().module_file(f"{pack}.tools.noqa")
+
+    assert found is not None
+    assert found.name == "tools.py"
+
+
+def test_module_file_raises_when_nothing_imports() -> None:
+    with pytest.raises(TemplateNotFoundError):
+        PythonTemplateLoader().module_file("no_such_pack_here.noqa")
