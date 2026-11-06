@@ -117,6 +117,7 @@ class DiffRunner:
             merge_base=branch_diff.merge_base,
             sections=sections(outcomes),
             skipped=tuple(skipped),
+            changed=tuple(file.path for file in branch_diff.files),
         )
 
     def _outcome(

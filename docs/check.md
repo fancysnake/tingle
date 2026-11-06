@@ -58,6 +58,63 @@ and they stay out of the output.
 A name that matches no configured metric is a config error, so a typo cannot
 silently ignore nothing.
 
+## Strict mode
+
+A false positive is fixed in the config, and that fix can ride along on the
+branch it turns green, where a review sees a feature rather than a looser gate.
+`strict` puts loosening on a branch of its own:
+
+```toml
+[check]
+strict = true
+```
+
+With it on, a branch fails when it loosens the config **and** changes anything
+else. The same config change alone passes.
+
+```console
+$ tingle check
+config loosened alongside other changes:
+  noqa-comment: 12 to 11
+  ~ src/api/views.py
+
+check failed: noqa-comment loosened alongside 1 other changed file
+```
+
+The branch's tree is measured under the base's config and under its own, so
+only the config can move the numbers. Loosening is any of these:
+
+| Change | Reported as |
+| --- | --- |
+| a judged metric scores lower | `noqa-comment: 12 to 11` |
+| a judged metric is removed, or renamed | `noqa-comment: removed` |
+| a judged metric moves to `[check] ignore` | `noqa-comment: moved to [check] ignore` |
+| `policy` goes from `any` to `sum` | `[check] policy: any to sum` |
+| `strict` is turned off | `[check] strict: turned off` |
+| a template module in the project changes | `pack/rules.py: template module changed` |
+
+A config change that only raises a score may ride along. Lowered metrics are
+judged one by one, so raising one never pays for lowering another.
+
+Everything the branch changed counts as "anything else" except the config file
+and those template modules. With config in `pyproject.toml`, a change outside
+`[tool.tingle]` counts too.
+
+What decides is the **base's** config: `strict` is read from the merge-base, so
+a branch cannot drop it to get past it, and `--config` cannot point around it.
+The branch that turns it on is not held to it.
+
+With no base config to compare with, because there is none, it cannot be parsed
+or it no longer validates, strict mode cannot judge the branch. `check` says so
+and carries on. The exception is a base that asked for `strict` and stopped
+validating while the branch changed or deleted a template module it names: that
+counts as loosening. The module is recognised by its dotted path, so a package
+whose directory does not match its name is not seen.
+
+Only the config is compared. A newer tingle whose bundled patterns differ is
+not seen, because only one version is installed. Under advisory CI a strict
+failure is a red job like any other, and does not block the merge.
+
 ## Gating on spread rather than volume
 
 `ignore` is the blunt instrument. Where a metric is not so much expected to grow

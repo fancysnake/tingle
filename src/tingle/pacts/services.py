@@ -9,12 +9,12 @@ from tingle.pacts.config import EVERY_METRIC, Selection
 from tingle.pacts.metrics import uninterrupted, unwatched
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-    from pathlib import Path
+    from collections.abc import Callable, Sequence
+    from pathlib import Path, PurePath
 
     from tingle.pacts.browse import BrowseState, Row, SortKey
     from tingle.pacts.check import CheckVerdict
-    from tingle.pacts.config import Config, Library, MetricDraft
+    from tingle.pacts.config import BaseConfig, Config, Library, MetricDraft
     from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.metrics import Checkpoint, MetricType, ProgressSink
@@ -27,6 +27,16 @@ class ConfigServiceProtocol(Protocol):
     @abstractmethod
     def load(self, cwd: Path, override: Path | None = None) -> Config:
         """Discover, parse, and validate the configuration."""
+
+    @abstractmethod
+    def at_base(
+        self, config: Config, read: Callable[[PurePath], bytes | None]
+    ) -> BaseConfig | None:
+        """Return the strict config the branch started from, read through `read`.
+
+        None when the base asked for no strict. Raises BaseConfigError when
+        it cannot be judged against.
+        """
 
     @abstractmethod
     def load_raw(self, cwd: Path) -> dict[str, Any]:

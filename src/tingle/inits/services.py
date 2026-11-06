@@ -38,6 +38,8 @@ class Services:
             project_files=LocalProjectFiles,
             diff_source=GitCli,
             metric_types=METRIC_TYPES,
+            store=TomlConfigStore(),
+            configs=self.config,
         )
 
     @cached_property

@@ -33,7 +33,7 @@ _TOP_LEVEL_KEYS = frozenset(
     {"ranges", "metrics", "templates", "diff", "check", "display"}
 )
 _DIFF_KEYS = frozenset({"base"})
-_CHECK_KEYS = frozenset({"policy", "ignore"})
+_CHECK_KEYS = frozenset({"policy", "ignore", "strict"})
 _DISPLAY_KEYS = frozenset({"guide", "loc_range"})
 _RANGE_KEYS = frozenset({"include", "exclude", "default"})
 # `guide` and `description` are tingle's own, so they must not reach a
@@ -96,6 +96,20 @@ def validate(
         check=check,
         display=display,
     )
+
+
+def asks_for_strict(raw: Mapping[str, Any]) -> bool:
+    """Whether a raw config asks for `[check] strict`.
+
+    Anything but a plain no counts: a malformed value fails validation, and
+    has to reach that failure rather than read as off.
+    """
+    return _stated_strict(raw.get("check", {})) is not False
+
+
+def _stated_strict(raw_check: object) -> object:
+    """Read `[check] strict` as written; None when `[check]` is no table."""
+    return raw_check.get("strict", False) if isinstance(raw_check, Mapping) else None
 
 
 def narrowed(config: Config, selection: Selection) -> Config:
@@ -443,7 +457,11 @@ def _validate_check(
         for name in ignore or []
         if name not in known
     )
-    return CheckSpec(policy=policy, ignore=tuple(ignore or ()))
+    strict = _stated_strict(raw_check)
+    if not isinstance(strict, bool):
+        errors.append("[check]: strict must be a boolean")
+        strict = False
+    return CheckSpec(policy=policy, ignore=tuple(ignore or ()), strict=strict)
 
 
 def _check_policy(policy: object, errors: list[str]) -> CheckPolicy:

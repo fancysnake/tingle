@@ -18,6 +18,7 @@ from tingle.gates.cli import typer as typer_gate
 from tingle.gates.cli.textual.browse import MetricsApp
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
     from tingle.gates.cli.textual.run import Measured
@@ -36,6 +37,17 @@ pattern = '#\\s*noqa'
 name = "ruff-ignores"
 type = "toml_list_length"
 key = "tool.ruff.lint.ignore"
+"""
+
+#: A config strict on the base, with the metric a branch will loosen.
+STRICT_CONFIG = """
+[check]
+strict = true
+
+[[metrics]]
+name = "debt"
+type = "regex_count"
+pattern = '#\\s*debt'
 """
 
 #: Like CONFIG, but counting files instead of reading pyproject.toml -- what
@@ -108,6 +120,31 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (src / "new.py").write_text("w = 4  # noqa\n")  # untracked
     monkeypatch.chdir(root)
     return root
+
+
+@pytest.fixture(name="branched")
+def fixture_branched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Callable[[Mapping[str, str]], Path]:
+    """Commit files to main and return a function leaving a fresh branch on them."""
+
+    def build(files: Mapping[str, str]) -> Path:
+        _git(tmp_path, "init", "-q", "-b", "main")
+        for name, content in files.items():
+            (tmp_path / name).write_text(content)
+        _git(tmp_path, "add", "-A")
+        _git(tmp_path, "commit", "-qm", "base")
+        _git(tmp_path, "checkout", "-qb", "feature")
+        monkeypatch.chdir(tmp_path)
+        return tmp_path
+
+    return build
+
+
+@pytest.fixture
+def strict_repo(branched: Callable[[Mapping[str, str]], Path]) -> Path:
+    """Build a repo whose strict base holds one known hit, on a fresh branch."""
+    return branched({"tingle.toml": STRICT_CONFIG, "a.py": "x = 1  # debt\n"})
 
 
 @pytest.fixture
