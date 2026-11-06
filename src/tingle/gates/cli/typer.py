@@ -220,7 +220,7 @@ class CliGate:
         else:
             for line in render.check_listing(verdict):
                 self._stdout.print(line)
-            if not verdict.rejected:
+            if not verdict.failed:
                 # silence would be indistinguishable from a step that never ran
                 self._stdout.print(render.check_success(verdict, report.base_ref))
         if markdown is not None:
@@ -228,7 +228,7 @@ class CliGate:
                 render.check_markdown(report, verdict), encoding="utf-8"
             )
         self._finish_diff(report)
-        if verdict.rejected:
+        if verdict.failed:
             typer.echo(render.check_reason(verdict), err=True)
             raise typer.Exit(1)
 

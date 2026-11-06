@@ -104,8 +104,12 @@ What decides is the **base's** config: `strict` is read from the merge-base, so
 a branch cannot drop it to get past it, and `--config` cannot point around it.
 The branch that turns it on is not held to it.
 
-With no base config to compare with, because there is none or it no longer
-validates, strict mode cannot judge the branch. `check` says so and carries on.
+With no base config to compare with, because there is none, it cannot be parsed
+or it no longer validates, strict mode cannot judge the branch. `check` says so
+and carries on. The exception is a base that asked for `strict` and stopped
+validating while the branch changed or deleted a template module it names: that
+counts as loosening. The module is recognised by its dotted path, so a package
+whose directory does not match its name is not seen.
 
 Only the config is compared. A newer tingle whose bundled patterns differ is
 not seen, because only one version is installed. Under advisory CI a strict

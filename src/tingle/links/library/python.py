@@ -11,7 +11,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
 from tingle.pacts.config import MetricTemplate, TemplateLoader, TemplateNotFoundError
@@ -42,10 +42,17 @@ class PythonTemplateLoader(TemplateLoader):
         module, attributes = self._deepest(path)
         return _walk(module, attributes)
 
-    def module_file(self, path: str) -> Path | None:
-        """Return the file of the module a dotted path reaches, if it has one."""
-        file = getattr(self._deepest(path)[0], "__file__", None)
-        return None if file is None else Path(file)
+    def module_file(self, path: str, root: Path) -> PurePath | None:
+        """Return the file of the module a dotted path reaches, relative to `root`.
+
+        None when the module has no file, or its file lies outside `root`.
+        """
+        if (file := getattr(self._deepest(path)[0], "__file__", None)) is None:
+            return None
+        resolved = Path(file).resolve()
+        if not resolved.is_relative_to(root):
+            return None
+        return PurePath(resolved.relative_to(root))
 
     def _deepest(self, path: str) -> tuple[ModuleType, list[str]]:
         """Split a dotted path into its longest importable prefix and the rest."""

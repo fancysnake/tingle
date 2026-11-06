@@ -98,6 +98,20 @@ def validate(
     )
 
 
+def asks_for_strict(raw: Mapping[str, Any]) -> bool:
+    """Whether a raw config asks for `[check] strict`.
+
+    Anything but a plain no counts: a malformed value fails validation, and
+    has to reach that failure rather than read as off.
+    """
+    return _stated_strict(raw.get("check", {})) is not False
+
+
+def _stated_strict(raw_check: object) -> object:
+    """Read `[check] strict` as written; None when `[check]` is no table."""
+    return raw_check.get("strict", False) if isinstance(raw_check, Mapping) else None
+
+
 def narrowed(config: Config, selection: Selection) -> Config:
     """Return the config holding only the metrics a selection asks for.
 
@@ -443,7 +457,7 @@ def _validate_check(
         for name in ignore or []
         if name not in known
     )
-    strict = raw_check.get("strict", False)
+    strict = _stated_strict(raw_check)
     if not isinstance(strict, bool):
         errors.append("[check]: strict must be a boolean")
         strict = False

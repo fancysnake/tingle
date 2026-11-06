@@ -49,17 +49,17 @@ class CheckVerdict:
     `judged` counts the metrics that took part, which is what a passing
     check reports: "nothing grew" means little without saying of how many.
 
-    `failed` is the policy's answer alone; `rejected` is the whole verdict.
+    `over_policy` is the policy's answer alone; `failed` is the whole verdict.
     """
 
     policy: CheckPolicy
     worsened: tuple[DiffOutcome, ...]
     net_total: int
-    failed: bool
+    over_policy: bool
     judged: int = 0
     strict: StrictVerdict = field(default_factory=StrictVerdict)
 
     @property
-    def rejected(self) -> bool:
+    def failed(self) -> bool:
         """Whether the branch may not land, on debt or on loosening."""
-        return self.failed or self.strict.failed
+        return self.over_policy or self.strict.failed

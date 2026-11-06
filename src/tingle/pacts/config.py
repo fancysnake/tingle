@@ -39,6 +39,26 @@ class TemplateNotFoundError(Exception):
     """Nothing importable sits at a template's dotted path."""
 
 
+class BaseConfigError(Exception):
+    """The base's configuration cannot be judged against; says why.
+
+    `source` is the file holding it, when one was found. `bases` are the
+    dotted templates it names, when it stated `[check] strict`.
+    """
+
+    def __init__(
+        self,
+        problem: str,
+        *,
+        source: PurePath | None = None,
+        bases: tuple[str, ...] = (),
+    ) -> None:
+        """Keep what the base still says; the message is the problem."""
+        self.source = source
+        self.bases = bases
+        super().__init__(problem)
+
+
 class SelectionError(Exception):
     """A selection names something the configuration does not carry.
 
@@ -167,8 +187,11 @@ class TemplateLoader(Protocol):
         """Every template-shaped object under a package, by dotted path."""
 
     @abstractmethod
-    def module_file(self, path: str) -> Path | None:
-        """Return the file of the module a dotted path reaches, if it has one."""
+    def module_file(self, path: str, root: Path) -> PurePath | None:
+        """Return the file of the module a dotted path reaches, relative to `root`.
+
+        None when the module has no file, or its file lies outside `root`.
+        """
 
 
 @dataclass(frozen=True)
@@ -242,19 +265,15 @@ class Config:
 
 @dataclass(frozen=True)
 class BaseConfig:
-    """The configuration a branch started from, as the merge-base holds it.
+    """The strict configuration a branch started from, as the merge-base holds it.
 
-    `config` is None when there is none to compare with, and `problem` says
-    why. `asked` is whether that base stated `[check] strict` regardless.
-    `modules` are the project's own template modules it names, relative to
-    the root.
+    `source` is the file holding it. `modules` are the project's own template
+    modules it names, relative to the root.
     """
 
-    config: Config | None = None
-    source: PurePath | None = None
+    config: Config
+    source: PurePath
     modules: tuple[PurePath, ...] = ()
-    problem: str | None = None
-    asked: bool = False
 
 
 @dataclass(frozen=True)

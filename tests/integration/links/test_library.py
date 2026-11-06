@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import PurePath
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -117,13 +120,38 @@ def test_a_child_that_will_not_import_is_left_out_rather_than_raising(
     assert not PythonTemplateLoader(importer=importer).catalogue(pack)
 
 
-def test_module_file_is_the_module_a_path_reaches(pack: str) -> None:
-    found = PythonTemplateLoader().module_file(f"{pack}.tools.noqa")
+def test_module_file_is_the_module_a_path_reaches(pack: str, tmp_path: Path) -> None:
+    found = PythonTemplateLoader().module_file(f"{pack}.tools.noqa", tmp_path.resolve())
 
-    assert found is not None
-    assert found.name == "tools.py"
+    assert found == PurePath(pack, "tools.py")
 
 
-def test_module_file_raises_when_nothing_imports() -> None:
+def test_module_file_is_none_outside_the_root(pack: str, tmp_path: Path) -> None:
+    elsewhere = tmp_path.resolve() / "elsewhere"
+
+    assert PythonTemplateLoader().module_file(f"{pack}.tools.noqa", elsewhere) is None
+
+
+def test_module_file_follows_a_symlink_into_the_root(tmp_path: Path) -> None:
+    root = tmp_path.resolve() / "project"
+    root.mkdir()
+    linked = tmp_path / "site-packages"
+    linked.symlink_to(root)
+    importer = MagicMock(
+        return_value=SimpleNamespace(__file__=str(linked / "pack" / "tools.py"))
+    )
+
+    found = PythonTemplateLoader(importer=importer).module_file("pack.tools.t", root)
+
+    assert found == PurePath("pack", "tools.py")
+
+
+def test_module_file_is_none_for_a_module_with_no_file(tmp_path: Path) -> None:
+    importer = MagicMock(return_value=SimpleNamespace())
+
+    assert PythonTemplateLoader(importer=importer).module_file("a.b", tmp_path) is None
+
+
+def test_module_file_raises_when_nothing_imports(tmp_path: Path) -> None:
     with pytest.raises(TemplateNotFoundError):
-        PythonTemplateLoader().module_file("no_such_pack_here.noqa")
+        PythonTemplateLoader().module_file("no_such_pack_here.noqa", tmp_path)

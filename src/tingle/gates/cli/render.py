@@ -337,14 +337,18 @@ def check_success(verdict: CheckVerdict, base: str) -> Text:
 def check_reason(verdict: CheckVerdict) -> str:
     """One line saying what failed the branch, and by how much."""
     reasons = []
-    if verdict.failed:
+    if verdict.over_policy:
         reasons.append(_policy_reason(verdict))
     if verdict.strict.failed:
-        loosened = ", ".join(item.subject for item in verdict.strict.loosened)
-        count = len(verdict.strict.alongside)
-        files = "file" if count == 1 else "files"
-        reasons.append(f"{loosened} loosened alongside {count} other changed {files}")
+        reasons.append(_strict_reason(verdict.strict))
     return f"check failed: {'; '.join(reasons)}"
+
+
+def _strict_reason(strict: StrictVerdict) -> str:
+    loosened = ", ".join(item.subject for item in strict.loosened)
+    count = len(strict.alongside)
+    files = "file" if count == 1 else "files"
+    return f"{loosened} loosened alongside {count} other changed {files}"
 
 
 def _policy_reason(verdict: CheckVerdict) -> str:
@@ -367,7 +371,7 @@ def check_markdown(report: DiffReport, verdict: CheckVerdict) -> str:
     """
     summary = (
         f"❌ {check_reason(verdict)}"
-        if verdict.rejected
+        if verdict.failed
         else check_success(verdict, f"`{report.base_ref}`").plain
     )
     lines = ["### tingle", "", summary, "", *_strict_markdown(verdict.strict)]
@@ -438,11 +442,11 @@ def check_annotations(
 ) -> list[str]:
     """One GitHub workflow command per occurrence a worsened metric added.
 
-    An error when the check failed, a warning when the policy let the branch
+    An error when the policy failed the branch, a warning when it let the branch
     pass. Occurrence paths are relative to the config root and annotations
     to the workspace, so each path is rebased onto `cwd`.
     """
-    level = "error" if verdict.rejected else "warning"
+    level = "error" if verdict.over_policy else "warning"
     lines: list[str] = []
     for outcome in verdict.worsened:
         if (result := outcome.result) is None:  # pragma: no cover - never worsened
@@ -458,17 +462,17 @@ def check_annotations(
             if occurrence.note is not None:
                 message += f": {occurrence.note}"
             lines.append(f"::{level} {where},title={title}::{_command_data(message)}")
-    return lines + _strict_annotations(verdict)
+    return lines + _strict_annotations(verdict.strict)
 
 
-def _strict_annotations(verdict: CheckVerdict) -> list[str]:
+def _strict_annotations(strict: StrictVerdict) -> list[str]:
     """Annotate the run itself: loosening sits on no line a metric found."""
     title = _command_property("tingle: strict")
-    if verdict.strict.skipped:
-        message = _command_data(verdict.strict.skipped)
-        return [f"::warning title={title}::{message}"]
-    if verdict.strict.failed:
-        return [f"::error title={title}::{_command_data(check_reason(verdict))}"]
+    if strict.skipped:
+        return [f"::warning title={title}::{_command_data(strict.skipped)}"]
+    if strict.failed:
+        reason = f"check failed: {_strict_reason(strict)}"
+        return [f"::error title={title}::{_command_data(reason)}"]
     return []
 
 
@@ -507,7 +511,7 @@ def check_json(report: DiffReport, verdict: CheckVerdict) -> str:
     payload = _diff_payload(report, detailed=True)
     payload["check"] = {
         "policy": verdict.policy.value,
-        "failed": verdict.rejected,
+        "failed": verdict.failed,
         "net_total": verdict.net_total,
         "judged": verdict.judged,
         "worsened": [outcome.spec.name for outcome in verdict.worsened],

@@ -8,14 +8,18 @@ from support import FakeProject
 
 from tingle.mills.config import validate
 from tingle.mills.services import ConfigService, MetricsService
+from tingle.pacts.check import StrictVerdict
 from tingle.pacts.config import (
     BaseConfig,
+    BaseConfigError,
     Config,
     ConfigError,
     ConfigNotFoundError,
     MetricDraft,
     MetricTemplate,
+    TemplateNotFoundError,
 )
+from tingle.pacts.diff import DiffResult, FileDiff, FileStatus
 from tingle.pacts.metrics import MetricResult, MetricType
 from tingle.specs.ranges import UNREACHABLE_DIRS
 
@@ -27,6 +31,14 @@ METRIC_TYPES = {
         name="file_count",
         func=lambda _ctx: MetricResult(value=0),
         diff_func=MagicMock(),
+    )
+}
+
+CHECKED_TYPES = {
+    "file_count": MetricType(
+        name="file_count",
+        func=lambda _ctx: MetricResult(value=0),
+        diff_func=lambda _ctx: DiffResult(net=0),
     )
 }
 
@@ -154,6 +166,7 @@ def test_run_anchors_the_project_files_at_the_config_root() -> None:
         project_files=project_files,
         diff_source=MagicMock(),
         metric_types=METRIC_TYPES,
+        store=MagicMock(),
         configs=MagicMock(),
     )
 
@@ -172,6 +185,7 @@ def test_diff_anchors_both_adapters_at_the_config_root() -> None:
         project_files=project_files,
         diff_source=diff_source,
         metric_types=METRIC_TYPES,
+        store=MagicMock(),
         configs=MagicMock(),
     )
 
@@ -191,37 +205,68 @@ def _at_base(store: MagicMock, templates: MagicMock | None = None) -> ConfigServ
     )
 
 
-def test_at_base_says_when_there_is_no_config() -> None:
+def _strict_config() -> Config:
+    return validate({**RAW, "check": {"strict": True}}, METRIC_TYPES, source=SOURCE)
+
+
+def test_at_base_says_when_a_strict_branch_finds_no_config() -> None:
     store = MagicMock()
     store.load_at.return_value = None
 
-    found = _at_base(store).at_base(_config(), MagicMock())
+    with pytest.raises(BaseConfigError, match="the base has no config"):
+        _at_base(store).at_base(_strict_config(), MagicMock())
 
-    assert found == BaseConfig(problem="the base has no config")
+
+def test_at_base_asks_nothing_of_a_branch_with_no_config_either_side() -> None:
+    store = MagicMock()
+    store.load_at.return_value = None
+
+    assert _at_base(store).at_base(_config(), MagicMock()) is None
 
 
 def test_at_base_says_when_the_config_cannot_be_parsed() -> None:
     store = MagicMock()
     store.load_at.side_effect = ConfigError(["bad"])
 
-    found = _at_base(store).at_base(_config(), MagicMock())
+    with pytest.raises(BaseConfigError, match="the base config cannot be parsed"):
+        _at_base(store).at_base(_config(), MagicMock())
 
-    assert found == BaseConfig(problem="the base config cannot be parsed")
 
-
-def test_at_base_remembers_strict_on_a_config_that_no_longer_validates() -> None:
+def test_at_base_keeps_what_a_strict_config_names_when_it_no_longer_validates() -> None:
     store = MagicMock()
-    raw = {"check": {"strict": True}, "metrics": [{"name": "gone", "type": "x"}]}
+    raw = {"check": {"strict": True}, "metrics": [{"base": "pack.tools.gone"}]}
     store.load_at.return_value = (PurePath("tingle.toml"), raw)
+    templates = MagicMock()
+    templates.load.side_effect = TemplateNotFoundError("gone")
 
-    found = _at_base(store).at_base(_config(), MagicMock())
+    with pytest.raises(BaseConfigError, match="does not validate") as caught:
+        _at_base(store, templates).at_base(_config(), MagicMock())
 
-    assert found.config is None
-    assert found.problem == "the base config does not validate"
-    assert found.asked
+    assert caught.value.source == PurePath("tingle.toml")
+    assert caught.value.bases == ("pack.tools.gone",)
 
 
-def test_at_base_lists_only_the_modules_inside_the_project(tmp_path: Path) -> None:
+def test_at_base_names_no_bases_for_a_base_that_asked_nothing() -> None:
+    store = MagicMock()
+    raw = {"metrics": [{"base": "pack.tools.gone"}]}
+    store.load_at.return_value = (PurePath("tingle.toml"), raw)
+    templates = MagicMock()
+    templates.load.side_effect = TemplateNotFoundError("gone")
+
+    with pytest.raises(BaseConfigError, match="does not validate") as caught:
+        _at_base(store, templates).at_base(_strict_config(), MagicMock())
+
+    assert not caught.value.bases
+
+
+def test_at_base_is_silent_when_only_the_branch_asks_for_strict() -> None:
+    store = MagicMock()
+    store.load_at.return_value = (PurePath("tingle.toml"), RAW)
+
+    assert _at_base(store).at_base(_strict_config(), MagicMock()) is None
+
+
+def test_at_base_lists_only_the_modules_inside_the_project() -> None:
     store = MagicMock()
     store.load_at.return_value = (
         PurePath("tingle.toml"),
@@ -233,15 +278,25 @@ def test_at_base_lists_only_the_modules_inside_the_project(tmp_path: Path) -> No
     )
     templates = MagicMock()
     templates.load.return_value = MetricTemplate()
-    templates.module_file.side_effect = lambda path: (
-        tmp_path / "pack.py" if path == "in.t" else Path("/elsewhere/out.py")
+    templates.module_file.side_effect = lambda path, _root: (
+        PurePath("pack.py") if path == "in.t" else None
     )
-    config = validate(RAW, METRIC_TYPES, source=tmp_path / "tingle.toml")
 
-    found = _at_base(store, templates).at_base(config, MagicMock())
+    found = _at_base(store, templates).at_base(_config(), MagicMock())
 
+    assert found is not None
     assert found.modules == (PurePath("pack.py"),)
     assert found.source == PurePath("tingle.toml")
+    templates.module_file.assert_any_call("in.t", CWD)
+
+
+def test_a_malformed_strict_on_the_base_counts_as_asked() -> None:
+    store = MagicMock()
+    raw = {**RAW, "check": {"strict": "yes"}}
+    store.load_at.return_value = (PurePath("tingle.toml"), raw)
+
+    with pytest.raises(BaseConfigError, match="does not validate"):
+        _at_base(store).at_base(_config(), MagicMock())
 
 
 def test_at_base_resolves_nothing_when_neither_side_asks_for_strict() -> None:
@@ -249,7 +304,59 @@ def test_at_base_resolves_nothing_when_neither_side_asks_for_strict() -> None:
     store.load_at.return_value = (PurePath("tingle.toml"), RAW)
     templates = MagicMock()
 
-    found = _at_base(store, templates).at_base(_config(), MagicMock())
-
-    assert found == BaseConfig()
+    assert _at_base(store, templates).at_base(_config(), MagicMock()) is None
     templates.load.assert_not_called()
+
+
+def _check_service(
+    at_base: BaseConfig, *changed: str
+) -> tuple[MetricsService, MagicMock, MagicMock]:
+    project_files = MagicMock()
+    project_files.return_value.walk.return_value = ()
+    diff_source = MagicMock()
+    diff_source.return_value.branch_diff.return_value.files = tuple(
+        FileDiff(path=PurePath(path), status=FileStatus.MODIFIED) for path in changed
+    )
+    configs = MagicMock()
+    configs.at_base.return_value = at_base
+    service = MetricsService(
+        project_files=project_files,
+        diff_source=diff_source,
+        metric_types=CHECKED_TYPES,
+        store=MagicMock(),
+        configs=configs,
+    )
+    return service, project_files, diff_source
+
+
+def test_check_reads_the_base_through_the_source_that_diffed() -> None:
+    at_base = BaseConfig(config=_strict_config(), source=PurePath("tingle.toml"))
+    service, _, diff_source = _check_service(at_base, "a.py")
+
+    service.check(_strict_config(), "main")
+
+    diff_source.assert_called_once_with(CWD)
+    diff_source.return_value.branch_diff.assert_called_once_with("main")
+
+
+def test_check_measures_once_when_the_branch_left_the_config_alone() -> None:
+    at_base = BaseConfig(config=_strict_config(), source=PurePath("tingle.toml"))
+    service, project_files, _ = _check_service(at_base, "a.py")
+
+    _, verdict = service.check(_strict_config(), "main")
+
+    assert verdict.strict == StrictVerdict()
+    project_files.assert_called_once()
+
+
+def test_check_compares_a_config_in_another_file_though_the_base_one_is_unchanged() -> (
+    None
+):
+    at_base = BaseConfig(config=_strict_config(), source=PurePath("tingle.toml"))
+    service, project_files, _ = _check_service(at_base, "a.py")
+    other = validate(RAW, METRIC_TYPES, source=CWD / "pyproject.toml")
+
+    _, verdict = service.check(other, "main")
+
+    assert verdict.strict.loosened[0].subject == "[check] strict"
+    assert project_files.call_count > 1

@@ -72,24 +72,25 @@ class TomlConfigStore(ConfigStore):
         """Locate and parse the tingle configuration.
 
         Returns the file the configuration came from and its raw, unvalidated
-        content. `tingle.toml` wins over `[tool.tingle]` in `pyproject.toml`.
+        content.
         """
         if override is not None:
             if not override.is_file():
                 msg = f"config file not found: {override}"
                 raise ConfigNotFoundError(msg)
-            return override, _parse(override)
+            return override, _parsed(override.read_bytes(), override)
 
-        tingle = root / TINGLE_FILE
-        if tingle.is_file():
-            return tingle, _parse(tingle)
+        def read(file: PurePath) -> bytes | None:
+            path = root / file
+            return path.read_bytes() if path.is_file() else None
 
-        pyproject = root / PYPROJECT_FILE
-        if pyproject.is_file() and (section := _tool_tingle(pyproject)) is not None:
-            return pyproject, section
-
-        msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
-        raise ConfigNotFoundError(msg)
+        if (found := _discovered(read, labelled=root)) is None:
+            msg = (
+                f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
+            )
+            raise ConfigNotFoundError(msg)
+        file, raw = found
+        return root / file, raw
 
     def load_at(
         self, read: Callable[[PurePath], bytes | None], name: str
@@ -99,15 +100,11 @@ class TomlConfigStore(ConfigStore):
         Discovery is the same as `load_raw`'s, behind a file `--config`
         named, so a branch pointing at a new file still meets the base's own.
         """
+        path = PurePath(name)
         known = name in {TINGLE_FILE, PYPROJECT_FILE}
-        for file in (TINGLE_FILE,) if known else (name, TINGLE_FILE):
-            if (data := read(PurePath(file))) is not None:
-                return PurePath(file), _parsed(data, file)
-        path = PurePath(PYPROJECT_FILE)
-        if (data := read(path)) is None:
-            return None
-        section = _section(_parsed(data, PYPROJECT_FILE), PYPROJECT_FILE)
-        return None if section is None else (path, section)
+        if not known and (data := read(path)) is not None:
+            return path, _parsed(data, name)
+        return _discovered(read, labelled=PurePath())
 
     def differs_only_in_config(
         self, path: PurePath, *, before: bytes | None, after: bytes | None
@@ -184,6 +181,24 @@ class TomlConfigStore(ConfigStore):
         return target
 
 
+def _discovered(
+    read: Callable[[PurePath], bytes | None], *, labelled: PurePath
+) -> tuple[PurePath, dict[str, Any]] | None:
+    """Find the configuration through `read`; None if absent.
+
+    `tingle.toml` wins over `[tool.tingle]` in `pyproject.toml`. Errors name
+    each file under `labelled`.
+    """
+    if (data := read(PurePath(TINGLE_FILE))) is not None:
+        return PurePath(TINGLE_FILE), _parsed(data, labelled / TINGLE_FILE)
+    path = PurePath(PYPROJECT_FILE)
+    if (data := read(path)) is None:
+        return None
+    label = labelled / path
+    section = _section(_parsed(data, label), label)
+    return None if section is None else (path, section)
+
+
 def _metric_table(metric: Mapping[str, Any]) -> Table:
     """Build one `[[metrics]]` table, however it is about to be used."""
     table = tomlkit.table()
@@ -210,7 +225,7 @@ def _value(value: object) -> object:
 
 def _tool_tingle(pyproject: Path) -> dict[str, Any] | None:
     """Return the [tool.tingle] table of a pyproject.toml, None if it has none."""
-    return _section(_parse(pyproject), pyproject)
+    return _section(_parsed(pyproject.read_bytes(), pyproject), pyproject)
 
 
 def _section(parsed: dict[str, Any], label: object) -> dict[str, Any] | None:
@@ -225,10 +240,6 @@ def _beside_config(data: bytes | None) -> dict[str, Any]:
     parsed = _parsed(data or b"", PYPROJECT_FILE)
     parsed.get("tool", {}).pop("tingle", None)
     return parsed
-
-
-def _parse(path: Path) -> dict[str, Any]:
-    return _parsed(path.read_bytes(), path)
 
 
 def _parsed(data: bytes, label: object) -> dict[str, Any]:

@@ -31,14 +31,12 @@ class ConfigServiceProtocol(Protocol):
     @abstractmethod
     def at_base(
         self, config: Config, read: Callable[[PurePath], bytes | None]
-    ) -> BaseConfig:
-        """Return the configuration the branch started from, read through `read`."""
+    ) -> BaseConfig | None:
+        """Return the strict config the branch started from, read through `read`.
 
-    @abstractmethod
-    def differs_only_in_config(
-        self, path: PurePath, *, before: bytes | None, after: bytes | None
-    ) -> bool:
-        """Whether a config file's two copies differ in tingle's config alone."""
+        None when the base asked for no strict. Raises BaseConfigError when
+        it cannot be judged against.
+        """
 
     @abstractmethod
     def load_raw(self, cwd: Path) -> dict[str, Any]:

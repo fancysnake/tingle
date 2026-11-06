@@ -4,8 +4,10 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
+import pytest
+
 from tingle.mills.config import validate
-from tingle.mills.strict import judged_at_base, loosenings
+from tingle.mills.strict import Scores, changed_modules, judged_at_base, loosenings
 from tingle.pacts.check import Loosening, StrictVerdict
 from tingle.pacts.metrics import MetricResult, MetricType
 
@@ -48,9 +50,32 @@ def _loosened(
         base,
         own,
         judged=judged_at_base(base, METRIC_TYPES),
-        scores=(before or {}, after or {}),
+        scores=Scores(before=before or {}, after=after or {}),
         modules=modules,
     )
+
+
+@pytest.mark.parametrize(
+    ("path", "found"),
+    (
+        ("pack/tools.py", True),
+        ("src/pack/tools.py", True),
+        ("pack/tools/__init__.py", True),
+        ("pack/__init__.py", True),
+        ("pack.py", True),
+        ("pack/tools/noqa.py", False),
+        ("pack/other.py", False),
+        ("tools.py", False),
+        ("__init__.py", False),
+        ("pack/tools.toml", False),
+    ),
+)
+def test_changed_modules_finds_the_files_a_dotted_base_runs_through(
+    path: str, *, found: bool
+) -> None:
+    changed = (PurePath(path),)
+
+    assert changed_modules(("pack.tools.noqa",), changed) == (changed if found else ())
 
 
 def test_a_lower_score_is_named_with_both_numbers() -> None:

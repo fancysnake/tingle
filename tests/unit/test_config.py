@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from support import make_config
 
-from tingle.mills.config import narrowed, validate
+from tingle.mills.config import asks_for_strict, narrowed, validate
 from tingle.pacts.config import (
     CheckPolicy,
     CheckSpec,
@@ -576,6 +576,23 @@ def test_check_strict_is_read() -> None:
     config = _validate({"check": {"strict": True}, "metrics": []})
 
     assert config.check.strict
+
+
+@pytest.mark.parametrize(
+    ("raw", "asked"),
+    (
+        ({}, False),
+        ({"check": {}}, False),
+        ({"check": {"strict": False}}, False),
+        ({"check": {"strict": True}}, True),
+        ({"check": {"strict": "yes"}}, True),
+        ({"check": "strict"}, True),
+    ),
+)
+def test_anything_but_a_plain_no_asks_for_strict(
+    raw: dict[str, object], *, asked: bool
+) -> None:
+    assert asks_for_strict(raw) is asked
 
 
 def test_check_strict_must_be_a_boolean() -> None:

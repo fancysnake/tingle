@@ -133,7 +133,8 @@ class DiffReport:
     """The outcome of one `tingle diff` run.
 
     Sections are the only storage, as on RunReport; `skipped` names
-    metrics whose type has no diff variant.
+    metrics whose type has no diff variant, `changed` every file the branch
+    changed, relative to the root.
     """
 
     root: Path
@@ -142,6 +143,7 @@ class DiffReport:
     merge_base: str
     sections: tuple[ReportSection[DiffOutcome], ...]
     skipped: tuple[str, ...] = ()
+    changed: tuple[PurePath, ...] = ()
 
     @property
     def outcomes(self) -> tuple[DiffOutcome, ...]:

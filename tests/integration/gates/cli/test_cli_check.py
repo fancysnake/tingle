@@ -386,6 +386,7 @@ def test_strict_has_nothing_to_measure_when_the_base_ignores_every_metric(
 ) -> None:
     config = STRICT_CONFIG.replace("strict = true", 'strict = true\nignore = ["debt"]')
     repo = branched({"tingle.toml": config, "a.py": "x = 1\n"})
+    (repo / "tingle.toml").write_text(f"{config}\n# reworded\n")
     (repo / "b.py").write_text("y = 2  # debt\n")
 
     result = runner.invoke(app, ["check"])
@@ -409,6 +410,63 @@ def test_strict_counts_a_changed_project_template_module_as_config(
     assert alongside.exit_code == 1
     assert f"{pack}/tools.py: template module changed" in alongside.output
     assert "~ b.py" in alongside.output
+
+
+def test_strict_counts_a_deleted_template_module_as_loosening(
+    branched: Callable[[Mapping[str, str]], Path], pack: str
+) -> None:
+    config = f'[check]\nstrict = true\n\n[[metrics]]\nbase = "{pack}.tools.noqa"\n'
+    repo = branched({"tingle.toml": config, ".gitignore": "__pycache__\n"})
+    (repo / pack / "tools.py").unlink()
+    (repo / "tingle.toml").write_text(STRICT_CONFIG)
+    (repo / "b.py").write_text("y = 2\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 1
+    assert f"{pack}/tools.py: template module changed" in result.output
+    assert "~ b.py" in result.output
+    assert "strict mode skipped" not in result.output
+
+
+def test_strict_counts_a_rewritten_template_module_as_loosening(
+    branched: Callable[[Mapping[str, str]], Path], pack: str
+) -> None:
+    config = f'[check]\nstrict = true\n\n[[metrics]]\nbase = "{pack}.tools.noqa"\n'
+    repo = branched({"tingle.toml": config, ".gitignore": "__pycache__\n"})
+    (repo / pack / "tools.py").write_text("emptied = True\n")
+    (repo / "tingle.toml").write_text(STRICT_CONFIG)
+    (repo / "b.py").write_text("y = 2\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 1
+    assert f"{pack}/tools.py: template module changed" in result.output
+
+
+def test_strict_says_so_when_the_base_config_cannot_be_parsed(
+    branched: Callable[[Mapping[str, str]], Path],
+) -> None:
+    repo = branched({"tingle.toml": "not [ toml\n"})
+    (repo / "tingle.toml").write_text(STRICT_CONFIG.replace("strict = true", ""))
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+    assert "strict mode skipped: the base config cannot be parsed" in result.output
+
+
+def test_strict_says_so_when_the_base_misstates_it(
+    branched: Callable[[Mapping[str, str]], Path],
+) -> None:
+    config = STRICT_CONFIG.replace("strict = true", 'strict = "yes"')
+    repo = branched({"tingle.toml": config, "a.py": "x = 1\n"})
+    (repo / "tingle.toml").write_text(STRICT_CONFIG.replace("strict = true", ""))
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+    assert "strict mode skipped: the base config does not validate" in result.output
 
 
 def test_the_branch_that_turns_strict_on_is_not_held_to_it(

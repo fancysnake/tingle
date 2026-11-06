@@ -36,7 +36,7 @@ def _judged(
         policy=CheckPolicy.SUM,
         worsened=(outcome,),
         net_total=outcome.result.net if outcome.result else 0,
-        failed=True,
+        over_policy=True,
         judged=1,
     )
     return report, verdict
@@ -81,7 +81,7 @@ def _strict_verdict(*, failed: bool = False) -> CheckVerdict:
         policy=CheckPolicy.SUM,
         worsened=(),
         net_total=2 if failed else 0,
-        failed=failed,
+        over_policy=failed,
         strict=StrictVerdict(
             loosened=(Loosening("noqa", "5 to 3"),), alongside=(PurePath("a.py"),)
         ),
@@ -115,13 +115,47 @@ def test_markdown_and_annotations_carry_the_loosening() -> None:
     ]
 
 
+def test_additions_the_policy_allowed_stay_warnings_when_strict_rejects() -> None:
+    outcome = _worsened("noqa", Occurrence("a.py", line=1))
+    report, _ = _judged(outcome)
+    verdict = CheckVerdict(
+        policy=CheckPolicy.SUM,
+        worsened=(outcome,),
+        net_total=1,
+        over_policy=False,
+        strict=StrictVerdict(
+            loosened=(Loosening("noqa", "5 to 3"),), alongside=(PurePath("a.py"),)
+        ),
+    )
+
+    commands = check_annotations(report, verdict, cwd=Path("/repo"))
+
+    assert commands[0].startswith("::warning file=a.py,line=1,")
+    assert commands[1].startswith("::error title=tingle%3A strict::")
+
+
+def test_the_strict_annotation_leaves_the_policy_failure_out() -> None:
+    report, _ = _judged(_worsened("noqa"))
+
+    commands = check_annotations(
+        report, _strict_verdict(failed=True), cwd=Path("/repo")
+    )
+
+    assert commands == [
+        (
+            "::error title=tingle%3A strict::check failed: noqa loosened"
+            " alongside 1 other changed file"
+        )
+    ]
+
+
 def test_a_skipped_strict_mode_warns() -> None:
     report, _ = _judged(_worsened("noqa"))
     verdict = CheckVerdict(
         policy=CheckPolicy.SUM,
         worsened=(),
         net_total=0,
-        failed=False,
+        over_policy=False,
         strict=StrictVerdict(skipped="strict mode skipped: why"),
     )
 
