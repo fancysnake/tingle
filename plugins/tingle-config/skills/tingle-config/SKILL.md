@@ -25,8 +25,9 @@ disagrees with them; what follows is the compressed form.
 
 - `tingle --version`. Not installed: in a Python project on 3.11+ (tingle's
   floor), add it as a dev dependency with the project's package manager; in
-  any other project with a `mise.toml`, `mise use --pin pipx:tingle` — the
-  backend needs uv or pipx, so `mise use uv` first if neither is present.
+  any other project with a `mise.toml`, `mise use uv` then
+  `mise use --pin pipx:tingle` — the backend needs uv or pipx wherever CI
+  runs, not only on this machine, so pin uv even if it is installed here.
   Either pins the version CI runs.
   Otherwise `pipx run tingle …` or `uvx tingle …` runs it without touching
   the project; every command below accepts that prefix.
