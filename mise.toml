@@ -27,6 +27,7 @@ PACKAGE = "tingle"
 SRC_PATHS = "src"
 TEST_PATHS = "tests"
 SCRIPT_PATHS = ""
+TEST_ENV_FILE = ".env.test"
 # both globs, because a shell one does not match a leading dot and .vekna.toml
 # and .taplo.toml are held to the same column width as the rest
 TOML_PATHS = "*.toml .*.toml"
