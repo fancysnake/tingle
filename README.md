@@ -42,9 +42,10 @@ Copy this prompt to set up tingle in your project:
 ```text
 Set up tingle (https://tingle.fancysnake.dev) in this repository.
 
-1. Install the tingle-config skill:
+1. In Claude Code, install the tingle-config skill:
    `claude plugin marketplace add fancysnake/tingle`, then
-   `claude plugin install tingle-config@tingle`.
+   `claude plugin install tingle-config@tingle`. Other agents skip to the
+   URL in step 2.
 2. Set up tingle by following that skill. If it has not loaded in this
    session, read it from
    https://github.com/fancysnake/tingle/blob/main/plugins/tingle-config/skills/tingle-config/SKILL.md

@@ -23,9 +23,11 @@ disagrees with them; what follows is the compressed form.
 
 ## 1. Find the current state
 
-- `tingle --version`. Not installed: in a Python project, add it as a dev
-  dependency with the project's package manager; in any other project with
-  a `mise.toml`, `mise use pipx:tingle`. Either pins the version CI runs.
+- `tingle --version`. Not installed: in a Python project on 3.11+ (tingle's
+  floor), add it as a dev dependency with the project's package manager; in
+  any other project with a `mise.toml`, `mise use --pin pipx:tingle` — the
+  backend needs uv or pipx, so `mise use uv` first if neither is present.
+  Either pins the version CI runs.
   Otherwise `pipx run tingle …` or `uvx tingle …` runs it without touching
   the project; every command below accepts that prefix.
 - The config is `./tingle.toml`, else `[tool.tingle]` in `./pyproject.toml`.
@@ -245,7 +247,8 @@ must be written by hand. It has no `--config` flag.
 4. Add `tingle check` to CI, so a branch that adds debt fails the build.
    The checkout needs full history (`fetch-depth: 0`). The job runs tingle
    the way step 1 installed it: through the project's environment, through
-   mise, or with `pipx run tingle check` where Python is available.
+   mise, or with `pipx run tingle check` where the runner has pipx (or
+   `uvx tingle check` with uv).
 
 ## 6. Report
 

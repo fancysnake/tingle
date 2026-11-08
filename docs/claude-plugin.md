@@ -55,9 +55,9 @@ The skill is a compressed form of [Configuration](configuration.md) and
 tingle is a Python package, but the markers it counts are not. The skill
 carries starting patterns for JS/TS, Rust, Go, Ruby, PHP, Java/Kotlin, C#,
 shell, templates, CSS, Markdown, YAML, Dockerfile, Terraform and CI configs,
-and installs tingle outside Python too: through `mise use pipx:tingle` where
-the repository has a `mise.toml`, otherwise as `pipx run tingle` or
-`uvx tingle`.
+and installs tingle outside Python too: through
+`mise use --pin pipx:tingle` where the repository has a `mise.toml`,
+otherwise as `pipx run tingle` or `uvx tingle`.
 
 ## Versions
 
