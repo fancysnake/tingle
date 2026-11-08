@@ -52,8 +52,7 @@ class GitCli:
 
     def branch_diff(self, base: str) -> BranchDiff:
         """Diff the working tree against merge-base(base, HEAD)."""
-        base_ref = self._resolve_ref(base)
-        merge_base = self._merge_base_of(base_ref)
+        base_ref, merge_base = self._resolve_base(base)
         self._merge_base = merge_base
         self._prefix = self._run("rev-parse", "--show-prefix").strip()
 
@@ -74,18 +73,29 @@ class GitCli:
             return None
         return result.stdout
 
-    def _resolve_ref(self, base: str) -> str:
+    def _resolve_base(self, base: str) -> tuple[str, str]:
+        """Return (base_ref, merge_base); an unborn HEAD's base is the empty tree."""
         for candidate in (base, f"origin/{base}"):
             result = self._git(
                 "rev-parse", "--verify", "--quiet", f"{candidate}^{{commit}}"
             )
             if result.returncode == 0:
-                return candidate
+                return candidate, self._merge_base_of(candidate)
+        unborn = self._unborn_branch()
+        if unborn is not None and base in {"HEAD", unborn}:
+            return base, self._run("hash-object", "-t", "tree", os.devnull).strip()
         msg = (
             f'base ref "{base}" not found (also tried "origin/{base}");'
             " pick one with --base"
         )
         raise DiffSourceError(msg)
+
+    def _unborn_branch(self) -> str | None:
+        """Name the checked-out branch if it has no commit yet."""
+        if self._git("rev-parse", "--verify", "--quiet", "HEAD").returncode == 0:
+            return None
+        result = self._git("symbolic-ref", "--quiet", "--short", "HEAD")
+        return _decode(result.stdout).strip() if result.returncode == 0 else None
 
     def _merge_base_of(self, base_ref: str) -> str:
         result = self._git("merge-base", base_ref, "HEAD")

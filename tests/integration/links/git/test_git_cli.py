@@ -347,11 +347,29 @@ def test_unrelated_histories_raise(tmp_path: Path) -> None:
         GitCli(repo).branch_diff("main")
 
 
-def test_unborn_head_raises(tmp_path: Path) -> None:
+@pytest.mark.parametrize("base", ("HEAD", "main"))
+def test_unborn_head_diffs_against_an_empty_base(tmp_path: Path, base: str) -> None:
+    repo = _repo(tmp_path)
+    (repo / "staged.py").write_text("one\ntwo\n")
+    _git(repo, "add", "staged.py")
+    (repo / "untracked.py").write_text("three\n")
+
+    git = GitCli(repo)
+    diff = git.branch_diff(base)
+
+    files = _by_path(diff.files)
+    assert diff.base_ref == base
+    assert files["staged.py"].status is FileStatus.ADDED
+    assert files["staged.py"].added_lines == frozenset({1, 2})
+    assert files["untracked.py"].added_lines == frozenset({1})
+    assert git.read_base(PurePath("staged.py")) is None
+
+
+def test_unborn_head_with_another_base_still_raises(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
 
-    with pytest.raises(DiffSourceError):
-        GitCli(repo).branch_diff("main")
+    with pytest.raises(DiffSourceError, match='base ref "trunk" not found'):
+        GitCli(repo).branch_diff("trunk")
 
 
 def test_not_a_repo_raises(tmp_path: Path) -> None:

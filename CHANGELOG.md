@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `tingle init` refuses beside a `[tool.tingle]` table in `pyproject.toml`;
   the `tingle.toml` it wrote would have won and shadowed that config.
+- `--base HEAD`, or the current branch's name, works before a repo's first
+  commit: every file counts as new, so the pre-commit hook no longer blocks
+  that commit.
 
 ## [0.9.0] - 2026-10-23
 
