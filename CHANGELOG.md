@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `setup.cfg` and `tox.ini` — and writes a starter with a metric for each
   one's inline suppression comments. With none it recognises, it writes the
   generic starter as before.
+- `[check] strict`: a branch that loosens the config and changes anything else
+  fails `check`, naming the config change and the metrics it lowered, so
+  loosening lands on a branch of its own. Read from the base config, so a
+  branch cannot drop it, and off by default.
 
 ### Changed
 

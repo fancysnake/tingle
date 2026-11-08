@@ -37,7 +37,8 @@ and turns CI red on the branch that adds more, so the numbers only go down.
   changes its exit code. Failing the build is a separate command a team
   chooses to run.
 - **Keep no state.** `tingle stat` and `tingle check` measure the tree in
-  front of them, and the config is the only file they read, so there is
+  front of them, and the config is the only file they read (strict mode
+  also reads the base's copy), so there is
   nothing to merge and nothing to go stale. History is opt-in, and lives on
   a data branch.
 - **Any marker in any language.** If the code leaves a trace, a regex can

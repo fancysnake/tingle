@@ -47,7 +47,7 @@ def test_sum_passes_when_a_gain_offsets_a_loss() -> None:
     )
 
     assert verdict.net_total == -1
-    assert not verdict.failed
+    assert not verdict.over_policy
 
 
 def test_sum_fails_when_the_total_grows() -> None:
@@ -56,7 +56,7 @@ def test_sum_fails_when_the_total_grows() -> None:
     )
 
     assert verdict.net_total == 2
-    assert verdict.failed
+    assert verdict.over_policy
 
 
 def test_sum_passes_on_a_net_zero_trade() -> None:
@@ -65,14 +65,14 @@ def test_sum_passes_on_a_net_zero_trade() -> None:
     )
 
     assert verdict.net_total == 0
-    assert not verdict.failed
+    assert not verdict.over_policy
 
 
 def test_any_fails_on_the_trade_that_sum_allows() -> None:
     outcomes = (_outcome("noqa", 2), _outcome("type-ignores", -3))
 
-    assert not _judge(*outcomes, policy=CheckPolicy.SUM).failed
-    assert _judge(*outcomes, policy=CheckPolicy.ANY).failed
+    assert not _judge(*outcomes, policy=CheckPolicy.SUM).over_policy
+    assert _judge(*outcomes, policy=CheckPolicy.ANY).over_policy
 
 
 def test_any_passes_when_nothing_grew() -> None:
@@ -80,7 +80,7 @@ def test_any_passes_when_nothing_grew() -> None:
         _outcome("noqa", 0), _outcome("type-ignores", -3), policy=CheckPolicy.ANY
     )
 
-    assert not verdict.failed
+    assert not verdict.over_policy
     assert not verdict.worsened
 
 
@@ -89,7 +89,7 @@ def test_worsened_lists_every_grown_metric_whatever_the_policy() -> None:
         _outcome("noqa", 1), _outcome("type-ignores", -9), policy=CheckPolicy.SUM
     )
 
-    assert not verdict.failed
+    assert not verdict.over_policy
     assert [outcome.spec.name for outcome in verdict.worsened] == ["noqa"]
 
 
@@ -103,7 +103,7 @@ def test_ignored_metric_neither_fails_nor_counts() -> None:
 
     assert verdict.net_total == -1
     assert not verdict.worsened
-    assert not verdict.failed
+    assert not verdict.over_policy
 
 
 def test_errored_metric_is_not_evidence_either_way() -> None:
@@ -114,12 +114,12 @@ def test_errored_metric_is_not_evidence_either_way() -> None:
     )
 
     assert verdict.net_total == -1
-    assert not verdict.failed
+    assert not verdict.over_policy
 
 
 def test_empty_report_passes() -> None:
     verdict = _judge(policy=CheckPolicy.SUM)
 
     assert verdict.net_total == 0
-    assert not verdict.failed
+    assert not verdict.over_policy
     assert not verdict.worsened

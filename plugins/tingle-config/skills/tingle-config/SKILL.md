@@ -218,6 +218,8 @@ Ranges first, then metrics, grouped under comment headings the way
 - **`[check]`**: `policy = "sum"` (default) lets debt paid off in one metric
   cover debt taken on in another; `"any"` fails on any growth. `ignore`
   names metrics expected to grow; an unknown name is a config error.
+  `strict = true` fails a branch that loosens the config and changes
+  anything else; it is read from the base.
 - **Loosening a config already in use** (a new `ignore_lines` entry, an
   `exclude`, a narrowed pattern, a name in `[check] ignore`) goes in its own
   branch, never in the branch whose check it would turn green. tingle has no

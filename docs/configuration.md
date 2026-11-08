@@ -218,6 +218,7 @@ Configures the [CI gate](check.md).
 [check]
 policy = "sum"        # or "any"
 ignore = ["loc"]      # metrics that never fail the check
+strict = true         # loosening the config needs a branch of its own
 ```
 
 `policy = "sum"` (the default) fails when the metrics grow *in total*, so
@@ -228,3 +229,7 @@ paying off debt in one metric offsets taking it on in another. `policy =
 take no part: they neither move the total nor fail the build, and they stay
 out of the output. A name that matches no configured metric is a config
 error, so a typo cannot silently ignore nothing.
+
+`strict` fails a branch that loosens the config and changes anything else. It
+is read from the base, so a branch cannot drop it. See
+[Strict mode](check.md#strict-mode).

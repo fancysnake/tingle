@@ -338,7 +338,7 @@ def _verdict(*, net_total: int, judged: int, failed: bool = False) -> CheckVerdi
         policy=CheckPolicy.SUM,
         worsened=(),
         net_total=net_total,
-        failed=failed,
+        over_policy=failed,
         judged=judged,
     )
 

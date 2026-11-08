@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from dataclasses import dataclass
+from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
 from tingle.pacts.config import MetricTemplate, TemplateLoader, TemplateNotFoundError
@@ -38,10 +39,27 @@ class PythonTemplateLoader(TemplateLoader):
         (`pack.ruff.noqa`), in a subpackage below it, or behind whatever
         the module exposes it as, and moving it need not move the path.
         """
+        module, attributes = self._deepest(path)
+        return _walk(module, attributes)
+
+    def module_file(self, path: str, root: Path) -> PurePath | None:
+        """Return the file of the module a dotted path reaches, relative to `root`.
+
+        None when the module has no file, or its file lies outside `root`.
+        """
+        if (file := getattr(self._deepest(path)[0], "__file__", None)) is None:
+            return None
+        resolved = Path(file).resolve()
+        if not resolved.is_relative_to(root):
+            return None
+        return PurePath(resolved.relative_to(root))
+
+    def _deepest(self, path: str) -> tuple[ModuleType, list[str]]:
+        """Split a dotted path into its longest importable prefix and the rest."""
         parts = path.split(".")
         for cut in range(len(parts), 0, -1):
             if (module := self._imported(".".join(parts[:cut]))) is not None:
-                return _walk(module, parts[cut:])
+                return module, parts[cut:]
         msg = f"no importable module in {path!r}"
         raise TemplateNotFoundError(msg)
 
