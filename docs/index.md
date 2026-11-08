@@ -10,6 +10,10 @@ description: "tingle counts noqa, type: ignore and other tech-debt markers in yo
 
 --8<-- "README.md:install"
 
+## Setup
+
+--8<-- "README.md:setup"
+
 ## Quick start
 
 --8<-- "README.md:quickstart"

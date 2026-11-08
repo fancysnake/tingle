@@ -36,32 +36,21 @@ pip install tingle
 
 ## Setup
 
+<!-- --8<-- [start:setup] -->
 Copy this prompt to set up tingle in your project:
 
 ```text
 Set up tingle (https://tingle.fancysnake.dev) in this repository.
 
-1. Install the tingle-config skill, and follow it for the steps below:
+1. Install the tingle-config skill:
    `claude plugin marketplace add fancysnake/tingle`, then
    `claude plugin install tingle-config@tingle`.
-2. Install tingle. In a Python project, add it as a dev dependency with the
-   project's package manager. In any other project with a `mise.toml`, run
-   `mise use pipx:tingle`. Otherwise run it as `uvx tingle` or
-   `pipx run tingle`.
-3. Run `tingle init`, then `tingle library` to list ready-made metrics for
-   the tools this project already uses.
-4. Survey the project: languages, linters, type checkers, and the
-   suppression markers the code actually contains (`# noqa`,
-   `# type: ignore`, `eslint-disable`, skipped tests, ignored lint rules).
-   Grep each candidate first; a marker that does not occur here is not a
-   metric.
-5. Use a `base = "tingle.builtins..."` template where one fits; write a
-   `regex_count` or `toml_list_length` metric for the rest.
-6. Verify with `tingle stat` and `tingle report`. Exclude false positives
-   with `ignore_lines` in the config, never by dropping the metric.
-7. Add `tingle check` to CI, with `fetch-depth: 0` on checkout, so a branch
-   that adds debt fails the build.
+2. Set up tingle by following that skill. If it has not loaded in this
+   session, read it from
+   https://github.com/fancysnake/tingle/blob/main/plugins/tingle-config/skills/tingle-config/SKILL.md
+   instead.
 ```
+<!-- --8<-- [end:setup] -->
 
 ## Quick start
 
