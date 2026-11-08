@@ -34,6 +34,35 @@ pip install tingle
 ```
 <!-- --8<-- [end:install] -->
 
+## Setup
+
+Copy this prompt to set up tingle in your project:
+
+```text
+Set up tingle (https://tingle.fancysnake.dev) in this repository.
+
+1. Add tingle as a dev dependency with the project's package manager. A
+   repository with no Python environment runs it as `uvx tingle` or
+   `pipx run tingle` instead.
+2. Run `tingle init`, then `tingle library` to list ready-made metrics for
+   the tools this project already uses.
+3. Survey the project: languages, linters, type checkers, and the
+   suppression markers the code actually contains (`# noqa`,
+   `# type: ignore`, `eslint-disable`, skipped tests, ignored lint rules).
+   Grep each candidate first; a marker that does not occur here is not a
+   metric.
+4. Use a `base = "tingle.builtins..."` template where one fits; write a
+   `regex_count` or `toml_list_length` metric for the rest.
+5. Verify with `tingle stat` and `tingle report`. Exclude false positives
+   with `ignore_lines` in the config, never by dropping the metric.
+6. Add `tingle check` to CI, with `fetch-depth: 0` on checkout, so a branch
+   that adds debt fails the build.
+```
+
+On Claude Code, the
+[tingle-config plugin](https://tingle.fancysnake.dev/claude-plugin/) does
+the same with the full configuration reference at hand.
+
 ## Quick start
 
 <!-- --8<-- [start:quickstart] -->
