@@ -71,6 +71,11 @@ def resolve(
     return _locals(tables, imported, metric_types=metric_types, errors=errors)
 
 
+def imported_paths(raw: Mapping[str, Any]) -> list[str]:
+    """List every dotted base a config reaches for, each one once."""
+    return _paths(raw, _local_tables(raw, []), extra_bases=())
+
+
 def apply(
     base: Mapping[str, Any] | None,
     table: Mapping[str, Any],

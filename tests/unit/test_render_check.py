@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePath
 
-from tingle.gates.cli.render import check_annotations, check_markdown
+from tingle.gates.cli.render import check_annotations, check_markdown, check_reason
 from tingle.mills.display import sections
-from tingle.pacts.check import CheckVerdict
+from tingle.pacts.check import CheckVerdict, Loosening, StrictVerdict
 from tingle.pacts.config import CheckPolicy, MetricSpec
 from tingle.pacts.diff import DiffOutcome, DiffReport, DiffResult
 from tingle.pacts.metrics import MetricResult, Occurrence
@@ -36,7 +36,7 @@ def _judged(
         policy=CheckPolicy.SUM,
         worsened=(outcome,),
         net_total=outcome.result.net if outcome.result else 0,
-        failed=True,
+        over_policy=True,
         judged=1,
     )
     return report, verdict
@@ -74,3 +74,92 @@ def test_markdown_cuts_a_long_addition_list() -> None:
     assert "- `noqa` `a.py:200`" in markdown
     assert "a.py:201" not in markdown
     assert "- …and 5 more" in markdown
+
+
+def _strict_verdict(*, failed: bool = False) -> CheckVerdict:
+    return CheckVerdict(
+        policy=CheckPolicy.SUM,
+        worsened=(),
+        net_total=2 if failed else 0,
+        over_policy=failed,
+        strict=StrictVerdict(
+            loosened=(Loosening("noqa", "5 to 3"),), alongside=(PurePath("a.py"),)
+        ),
+    )
+
+
+def test_the_reason_names_loosening_alone() -> None:
+    assert check_reason(_strict_verdict()) == (
+        "check failed: noqa loosened alongside 1 other changed file"
+    )
+
+
+def test_the_reason_names_debt_and_loosening_together() -> None:
+    assert check_reason(_strict_verdict(failed=True)) == (
+        "check failed: metrics grew by a net +2 (policy: sum);"
+        " noqa loosened alongside 1 other changed file"
+    )
+
+
+def test_markdown_and_annotations_carry_the_loosening() -> None:
+    report, _ = _judged(_worsened("noqa"))
+    verdict = _strict_verdict()
+
+    assert "- `noqa`: 5 to 3" in check_markdown(report, verdict)
+    assert "- changed alongside: `a.py`" in check_markdown(report, verdict)
+    assert check_annotations(report, verdict, cwd=Path("/repo")) == [
+        (
+            "::error title=tingle%3A strict::check failed: noqa loosened"
+            " alongside 1 other changed file"
+        )
+    ]
+
+
+def test_additions_the_policy_allowed_stay_warnings_when_strict_rejects() -> None:
+    outcome = _worsened("noqa", Occurrence("a.py", line=1))
+    report, _ = _judged(outcome)
+    verdict = CheckVerdict(
+        policy=CheckPolicy.SUM,
+        worsened=(outcome,),
+        net_total=1,
+        over_policy=False,
+        strict=StrictVerdict(
+            loosened=(Loosening("noqa", "5 to 3"),), alongside=(PurePath("a.py"),)
+        ),
+    )
+
+    commands = check_annotations(report, verdict, cwd=Path("/repo"))
+
+    assert commands[0].startswith("::warning file=a.py,line=1,")
+    assert commands[1].startswith("::error title=tingle%3A strict::")
+
+
+def test_the_strict_annotation_leaves_the_policy_failure_out() -> None:
+    report, _ = _judged(_worsened("noqa"))
+
+    commands = check_annotations(
+        report, _strict_verdict(failed=True), cwd=Path("/repo")
+    )
+
+    assert commands == [
+        (
+            "::error title=tingle%3A strict::check failed: noqa loosened"
+            " alongside 1 other changed file"
+        )
+    ]
+
+
+def test_a_skipped_strict_mode_warns() -> None:
+    report, _ = _judged(_worsened("noqa"))
+    verdict = CheckVerdict(
+        policy=CheckPolicy.SUM,
+        worsened=(),
+        net_total=0,
+        over_policy=False,
+        strict=StrictVerdict(skipped="strict mode skipped: why"),
+    )
+
+    assert "strict mode skipped: why" in check_markdown(report, verdict)
+    assert check_annotations(report, verdict, cwd=Path("/repo")) == [
+        "::warning title=tingle%3A strict::strict mode skipped: why"
+    ]

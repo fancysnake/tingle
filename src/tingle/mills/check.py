@@ -29,11 +29,11 @@ def judge(report: DiffReport, spec: CheckSpec) -> CheckVerdict:
     worsened = tuple(
         outcome for outcome in judged if outcome.result and outcome.result.net > 0
     )
-    failed = net_total > 0 if spec.policy is CheckPolicy.SUM else bool(worsened)
+    over_policy = net_total > 0 if spec.policy is CheckPolicy.SUM else bool(worsened)
     return CheckVerdict(
         policy=spec.policy,
         worsened=worsened,
         net_total=net_total,
-        failed=failed,
+        over_policy=over_policy,
         judged=len(judged),
     )

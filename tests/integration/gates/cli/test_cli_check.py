@@ -4,12 +4,14 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
+from conftest import STRICT_CONFIG
 from typer.testing import CliRunner
 
 from tingle.gates.cli.typer import CliGate
 from tingle.inits.services import Services
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
 runner = CliRunner()
@@ -74,6 +76,7 @@ def test_json_carries_the_diff_and_the_verdict() -> None:
         "net_total": 4,
         "judged": 2,
         "worsened": ["lint-escapes", "ruff-ignores"],
+        "strict": {"loosened": [], "alongside": [], "skipped": None},
     }
     escapes = next(m for m in payload["metrics"] if m["name"] == "lint-escapes")
     assert {"file": "src/new.py", "line": 1, "note": None} in escapes[
@@ -276,3 +279,204 @@ def test_check_outside_repo_exits_2(workdir: Path, config_text: str) -> None:
 
     assert result.exit_code == 2
     assert "diff error" in result.stderr
+
+
+def _loosen(repo: Path) -> None:
+    config = (repo / "tingle.toml").read_text()
+    (repo / "tingle.toml").write_text(f"{config}ignore_lines = ['^x = ']\n")
+
+
+def test_strict_fails_loosening_that_rides_with_another_change(
+    strict_repo: Path,
+) -> None:
+    _loosen(strict_repo)
+    (strict_repo / "b.py").write_text("y = 2\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 1
+    assert "debt: 1 to 0" in result.output
+    assert "~ b.py" in result.output
+    assert "debt loosened alongside 1 other changed file" in result.stderr
+
+
+def test_strict_passes_loosening_on_its_own(strict_repo: Path) -> None:
+    _loosen(strict_repo)
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+
+
+def test_strict_cannot_be_turned_off_by_the_branch_it_judges(strict_repo: Path) -> None:
+    config = (strict_repo / "tingle.toml").read_text()
+    (strict_repo / "tingle.toml").write_text(
+        config.replace("strict = true", "strict = false")
+    )
+    (strict_repo / "b.py").write_text("y = 2\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 1
+    assert "[check] strict: turned off" in result.output
+
+
+def test_strict_is_not_lost_by_pointing_at_another_config(strict_repo: Path) -> None:
+    (strict_repo / "lax.toml").write_text(
+        STRICT_CONFIG.replace("strict = true", "").replace("debt'", "never'")
+    )
+    (strict_repo / "b.py").write_text("y = 2\n")
+
+    result = runner.invoke(app, ["check", "--config", "lax.toml"])
+
+    assert result.exit_code == 1
+    assert "debt: 1 to 0" in result.output
+
+
+def test_strict_ignores_a_config_that_tightens(strict_repo: Path) -> None:
+    config = (strict_repo / "tingle.toml").read_text()
+    (strict_repo / "tingle.toml").write_text(
+        f'{config}\n[[metrics]]\nname = "more"\n'
+        'type = "regex_count"\npattern = "[z]q"\n'
+    )
+    (strict_repo / "b.py").write_text("z = 2\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+
+
+def _in_pyproject(extra: str = "", version: str = "1") -> str:
+    section = STRICT_CONFIG.replace("[check]", "[tool.tingle.check]").replace(
+        "[[metrics]]", "[[tool.tingle.metrics]]"
+    )
+    return f'[project]\nversion = "{version}"\n{section}{extra}\n'
+
+
+def test_strict_in_pyproject_tells_config_from_the_rest_of_the_file(
+    branched: Callable[[Mapping[str, str]], Path],
+) -> None:
+    repo = branched({"pyproject.toml": _in_pyproject(), "a.py": "x = 1  # debt\n"})
+    ignored = "ignore_lines = ['^x = ']"
+
+    (repo / "pyproject.toml").write_text(_in_pyproject(ignored))
+    alone = runner.invoke(app, ["check"])
+    (repo / "pyproject.toml").write_text(_in_pyproject(ignored, version="2"))
+    alongside = runner.invoke(app, ["check"])
+
+    assert alone.exit_code == 0
+    assert alongside.exit_code == 1
+    assert "~ pyproject.toml" in alongside.output
+
+
+def test_strict_says_so_when_the_base_has_no_config(
+    branched: Callable[[Mapping[str, str]], Path],
+) -> None:
+    repo = branched({"a.py": "x = 1\n"})
+    (repo / "tingle.toml").write_text(STRICT_CONFIG)
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+    assert "strict mode skipped: the base has no config" in result.output
+
+
+def test_strict_has_nothing_to_measure_when_the_base_ignores_every_metric(
+    branched: Callable[[Mapping[str, str]], Path],
+) -> None:
+    config = STRICT_CONFIG.replace("strict = true", 'strict = true\nignore = ["debt"]')
+    repo = branched({"tingle.toml": config, "a.py": "x = 1\n"})
+    (repo / "tingle.toml").write_text(f"{config}\n# reworded\n")
+    (repo / "b.py").write_text("y = 2  # debt\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+
+
+def test_strict_counts_a_changed_project_template_module_as_config(
+    branched: Callable[[Mapping[str, str]], Path], pack: str
+) -> None:
+    config = f'[check]\nstrict = true\n\n[[metrics]]\nbase = "{pack}.tools.noqa"\n'
+    repo = branched({"tingle.toml": config, ".gitignore": "__pycache__\n"})
+    module = repo / pack / "tools.py"
+    module.write_text(f"{module.read_text()}\n# narrowed\n")
+
+    alone = runner.invoke(app, ["check"])
+    (repo / "b.py").write_text("y = 2\n")
+    alongside = runner.invoke(app, ["check"])
+
+    assert alone.exit_code == 0
+    assert alongside.exit_code == 1
+    assert f"{pack}/tools.py: template module changed" in alongside.output
+    assert "~ b.py" in alongside.output
+
+
+def test_strict_counts_a_deleted_template_module_as_loosening(
+    branched: Callable[[Mapping[str, str]], Path], pack: str
+) -> None:
+    config = f'[check]\nstrict = true\n\n[[metrics]]\nbase = "{pack}.tools.noqa"\n'
+    repo = branched({"tingle.toml": config, ".gitignore": "__pycache__\n"})
+    (repo / pack / "tools.py").unlink()
+    (repo / "tingle.toml").write_text(STRICT_CONFIG)
+    (repo / "b.py").write_text("y = 2\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 1
+    assert f"{pack}/tools.py: template module changed" in result.output
+    assert "~ b.py" in result.output
+    assert "strict mode skipped" not in result.output
+
+
+def test_strict_counts_a_rewritten_template_module_as_loosening(
+    branched: Callable[[Mapping[str, str]], Path], pack: str
+) -> None:
+    config = f'[check]\nstrict = true\n\n[[metrics]]\nbase = "{pack}.tools.noqa"\n'
+    repo = branched({"tingle.toml": config, ".gitignore": "__pycache__\n"})
+    (repo / pack / "tools.py").write_text("emptied = True\n")
+    (repo / "tingle.toml").write_text(STRICT_CONFIG)
+    (repo / "b.py").write_text("y = 2\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 1
+    assert f"{pack}/tools.py: template module changed" in result.output
+
+
+def test_strict_says_so_when_the_base_config_cannot_be_parsed(
+    branched: Callable[[Mapping[str, str]], Path],
+) -> None:
+    repo = branched({"tingle.toml": "not [ toml\n"})
+    (repo / "tingle.toml").write_text(STRICT_CONFIG.replace("strict = true", ""))
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+    assert "strict mode skipped: the base config cannot be parsed" in result.output
+
+
+def test_strict_says_so_when_the_base_misstates_it(
+    branched: Callable[[Mapping[str, str]], Path],
+) -> None:
+    config = STRICT_CONFIG.replace("strict = true", 'strict = "yes"')
+    repo = branched({"tingle.toml": config, "a.py": "x = 1\n"})
+    (repo / "tingle.toml").write_text(STRICT_CONFIG.replace("strict = true", ""))
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0
+    assert "strict mode skipped: the base config does not validate" in result.output
+
+
+def test_the_branch_that_turns_strict_on_is_not_held_to_it(
+    branched: Callable[[Mapping[str, str]], Path],
+) -> None:
+    config = STRICT_CONFIG.replace("strict = true", "")
+    repo = branched({"tingle.toml": config, "a.py": "x = 1  # debt\n"})
+    (repo / "tingle.toml").write_text(f"{STRICT_CONFIG}ignore_lines = ['^x = ']\n")
+    (repo / "b.py").write_text("y = 2\n")
+
+    result = runner.invoke(app, ["check"])
+
+    assert result.exit_code == 0

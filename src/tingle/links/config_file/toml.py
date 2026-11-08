@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import tomllib
+from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
 import tomlkit
@@ -10,7 +12,7 @@ import tomlkit
 from tingle.pacts.config import ConfigError, ConfigNotFoundError, ConfigStore
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
     from pathlib import Path
 
     from tomlkit.items import Table
@@ -70,24 +72,54 @@ class TomlConfigStore(ConfigStore):
         """Locate and parse the tingle configuration.
 
         Returns the file the configuration came from and its raw, unvalidated
-        content. `tingle.toml` wins over `[tool.tingle]` in `pyproject.toml`.
+        content.
         """
         if override is not None:
             if not override.is_file():
                 msg = f"config file not found: {override}"
                 raise ConfigNotFoundError(msg)
-            return override, _parse(override)
+            return override, _parsed(override.read_bytes(), override)
 
-        tingle = root / TINGLE_FILE
-        if tingle.is_file():
-            return tingle, _parse(tingle)
+        def read(file: PurePath) -> bytes | None:
+            path = root / file
+            return path.read_bytes() if path.is_file() else None
 
-        pyproject = root / PYPROJECT_FILE
-        if pyproject.is_file() and (section := _tool_tingle(pyproject)) is not None:
-            return pyproject, section
+        if (found := _discovered(read, labelled=root)) is None:
+            msg = (
+                f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
+            )
+            raise ConfigNotFoundError(msg)
+        file, raw = found
+        return root / file, raw
 
-        msg = f"no {TINGLE_FILE} or [tool.tingle] in {PYPROJECT_FILE} found in {root}"
-        raise ConfigNotFoundError(msg)
+    def load_at(
+        self, read: Callable[[PurePath], bytes | None], name: str
+    ) -> tuple[PurePath, dict[str, Any]] | None:
+        """Locate and parse the configuration of another revision.
+
+        Discovery is the same as `load_raw`'s, behind a file `--config`
+        named, so a branch pointing at a new file still meets the base's own.
+        """
+        path = PurePath(name)
+        known = name in {TINGLE_FILE, PYPROJECT_FILE}
+        if not known and (data := read(path)) is not None:
+            return path, _parsed(data, name)
+        return _discovered(read, labelled=PurePath())
+
+    def differs_only_in_config(
+        self, path: PurePath, *, before: bytes | None, after: bytes | None
+    ) -> bool:
+        """Whether a config file's two copies differ in tingle's config alone.
+
+        A pyproject.toml holds everything else too, so its other tables are
+        compared; any other config file is tingle's entirely.
+        """
+        if path.name != PYPROJECT_FILE:
+            return True
+        try:
+            return _beside_config(before) == _beside_config(after)
+        except ConfigError:
+            return False
 
     def edit_target(self, root: Path) -> Path:
         """Return the config file `tingle add` should edit.
@@ -149,6 +181,24 @@ class TomlConfigStore(ConfigStore):
         return target
 
 
+def _discovered(
+    read: Callable[[PurePath], bytes | None], *, labelled: PurePath
+) -> tuple[PurePath, dict[str, Any]] | None:
+    """Find the configuration through `read`; None if absent.
+
+    `tingle.toml` wins over `[tool.tingle]` in `pyproject.toml`. Errors name
+    each file under `labelled`.
+    """
+    if (data := read(PurePath(TINGLE_FILE))) is not None:
+        return PurePath(TINGLE_FILE), _parsed(data, labelled / TINGLE_FILE)
+    path = PurePath(PYPROJECT_FILE)
+    if (data := read(path)) is None:
+        return None
+    label = labelled / path
+    section = _section(_parsed(data, label), label)
+    return None if section is None else (path, section)
+
+
 def _metric_table(metric: Mapping[str, Any]) -> Table:
     """Build one `[[metrics]]` table, however it is about to be used."""
     table = tomlkit.table()
@@ -175,15 +225,25 @@ def _value(value: object) -> object:
 
 def _tool_tingle(pyproject: Path) -> dict[str, Any] | None:
     """Return the [tool.tingle] table of a pyproject.toml, None if it has none."""
-    section = _parse(pyproject).get("tool", {}).get("tingle")
+    return _section(_parsed(pyproject.read_bytes(), pyproject), pyproject)
+
+
+def _section(parsed: dict[str, Any], label: object) -> dict[str, Any] | None:
+    section = parsed.get("tool", {}).get("tingle")
     if section is None or isinstance(section, dict):
         return section
-    raise ConfigError([f"{pyproject}: [tool.tingle] must be a table"])
+    raise ConfigError([f"{label}: [tool.tingle] must be a table"])
 
 
-def _parse(path: Path) -> dict[str, Any]:
-    with path.open("rb") as fp:
-        try:
-            return tomllib.load(fp)
-        except tomllib.TOMLDecodeError as exc:
-            raise ConfigError([f"{path}: invalid TOML: {exc}"]) from exc
+def _beside_config(data: bytes | None) -> dict[str, Any]:
+    """Parse a pyproject.toml into everything but tingle's own table."""
+    parsed = _parsed(data or b"", PYPROJECT_FILE)
+    parsed.get("tool", {}).pop("tingle", None)
+    return parsed
+
+
+def _parsed(data: bytes, label: object) -> dict[str, Any]:
+    try:
+        return tomllib.load(io.BytesIO(data))
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError([f"{label}: invalid TOML: {exc}"]) from exc
