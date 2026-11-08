@@ -23,9 +23,14 @@ disagrees with them; what follows is the compressed form.
 
 ## 1. Find the current state
 
-- `tingle --version`. Not installed: `pipx run tingle …` or `uvx tingle …`
-  runs it without touching the project — the right choice in a non-Python
-  repo. Every command below accepts that prefix.
+- `tingle --version`. Not installed: in a Python project on 3.11+ (tingle's
+  floor), add it as a dev dependency with the project's package manager; in
+  any other project with a `mise.toml`, `mise use uv` then
+  `mise use --pin pipx:tingle` — the backend needs uv or pipx wherever CI
+  runs, not only on this machine, so pin uv even if it is installed here.
+  Either pins the version CI runs.
+  Otherwise `pipx run tingle …` or `uvx tingle …` runs it without touching
+  the project; every command below accepts that prefix.
 - The config is `./tingle.toml`, else `[tool.tingle]` in `./pyproject.toml`.
   Discovery looks in the working directory only, never upward, and the
   config file's directory is the root every glob and `file` param resolves
@@ -242,9 +247,11 @@ must be written by hand. It has no `--config` flag.
    `ranges matched no files` unless that range is deliberately empty.
 3. `tingle report --metric NAME` for each hand-written regex — open a few
    lines, then add `ignore_lines` for what is not debt.
-4. If `tingle check` will run in CI, the checkout needs full history
-   (`fetch-depth: 0`), and a non-Python job needs Python to
-   `pip install tingle` or `pipx run tingle check`.
+4. Add `tingle check` to CI, so a branch that adds debt fails the build.
+   The checkout needs full history (`fetch-depth: 0`). The job runs tingle
+   the way step 1 installed it: through the project's environment, through
+   mise, or with `pipx run tingle check` where the runner has pipx (or
+   `uvx tingle check` with uv).
 
 ## 6. Report
 
