@@ -41,27 +41,27 @@ Copy this prompt to set up tingle in your project:
 ```text
 Set up tingle (https://tingle.fancysnake.dev) in this repository.
 
-1. Add tingle as a dev dependency with the project's package manager. A
-   repository with no Python environment runs it as `uvx tingle` or
-   `pipx run tingle` instead.
-2. Run `tingle init`, then `tingle library` to list ready-made metrics for
+1. Install the tingle-config skill, and follow it for the steps below:
+   `claude plugin marketplace add fancysnake/tingle`, then
+   `claude plugin install tingle-config@tingle`.
+2. Install tingle. In a Python project, add it as a dev dependency with the
+   project's package manager. In any other project with a `mise.toml`, run
+   `mise use pipx:tingle`. Otherwise run it as `uvx tingle` or
+   `pipx run tingle`.
+3. Run `tingle init`, then `tingle library` to list ready-made metrics for
    the tools this project already uses.
-3. Survey the project: languages, linters, type checkers, and the
+4. Survey the project: languages, linters, type checkers, and the
    suppression markers the code actually contains (`# noqa`,
    `# type: ignore`, `eslint-disable`, skipped tests, ignored lint rules).
    Grep each candidate first; a marker that does not occur here is not a
    metric.
-4. Use a `base = "tingle.builtins..."` template where one fits; write a
+5. Use a `base = "tingle.builtins..."` template where one fits; write a
    `regex_count` or `toml_list_length` metric for the rest.
-5. Verify with `tingle stat` and `tingle report`. Exclude false positives
+6. Verify with `tingle stat` and `tingle report`. Exclude false positives
    with `ignore_lines` in the config, never by dropping the metric.
-6. Add `tingle check` to CI, with `fetch-depth: 0` on checkout, so a branch
+7. Add `tingle check` to CI, with `fetch-depth: 0` on checkout, so a branch
    that adds debt fails the build.
 ```
-
-On Claude Code, the
-[tingle-config plugin](https://tingle.fancysnake.dev/claude-plugin/) does
-the same with the full configuration reference at hand.
 
 ## Quick start
 
