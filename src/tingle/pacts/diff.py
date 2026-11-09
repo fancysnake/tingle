@@ -46,10 +46,14 @@ class FileDiff:
 
 @dataclass(frozen=True)
 class BranchDiff:
-    """Everything the branch changed relative to the merge-base."""
+    """Everything the branch changed relative to the merge-base.
+
+    `merge_base` is None when HEAD has no commit: there is no base commit,
+    and every file counts as added.
+    """
 
     base_ref: str
-    merge_base: str
+    merge_base: str | None
     files: tuple[FileDiff, ...]
 
 
@@ -140,7 +144,7 @@ class DiffReport:
     root: Path
     source: Path
     base_ref: str
-    merge_base: str
+    merge_base: str | None
     sections: tuple[ReportSection[DiffOutcome], ...]
     skipped: tuple[str, ...] = ()
     changed: tuple[PurePath, ...] = ()

@@ -359,17 +359,38 @@ def test_unborn_head_diffs_against_an_empty_base(tmp_path: Path, base: str) -> N
 
     files = _by_path(diff.files)
     assert diff.base_ref == base
+    assert diff.merge_base is None
     assert files["staged.py"].status is FileStatus.ADDED
     assert files["staged.py"].added_lines == frozenset({1, 2})
     assert files["untracked.py"].added_lines == frozenset({1})
     assert git.read_base(PurePath("staged.py")) is None
 
 
-def test_unborn_head_with_another_base_still_raises(tmp_path: Path) -> None:
-    repo = _repo(tmp_path)
+def test_unborn_head_ignores_a_fetched_origin_branch(tmp_path: Path) -> None:
+    upstream = _repo(tmp_path)
+    (upstream / "old.py").write_text("x\n")
+    _commit_all(upstream, "upstream")
+    clone = tmp_path / "clone"
+    _git(tmp_path, "init", "-b", "main", "clone")
+    _git(clone, "fetch", str(upstream), "main:refs/remotes/origin/main")
+    (clone / "new.py").write_text("one\n")
 
-    with pytest.raises(DiffSourceError, match='base ref "trunk" not found'):
-        GitCli(repo).branch_diff("trunk")
+    diff = GitCli(clone).branch_diff("main")
+
+    assert diff.base_ref == "main"
+    assert diff.merge_base is None
+    assert list(_by_path(diff.files)) == ["new.py"]
+
+
+@pytest.mark.parametrize("base", ("trunk", "main"))
+def test_unborn_head_with_another_base_raises(tmp_path: Path, base: str) -> None:
+    repo = _repo(tmp_path)
+    (repo / "a.py").write_text("x\n")
+    _commit_all(repo, "base")
+    _git(repo, "checkout", "--orphan", "fresh")
+
+    with pytest.raises(DiffSourceError, match=f'HEAD has no commit yet.*"{base}"'):
+        GitCli(repo).branch_diff(base)
 
 
 def test_not_a_repo_raises(tmp_path: Path) -> None:

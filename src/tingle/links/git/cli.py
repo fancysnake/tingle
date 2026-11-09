@@ -41,22 +41,39 @@ class GitCli:
     """DiffSource over the `git` executable.
 
     Stateful: read_base() serves blobs at the merge-base resolved by the
-    last branch_diff() call.
+    last branch_diff() call, and none when HEAD had no commit.
     """
 
     def __init__(self, root: Path) -> None:
         """Anchor at the tingle project root (may be a repo subdirectory)."""
         self._root = root
+        self._diffed = False
         self._merge_base: str | None = None
         self._prefix = ""
 
     def branch_diff(self, base: str) -> BranchDiff:
-        """Diff the working tree against merge-base(base, HEAD)."""
-        base_ref, merge_base = self._resolve_base(base)
+        """Diff the working tree against merge-base(base, HEAD).
+
+        An unborn HEAD shares no history with any ref: only `HEAD` or its own
+        branch name is accepted, and the diff runs against the empty tree.
+        """
+        if (unborn := self._unborn_branch()) is None:
+            base_ref = self._resolve_ref(base)
+            merge_base: str | None = self._merge_base_of(base_ref)
+        elif base in {"HEAD", unborn}:
+            base_ref, merge_base = base, None
+        else:
+            msg = (
+                f'HEAD has no commit yet, so it has no merge-base with "{base}";'
+                " use --base HEAD to count every file as added"
+            )
+            raise DiffSourceError(msg)
+        self._diffed = True
         self._merge_base = merge_base
         self._prefix = self._run("rev-parse", "--show-prefix").strip()
 
-        diff_files = _parse_diff(self._run(*_DIFF_ARGS, merge_base))
+        against = merge_base or self._run("hash-object", "-t", "tree", os.devnull)
+        diff_files = _parse_diff(self._run(*_DIFF_ARGS, against.strip()))
         untracked = self._untracked_files(seen={diff.path for diff in diff_files})
         return BranchDiff(
             base_ref=base_ref, merge_base=merge_base, files=(*diff_files, *untracked)
@@ -64,26 +81,24 @@ class GitCli:
 
     def read_base(self, path: PurePath) -> bytes | None:
         """Return the file's bytes at the merge-base, mirroring worktree read()."""
-        if self._merge_base is None:
+        if not self._diffed:
             msg = "read_base() called before branch_diff()"
             raise DiffSourceError(msg)
+        if self._merge_base is None:
+            return None
         blob_ref = f"{self._merge_base}:{self._prefix}{path.as_posix()}"
         result = self._git("show", blob_ref)
         if result.returncode != 0:
             return None
         return result.stdout
 
-    def _resolve_base(self, base: str) -> tuple[str, str]:
-        """Return (base_ref, merge_base); an unborn HEAD's base is the empty tree."""
+    def _resolve_ref(self, base: str) -> str:
         for candidate in (base, f"origin/{base}"):
             result = self._git(
                 "rev-parse", "--verify", "--quiet", f"{candidate}^{{commit}}"
             )
             if result.returncode == 0:
-                return candidate, self._merge_base_of(candidate)
-        unborn = self._unborn_branch()
-        if unborn is not None and base in {"HEAD", unborn}:
-            return base, self._run("hash-object", "-t", "tree", os.devnull).strip()
+                return candidate
         msg = (
             f'base ref "{base}" not found (also tried "origin/{base}");'
             " pick one with --base"

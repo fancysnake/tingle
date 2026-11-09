@@ -143,7 +143,7 @@ The compact summary — values only.
 
 | Option | Meaning |
 | --- | --- |
-| `--json` | machine-readable output; values only, no occurrences or per-file details (use [`report --json`](#tingle-report) for those); diff JSON includes the resolved base ref and merge-base sha |
+| `--json` | machine-readable output; values only, no occurrences or per-file details (use [`report --json`](#tingle-report) for those); diff JSON includes the resolved base ref and merge-base sha, `null` before the first commit |
 | `--diff` | measure the current branch's impact instead |
 | `--base REF` | base branch for `--diff` (implies `--diff`) |
 | `--config PATH` | path to the config file |
