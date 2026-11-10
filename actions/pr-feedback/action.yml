@@ -15,7 +15,7 @@ inputs:
   key:
     description: >-
       Names the comment this run owns. Give each config its own when a pull
-      request runs several; empty means the config path.
+      request runs several; empty means the `config` input, else `default`.
     default: ""
   github-token:
     description: Token used to read and write the pull request's comments.
@@ -53,8 +53,12 @@ runs:
         body="$RUNNER_TEMP/tingle-comment-body.md"
         { echo "$MARKER"; cat "$RUNNER_TEMP/tingle-comment.md"; } > "$body"
         comments="repos/$GITHUB_REPOSITORY/issues"
+        # REST `GET /user` refuses an installation token, GraphQL `viewer`
+        # does not
+        TOKEN_USER_ID=$(gh api graphql -f query='{viewer{databaseId}}' --jq .data.viewer.databaseId)
+        export TOKEN_USER_ID
         existing=$(gh api --paginate "$comments/$PR/comments" \
-          --jq '.[] | select(.body | startswith(env.MARKER)) | .id')
+          --jq "$(cat "$GITHUB_ACTION_PATH/own-comment.jq")")
         # --jq runs once per page, so several pages can each name a match;
         # cut in bash, since `head` closing the pipe early kills gh by SIGPIPE
         existing=${existing%%$'\n'*}
