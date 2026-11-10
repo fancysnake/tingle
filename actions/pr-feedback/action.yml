@@ -15,7 +15,7 @@ inputs:
   key:
     description: >-
       Names the comment this run owns. Give each config its own when a pull
-      request runs several; empty means the config path.
+      request runs several; empty means the `config` input, else `default`.
     default: ""
   github-token:
     description: Token used to read and write the pull request's comments.

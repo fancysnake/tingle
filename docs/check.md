@@ -226,7 +226,7 @@ It fails the step exactly when `check` does, so it replaces the `check` step:
 | --- | --- | --- |
 | `config` | auto-discovered | path to `tingle.toml`; annotations follow it into a subdirectory |
 | `comment` | `true` | `false` keeps the annotations and posts no comment |
-| `key` | the config path | names the comment a run owns, together with the user or App behind the token; give each config its own when one pull request runs several |
+| `key` | the `config` input, else `default` | names the comment a run owns, together with the user or App behind the token; give each config its own when one pull request runs several |
 | `github-token` | `github.token` | token used to read and write the comments; a run edits only a comment the same user or App wrote, so a renewed token keeps editing the old comment, and a token for a different user or App starts a new comment and leaves the old one as it was |
 
 !!! note "What GitHub will not show"
