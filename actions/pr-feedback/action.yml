@@ -53,14 +53,12 @@ runs:
         body="$RUNNER_TEMP/tingle-comment-body.md"
         { echo "$MARKER"; cat "$RUNNER_TEMP/tingle-comment.md"; } > "$body"
         comments="repos/$GITHUB_REPOSITORY/issues"
-        # only the token's own comment counts, or a participant's comment
-        # carrying the marker gets overwritten; REST `GET /user` refuses an
-        # installation token, GraphQL `viewer` does not
-        ME=$(gh api graphql -f query='{viewer{databaseId}}' --jq .data.viewer.databaseId)
-        export ME
+        # REST `GET /user` refuses an installation token, GraphQL `viewer`
+        # does not
+        TOKEN_USER_ID=$(gh api graphql -f query='{viewer{databaseId}}' --jq .data.viewer.databaseId)
+        export TOKEN_USER_ID
         existing=$(gh api --paginate "$comments/$PR/comments" \
-          --jq '.[] | select(.body | startswith(env.MARKER))
-            | select(.user.id == (env.ME | tonumber)) | .id')
+          --jq "$(cat "$GITHUB_ACTION_PATH/own-comment.jq")")
         # --jq runs once per page, so several pages can each name a match;
         # cut in bash, since `head` closing the pipe early kills gh by SIGPIPE
         existing=${existing%%$'\n'*}
