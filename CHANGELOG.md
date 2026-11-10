@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `pr-feedback` composite action: it runs `check`, annotates each line a
   pull request added debt on, and keeps one comment on the pull request
   holding the per-metric delta, edited on each push. It edits only a comment
-  its own token wrote.
+  the user or App behind its token wrote.
 - Templates for `# pyright: ignore` (pyright and basedpyright),
   `# ty: ignore`, bandit's `# nosec` and `@deprecated` decorators:
   `pyright.ignore_comment`, `ty.ignore_comment`, `bandit.nosec_comment` and
