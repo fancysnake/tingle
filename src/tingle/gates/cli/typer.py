@@ -417,14 +417,13 @@ class CliGate:
     def _collector(self, config: Config, request: _MetricRequest) -> Collect:
         """Bind the run the TUI will start once it is on screen."""
         if request.diff:
-            base = self._base_of(config, request.base)
 
             def collect_diff(
                 progress: ProgressSink, checkpoint: Checkpoint
             ) -> DiffReport:
                 return self._services.metrics.diff(
                     config,
-                    base,
+                    request.base,
                     selection=request.selection,
                     progress=progress,
                     checkpoint=checkpoint,
@@ -507,7 +506,7 @@ class CliGate:
         config = self._load(request.config)
         try:
             return self._services.metrics.diff(
-                config, self._base_of(config, request.base), selection=request.selection
+                config, request.base, selection=request.selection
             )
         except (SelectionError, DiffSourceError) as exc:
             self._reported(exc)
@@ -517,13 +516,9 @@ class CliGate:
     ) -> tuple[DiffReport, CheckVerdict]:
         config = self._load(config_path)
         try:
-            return self._services.metrics.check(config, self._base_of(config, base))
+            return self._services.metrics.check(config, base)
         except DiffSourceError as exc:
             self._reported(exc)
-
-    @staticmethod
-    def _base_of(config: Config, base: str | None) -> str:
-        return base or config.diff_base or "main"
 
     @staticmethod
     def _diff_failure(exc: DiffSourceError) -> NoReturn:

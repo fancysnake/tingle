@@ -82,17 +82,25 @@ class MetricsServiceProtocol(Protocol):
     def diff(
         self,
         config: Config,
-        base: str,
+        base: str | None,
         *,
         selection: Selection = EVERY_METRIC,
         progress: ProgressSink = unwatched,
         checkpoint: Checkpoint = uninterrupted,
     ) -> DiffReport:
-        """Measure the branch's impact on every selected metric."""
+        """Measure the branch's impact on every selected metric.
+
+        A `base` of None is the config's `diff_base`, then `main`.
+        """
 
     @abstractmethod
-    def check(self, config: Config, base: str) -> tuple[DiffReport, CheckVerdict]:
-        """Measure the branch, then judge it on every metric the config names."""
+    def check(
+        self, config: Config, base: str | None
+    ) -> tuple[DiffReport, CheckVerdict]:
+        """Measure the branch, then judge it on every metric the config names.
+
+        A `base` of None is the config's `diff_base`, then `main`.
+        """
 
 
 class BrowseServiceProtocol(Protocol):

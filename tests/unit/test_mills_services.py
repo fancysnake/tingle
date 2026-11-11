@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path, PurePath
 from unittest.mock import MagicMock
 
@@ -196,6 +197,36 @@ def test_diff_anchors_both_adapters_at_the_config_root() -> None:
     diff_source.return_value.branch_diff.assert_called_once_with("main")
 
 
+# (base asked for, [diff] base, the base measured against)
+BASES = [
+    ("feature", "origin/develop", "feature"),
+    (None, "origin/develop", "origin/develop"),
+    (None, None, "main"),
+]
+
+
+@pytest.mark.parametrize("case", BASES)
+def test_diff_takes_the_base_asked_for_then_the_configured_one_then_main(
+    case: tuple[str | None, str | None, str],
+) -> None:
+    asked, configured, resolved = case
+    project_files = MagicMock()
+    project_files.return_value.walk.return_value = ()
+    diff_source = MagicMock()
+    diff_source.return_value.branch_diff.return_value.files = ()
+    service = MetricsService(
+        project_files=project_files,
+        diff_source=diff_source,
+        metric_types=METRIC_TYPES,
+        store=MagicMock(),
+        configs=MagicMock(),
+    )
+
+    service.diff(replace(_config(), diff_base=configured), asked)
+
+    diff_source.return_value.branch_diff.assert_called_once_with(resolved)
+
+
 def _at_base(store: MagicMock, templates: MagicMock | None = None) -> ConfigService:
     return ConfigService(
         store=store,
@@ -337,6 +368,20 @@ def test_check_reads_the_base_through_the_source_that_diffed() -> None:
 
     diff_source.assert_called_once_with(CWD)
     diff_source.return_value.branch_diff.assert_called_once_with("main")
+
+
+@pytest.mark.parametrize("case", BASES)
+def test_check_takes_the_base_asked_for_then_the_configured_one_then_main(
+    case: tuple[str | None, str | None, str],
+) -> None:
+    asked, configured, resolved = case
+    config = replace(_strict_config(), diff_base=configured)
+    at_base = BaseConfig(config=config, source=PurePath("tingle.toml"))
+    service, _, diff_source = _check_service(at_base, "a.py")
+
+    service.check(config, asked)
+
+    diff_source.return_value.branch_diff.assert_called_once_with(resolved)
 
 
 def test_check_measures_once_when_the_branch_left_the_config_alone() -> None:
