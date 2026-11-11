@@ -205,6 +205,7 @@ def test_diff_anchors_both_adapters_at_the_config_root() -> None:
 BASES = (
     pytest.param("feature", "origin/develop", "feature", id="asked"),
     pytest.param(None, "origin/develop", "origin/develop", id="configured"),
+    pytest.param("", "origin/develop", "origin/develop", id="empty-asked"),
 )
 
 

@@ -430,7 +430,7 @@ def _validate_diff(raw_diff: object, errors: list[str]) -> str:
     if not isinstance(base, str):
         errors.append("[diff]: base must be a string")
         return "main"
-    return base
+    return base or "main"
 
 
 def _validate_check(

@@ -286,6 +286,12 @@ def test_diff_base_is_read() -> None:
     assert config.diff_base == "origin/develop"
 
 
+def test_diff_base_empty_falls_back_to_main() -> None:
+    config = _validate({"diff": {"base": ""}, "metrics": []})
+
+    assert config.diff_base == "main"
+
+
 def test_diff_unknown_key() -> None:
     errors = _errors_of({"diff": {"branch": "main"}})
 
