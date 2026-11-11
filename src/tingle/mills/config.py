@@ -419,18 +419,18 @@ def _validate_params(
         errors.extend(f"{label}: {problem}" for problem in schema.validate(params))
 
 
-def _validate_diff(raw_diff: object, errors: list[str]) -> str | None:
+def _validate_diff(raw_diff: object, errors: list[str]) -> str:
     if not isinstance(raw_diff, Mapping):
         errors.append("[diff] must be a table")
-        return None
+        return "main"
     errors.extend(
         f'[diff]: unknown key "{key}"' for key in sorted(set(raw_diff) - _DIFF_KEYS)
     )
-    base = raw_diff.get("base")
-    if base is not None and not isinstance(base, str):
+    base = raw_diff.get("base", "main")
+    if not isinstance(base, str):
         errors.append("[diff]: base must be a string")
-        return None
-    return base
+        return "main"
+    return base or "main"
 
 
 def _validate_check(

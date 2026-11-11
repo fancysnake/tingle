@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path, PurePath
 from unittest.mock import MagicMock
 
@@ -176,7 +177,7 @@ def test_run_anchors_the_project_files_at_the_config_root() -> None:
     assert [outcome.spec.name for outcome in report.outcomes] == ["files"]
 
 
-def test_diff_anchors_both_adapters_at_the_config_root() -> None:
+def _diff_service() -> tuple[MetricsService, MagicMock, MagicMock]:
     project_files = MagicMock()
     project_files.return_value.walk.return_value = ()
     diff_source = MagicMock()
@@ -188,12 +189,35 @@ def test_diff_anchors_both_adapters_at_the_config_root() -> None:
         store=MagicMock(),
         configs=MagicMock(),
     )
+    return service, project_files, diff_source
+
+
+def test_diff_anchors_both_adapters_at_the_config_root() -> None:
+    service, project_files, diff_source = _diff_service()
 
     service.diff(_config(), "main")
 
     project_files.assert_called_once_with(CWD, prune=UNREACHABLE_DIRS)
     diff_source.assert_called_once_with(CWD)
     diff_source.return_value.branch_diff.assert_called_once_with("main")
+
+
+BASES = (
+    pytest.param("feature", "origin/develop", "feature", id="asked"),
+    pytest.param(None, "origin/develop", "origin/develop", id="configured"),
+    pytest.param("", "origin/develop", "origin/develop", id="empty-asked"),
+)
+
+
+@pytest.mark.parametrize(("asked", "configured", "resolved"), BASES)
+def test_diff_takes_the_base_asked_for_then_the_configured_one(
+    asked: str | None, *, configured: str, resolved: str
+) -> None:
+    service, _, diff_source = _diff_service()
+
+    service.diff(replace(_config(), diff_base=configured), asked)
+
+    diff_source.return_value.branch_diff.assert_called_once_with(resolved)
 
 
 def _at_base(store: MagicMock, templates: MagicMock | None = None) -> ConfigService:
@@ -337,6 +361,19 @@ def test_check_reads_the_base_through_the_source_that_diffed() -> None:
 
     diff_source.assert_called_once_with(CWD)
     diff_source.return_value.branch_diff.assert_called_once_with("main")
+
+
+@pytest.mark.parametrize(("asked", "configured", "resolved"), BASES)
+def test_check_takes_the_base_asked_for_then_the_configured_one(
+    asked: str | None, *, configured: str, resolved: str
+) -> None:
+    config = replace(_strict_config(), diff_base=configured)
+    at_base = BaseConfig(config=config, source=PurePath("tingle.toml"))
+    service, _, diff_source = _check_service(at_base, "a.py")
+
+    service.check(config, asked)
+
+    diff_source.return_value.branch_diff.assert_called_once_with(resolved)
 
 
 def test_check_measures_once_when_the_branch_left_the_config_alone() -> None:

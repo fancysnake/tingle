@@ -274,16 +274,22 @@ def test_include_must_be_string_list() -> None:
     assert 'range "python": include must be a list of strings' in errors
 
 
-def test_diff_base_defaults_to_none() -> None:
+def test_diff_base_defaults_to_main() -> None:
     config = _validate({"metrics": []})
 
-    assert config.diff_base is None
+    assert config.diff_base == "main"
 
 
 def test_diff_base_is_read() -> None:
     config = _validate({"diff": {"base": "origin/develop"}, "metrics": []})
 
     assert config.diff_base == "origin/develop"
+
+
+def test_diff_base_empty_falls_back_to_main() -> None:
+    config = _validate({"diff": {"base": ""}, "metrics": []})
+
+    assert config.diff_base == "main"
 
 
 def test_diff_unknown_key() -> None:

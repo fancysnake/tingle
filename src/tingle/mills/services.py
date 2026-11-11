@@ -247,7 +247,7 @@ class MetricsService:
     def diff(
         self,
         config: Config,
-        base: str,
+        base: str | None,
         *,
         selection: Selection = EVERY_METRIC,
         progress: ProgressSink = unwatched,
@@ -257,7 +257,9 @@ class MetricsService:
         runner = self._runner(
             narrowed(config, selection), self.diff_source(config.root)
         )
-        return runner.run(base, progress=progress, checkpoint=checkpoint)
+        return runner.run(
+            _base_of(config, base), progress=progress, checkpoint=checkpoint
+        )
 
     def _runner(self, config: Config, source: DiffSource) -> DiffRunner:
         return DiffRunner(
@@ -267,14 +269,16 @@ class MetricsService:
             metric_types=self.metric_types,
         )
 
-    def check(self, config: Config, base: str) -> tuple[DiffReport, CheckVerdict]:
+    def check(
+        self, config: Config, base: str | None
+    ) -> tuple[DiffReport, CheckVerdict]:
         """Measure the branch, then judge it on every metric the config names.
 
         One source serves both, because it reads the base only once it has
         diffed.
         """
         source = self.diff_source(config.root)
-        report = self._runner(config, source).run(base)
+        report = self._runner(config, source).run(_base_of(config, base))
         verdict = judge(report, config.check)
         return report, replace(
             verdict, strict=self._strict(config, source=source, report=report)
@@ -377,6 +381,10 @@ class MetricsService:
                 )
             )
         )
+
+
+def _base_of(config: Config, base: str | None) -> str:
+    return base or config.diff_base
 
 
 def _values(report: RunReport | DiffReport) -> dict[str, int]:

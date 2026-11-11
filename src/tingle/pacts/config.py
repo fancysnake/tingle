@@ -258,7 +258,7 @@ class Config:
     ranges: Mapping[str, RangeSpec]
     metrics: tuple[MetricSpec, ...]
     default_range: RangeSpec
-    diff_base: str | None = None
+    diff_base: str = "main"
     check: CheckSpec = field(default_factory=CheckSpec)
     display: DisplaySpec = field(default_factory=DisplaySpec)
 
