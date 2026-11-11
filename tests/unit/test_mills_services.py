@@ -177,7 +177,7 @@ def test_run_anchors_the_project_files_at_the_config_root() -> None:
     assert [outcome.spec.name for outcome in report.outcomes] == ["files"]
 
 
-def test_diff_anchors_both_adapters_at_the_config_root() -> None:
+def _diff_service() -> tuple[MetricsService, MagicMock, MagicMock]:
     project_files = MagicMock()
     project_files.return_value.walk.return_value = ()
     diff_source = MagicMock()
@@ -189,6 +189,11 @@ def test_diff_anchors_both_adapters_at_the_config_root() -> None:
         store=MagicMock(),
         configs=MagicMock(),
     )
+    return service, project_files, diff_source
+
+
+def test_diff_anchors_both_adapters_at_the_config_root() -> None:
+    service, project_files, diff_source = _diff_service()
 
     service.diff(_config(), "main")
 
@@ -197,30 +202,17 @@ def test_diff_anchors_both_adapters_at_the_config_root() -> None:
     diff_source.return_value.branch_diff.assert_called_once_with("main")
 
 
-# (base asked for, [diff] base, the base measured against)
-BASES = [
-    ("feature", "origin/develop", "feature"),
-    (None, "origin/develop", "origin/develop"),
-    (None, None, "main"),
-]
+BASES = (
+    pytest.param("feature", "origin/develop", "feature", id="asked"),
+    pytest.param(None, "origin/develop", "origin/develop", id="configured"),
+)
 
 
-@pytest.mark.parametrize("case", BASES)
-def test_diff_takes_the_base_asked_for_then_the_configured_one_then_main(
-    case: tuple[str | None, str | None, str],
+@pytest.mark.parametrize(("asked", "configured", "resolved"), BASES)
+def test_diff_takes_the_base_asked_for_then_the_configured_one(
+    asked: str | None, *, configured: str, resolved: str
 ) -> None:
-    asked, configured, resolved = case
-    project_files = MagicMock()
-    project_files.return_value.walk.return_value = ()
-    diff_source = MagicMock()
-    diff_source.return_value.branch_diff.return_value.files = ()
-    service = MetricsService(
-        project_files=project_files,
-        diff_source=diff_source,
-        metric_types=METRIC_TYPES,
-        store=MagicMock(),
-        configs=MagicMock(),
-    )
+    service, _, diff_source = _diff_service()
 
     service.diff(replace(_config(), diff_base=configured), asked)
 
@@ -370,11 +362,10 @@ def test_check_reads_the_base_through_the_source_that_diffed() -> None:
     diff_source.return_value.branch_diff.assert_called_once_with("main")
 
 
-@pytest.mark.parametrize("case", BASES)
-def test_check_takes_the_base_asked_for_then_the_configured_one_then_main(
-    case: tuple[str | None, str | None, str],
+@pytest.mark.parametrize(("asked", "configured", "resolved"), BASES)
+def test_check_takes_the_base_asked_for_then_the_configured_one(
+    asked: str | None, *, configured: str, resolved: str
 ) -> None:
-    asked, configured, resolved = case
     config = replace(_strict_config(), diff_base=configured)
     at_base = BaseConfig(config=config, source=PurePath("tingle.toml"))
     service, _, diff_source = _check_service(at_base, "a.py")

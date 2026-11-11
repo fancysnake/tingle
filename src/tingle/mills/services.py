@@ -384,7 +384,7 @@ class MetricsService:
 
 
 def _base_of(config: Config, base: str | None) -> str:
-    return base or config.diff_base or "main"
+    return base or config.diff_base
 
 
 def _values(report: RunReport | DiffReport) -> dict[str, int]:

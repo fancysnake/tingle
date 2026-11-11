@@ -90,7 +90,7 @@ class MetricsServiceProtocol(Protocol):
     ) -> DiffReport:
         """Measure the branch's impact on every selected metric.
 
-        A `base` of None is the config's `diff_base`, then `main`.
+        A `base` of None is the config's `diff_base`.
         """
 
     @abstractmethod
@@ -99,7 +99,7 @@ class MetricsServiceProtocol(Protocol):
     ) -> tuple[DiffReport, CheckVerdict]:
         """Measure the branch, then judge it on every metric the config names.
 
-        A `base` of None is the config's `diff_base`, then `main`.
+        A `base` of None is the config's `diff_base`.
         """
 
 
