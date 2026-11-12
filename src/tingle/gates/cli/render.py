@@ -432,9 +432,9 @@ def _fitted(items: list[str], room: int) -> list[str]:
     for item in items:
         room -= len(item) + 1
         if room < 0:
-            return [*kept, f"- …and {len(items) - len(kept)} more"]
+            break
         kept.append(item)
-    return kept
+    return [*kept, f"- …and {len(items) - len(kept)} more"]
 
 
 def _strict_markdown(strict: StrictVerdict, alongside: list[str]) -> list[str]:
