@@ -358,8 +358,9 @@ def _policy_reason(verdict: CheckVerdict) -> str:
     return f"{grown} grew (policy: any)"
 
 
-# a comment holds at most 65536 characters; past this the list is cut
-_ADDITIONS_SHOWN = 200
+# GitHub rejects a comment over 65536 characters; the difference is left for
+# the marker the pr-feedback action writes above this body
+COMMENT_ROOM = 60_000
 
 
 def check_markdown(report: DiffReport, verdict: CheckVerdict) -> str:
@@ -367,53 +368,81 @@ def check_markdown(report: DiffReport, verdict: CheckVerdict) -> str:
 
     Every metric that changed or errored gets a row, so a reviewer sees what
     the branch paid off too; the additions list only the worsened metrics,
-    as `check_listing` does.
+    as `check_listing` does. The files changed alongside a loosening and the
+    additions are cut to keep the comment within `COMMENT_ROOM`.
     """
     summary = (
         f"❌ {check_reason(verdict)}"
         if verdict.failed
         else check_success(verdict, f"`{report.base_ref}`").plain
     )
-    lines = ["### tingle", "", summary, "", *_strict_markdown(verdict.strict)]
     rows = [
         row
         for outcome in report.outcomes
         if (row := _markdown_row(outcome)) is not None
     ]
-    if rows:
-        lines += [
+    table = (
+        [
             "| Metric | Added | Removed | Net | Total |",
             "| --- | ---: | ---: | ---: | ---: |",
             *rows,
         ]
-    else:
-        lines.append("No metric changed.")
+        if rows
+        else ["No metric changed."]
+    )
     added = [
         f"- `{outcome.spec.name}` `{occurrence}`"
         for outcome in verdict.worsened
         if outcome.result is not None
         for occurrence in outcome.result.added_occurrences
     ]
-    if added:
-        lines += [
-            "",
-            f"<details><summary>Added ({len(added)})</summary>",
-            "",
-            *added[:_ADDITIONS_SHOWN],
-        ]
-        if len(added) > _ADDITIONS_SHOWN:
-            lines.append(f"- …and {len(added) - _ADDITIONS_SHOWN} more")
-        lines += ["", "</details>"]
+    alongside = [f"- changed alongside: `{path}`" for path in verdict.strict.alongside]
+    head = ["### tingle", "", summary, ""]
+    opening = (
+        ["", f"<details><summary>Added ({len(added)})</summary>", ""] if added else []
+    )
+    closing = ["", "</details>"] if added else []
+    frame = [*head, *table, *opening, *closing]
+    room = COMMENT_ROOM - _size([*frame, *_strict_markdown(verdict.strict, [])])
+    # the additions keep at most half, so neither list starves the other
+    alongside = _fitted(alongside, room - min(_size(added), room // 2))
+    strict = _strict_markdown(verdict.strict, alongside)
+    added = _fitted(added, COMMENT_ROOM - _size([*frame, *strict]))
+    lines = [*head, *strict, *table, *opening, *added, *closing]
     return "\n".join(lines) + "\n"
 
 
-def _strict_markdown(strict: StrictVerdict) -> list[str]:
+def _size(lines: list[str]) -> int:
+    """Characters the lines take once each ends in a newline."""
+    return sum(len(line) + 1 for line in lines)
+
+
+def _fitted(items: list[str], room: int) -> list[str]:
+    """Keep the leading items that fit in `room` characters; count the rest.
+
+    With no room even for the count, nothing is kept: the headers around
+    the list already carry its size.
+    """
+    if _size(items) <= room:
+        return items
+    room -= len(f"- …and {len(items)} more") + 1
+    if room < 0:
+        return []
+    kept: list[str] = []
+    for item in items:
+        room -= len(item) + 1
+        if room < 0:
+            break
+        kept.append(item)
+    return [*kept, f"- …and {len(items) - len(kept)} more"]
+
+
+def _strict_markdown(strict: StrictVerdict, alongside: list[str]) -> list[str]:
     lines = [strict.skipped, ""] if strict.skipped else []
     if not strict.failed:
         return lines
-    lines += [f"- `{item.subject}`: {item.change}" for item in strict.loosened]
-    lines += [f"- changed alongside: `{path}`" for path in strict.alongside]
-    return [*lines, ""]
+    loosened = [f"- `{item.subject}`: {item.change}" for item in strict.loosened]
+    return [*lines, *loosened, *alongside, ""]
 
 
 def _markdown_row(outcome: DiffOutcome) -> str | None:
