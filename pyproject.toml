@@ -314,3 +314,15 @@ modules = ["tingle.specs.*"]
 name = "inside-edges"
 type = "independence"
 modules = ["tingle.edges.*"]
+
+# COVERAGE
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+sigterm = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 2
