@@ -418,10 +418,16 @@ def _size(lines: list[str]) -> int:
 
 
 def _fitted(items: list[str], room: int) -> list[str]:
-    """Keep the leading items that fit in `room` characters; count the rest."""
+    """Keep the leading items that fit in `room` characters; count the rest.
+
+    With no room even for the count, nothing is kept: the headers around
+    the list already carry its size.
+    """
     if _size(items) <= room:
         return items
     room -= len(f"- …and {len(items)} more") + 1
+    if room < 0:
+        return []
     kept: list[str] = []
     for item in items:
         room -= len(item) + 1

@@ -111,6 +111,25 @@ def test_markdown_cuts_the_additions_to_fit_a_comment() -> None:
     assert markdown.endswith("more\n\n</details>\n")
 
 
+def test_markdown_drops_the_count_of_additions_when_it_does_not_fit() -> None:
+    path = "d/" * 200 + "a.py"
+    outcome = _worsened("noqa", *(Occurrence(path, line=n) for n in range(300)))
+    report, verdict = _judged(outcome)
+    filled = check_markdown(report, replace(verdict, strict=StrictVerdict(skipped="s")))
+    listed = re.findall(r"^- (?:`noqa`|…and).*$", filled, flags=re.MULTILINE)
+    frame = len(filled) - sum(len(line) + 1 for line in listed)
+    skipped = "s" * (COMMENT_ROOM - frame - 4)
+
+    markdown = check_markdown(
+        report, replace(verdict, strict=StrictVerdict(skipped=skipped))
+    )
+
+    assert len(markdown) <= COMMENT_ROOM
+    assert "<summary>Added (300)</summary>" in markdown
+    assert path not in markdown
+    assert "more" not in markdown
+
+
 def test_markdown_cuts_the_files_changed_alongside_to_fit_a_comment() -> None:
     outcome = _worsened("noqa", *(Occurrence("a.py", line=n) for n in range(300)))
     report, verdict = _judged(outcome)
