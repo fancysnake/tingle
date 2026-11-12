@@ -259,7 +259,8 @@ class MetricsService:
         report = self._runner(config, source).run(_base_of(config, base))
         verdict = judge(report, config.check)
         return report, replace(
-            verdict, strict=self.strict.judge(config, source=source, report=report)
+            verdict,
+            strict=self.strict.judge(config, read_base=source.read_base, report=report),
         )
 
 

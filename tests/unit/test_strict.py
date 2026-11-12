@@ -201,14 +201,17 @@ def _report(*changed: str) -> DiffReport:
     )
 
 
-def test_judge_reads_the_base_through_the_source_it_is_handed() -> None:
+def _no_base(_: PurePath) -> bytes | None:
+    return None
+
+
+def test_judge_reads_the_base_through_the_reader_it_is_handed() -> None:
     service, configs, _ = _service()
-    source = MagicMock()
     config = _config("files", check={"strict": True})
 
-    service.judge(config, source=source, report=_report("a.py"))
+    service.judge(config, read_base=_no_base, report=_report("a.py"))
 
-    configs.at_base.assert_called_once_with(config, source.read_base)
+    configs.at_base.assert_called_once_with(config, _no_base)
 
 
 def test_judge_measures_nothing_when_the_branch_left_the_config_alone() -> None:
@@ -216,7 +219,7 @@ def test_judge_measures_nothing_when_the_branch_left_the_config_alone() -> None:
 
     verdict = service.judge(
         _config("files", check={"strict": True}),
-        source=MagicMock(),
+        read_base=_no_base,
         report=_report("a.py"),
     )
 
@@ -234,7 +237,7 @@ def test_judge_compares_a_config_in_another_file_though_the_base_one_is_unchange
         source=SOURCE.with_name("pyproject.toml"),
     )
 
-    verdict = service.judge(other, source=MagicMock(), report=_report("a.py"))
+    verdict = service.judge(other, read_base=_no_base, report=_report("a.py"))
 
     assert verdict.loosened[0].subject == "[check] strict"
     project_files.assert_called_with(SOURCE.parent, prune=UNREACHABLE_DIRS)

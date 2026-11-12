@@ -12,10 +12,10 @@ from tingle.pacts.check import Loosening, StrictVerdict
 from tingle.pacts.config import BaseConfigError, CheckPolicy, Selection
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Callable, Iterable, Mapping
 
     from tingle.pacts.config import Config, ConfigStore, MetricSpec
-    from tingle.pacts.diff import DiffReport, DiffSource
+    from tingle.pacts.diff import DiffReport
     from tingle.pacts.metrics import MetricType, ProjectFilesFactory
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ConfigServiceProtocol
@@ -127,68 +127,53 @@ class StrictService:
     metric_types: Mapping[str, MetricType]
 
     def judge(
-        self, config: Config, *, source: DiffSource, report: DiffReport
+        self,
+        config: Config,
+        *,
+        read_base: Callable[[PurePath], bytes | None],
+        report: DiffReport,
     ) -> StrictVerdict:
         """Judge the branch's config against the one it started from."""
         try:
-            at_base = self.configs.at_base(config, source.read_base)
+            at_base = self.configs.at_base(config, read_base)
         except BaseConfigError as exc:
-            return self._unjudged(config, exc, source=source, report=report)
-        if at_base is None:
-            return StrictVerdict()
-        modules = tuple(path for path in at_base.modules if path in report.changed)
-        if (
-            not modules
-            and at_base.source == PurePath(config.source.name)
-            and at_base.source not in report.changed
-        ):
-            return StrictVerdict()
-        judged = judged_at_base(at_base.config, self.metric_types)
-        loosened = loosenings(
-            at_base.config,
-            config,
-            judged=judged,
-            scores=Scores(
-                before=self._scores(at_base.config, judged), after=_values(report)
-            ),
-            modules=modules,
-        )
-        if not loosened:
-            return StrictVerdict()
+            # a changed module the base's templates ran through is likely why
+            # the base stopped validating, so that still counts as loosening
+            modules = changed_modules(exc.bases, report.changed)
+            if exc.source is None or not modules:
+                return StrictVerdict(skipped=f"strict mode skipped: {exc}")
+            loosened = module_loosenings(modules)
+            base_file = exc.source
+        else:
+            if at_base is None:
+                return StrictVerdict()
+            modules = tuple(path for path in at_base.modules if path in report.changed)
+            if (
+                not modules
+                and at_base.source == PurePath(config.source.name)
+                and at_base.source not in report.changed
+            ):
+                return StrictVerdict()
+            judged = judged_at_base(at_base.config, self.metric_types)
+            loosened = loosenings(
+                at_base.config,
+                config,
+                judged=judged,
+                scores=Scores(
+                    before=self._scores(at_base.config, judged), after=_values(report)
+                ),
+                modules=modules,
+            )
+            if not loosened:
+                return StrictVerdict()
+            base_file = at_base.source
         return StrictVerdict(
             loosened=loosened,
             alongside=self._alongside(
                 config,
-                source=source,
+                read_base=read_base,
                 report=report,
-                base_file=at_base.source,
-                modules=modules,
-            ),
-        )
-
-    def _unjudged(
-        self,
-        config: Config,
-        problem: BaseConfigError,
-        *,
-        source: DiffSource,
-        report: DiffReport,
-    ) -> StrictVerdict:
-        """Answer for a base that cannot be compared with.
-
-        A module the base's templates ran through and the branch changed is
-        likely why it stopped validating, so that still counts as loosening.
-        """
-        modules = changed_modules(problem.bases, report.changed)
-        if problem.source is None or not modules:
-            return StrictVerdict(skipped=f"strict mode skipped: {problem}")
-        return StrictVerdict(
-            loosened=module_loosenings(modules),
-            alongside=self._alongside(
-                config,
-                source=source,
-                report=report,
-                base_file=problem.source,
+                base_file=base_file,
                 modules=modules,
             ),
         )
@@ -209,7 +194,7 @@ class StrictService:
         self,
         config: Config,
         *,
-        source: DiffSource,
+        read_base: Callable[[PurePath], bytes | None],
         report: DiffReport,
         base_file: PurePath,
         modules: tuple[PurePath, ...],
@@ -224,7 +209,7 @@ class StrictService:
             and not (
                 path in files
                 and self.store.differs_only_in_config(
-                    path, before=source.read_base(path), after=project.read(path)
+                    path, before=read_base(path), after=project.read(path)
                 )
             )
         )

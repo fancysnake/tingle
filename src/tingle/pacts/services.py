@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from tingle.pacts.browse import BrowseState, Row, SortKey
     from tingle.pacts.check import CheckVerdict, StrictVerdict
     from tingle.pacts.config import BaseConfig, Config, Library, MetricDraft
-    from tingle.pacts.diff import DiffOutcome, DiffReport, DiffSource
+    from tingle.pacts.diff import DiffOutcome, DiffReport
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.metrics import Checkpoint, MetricType, ProgressSink
     from tingle.pacts.report import MetricOutcome, ReportSection, RunReport
@@ -108,13 +108,13 @@ class StrictServiceProtocol(Protocol):
 
     @abstractmethod
     def judge(
-        self, config: Config, *, source: DiffSource, report: DiffReport
+        self,
+        config: Config,
+        *,
+        read_base: Callable[[PurePath], bytes | None],
+        report: DiffReport,
     ) -> StrictVerdict:
-        """Say how the branch loosened its config, and what it changed beside it.
-
-        `source` is the one that produced `report`: it reads the base only
-        once it has diffed.
-        """
+        """Say how the branch loosened its config, and what it changed beside it."""
 
 
 class BrowseServiceProtocol(Protocol):

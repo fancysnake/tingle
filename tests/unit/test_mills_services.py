@@ -375,6 +375,6 @@ def test_check_has_strict_judged_through_the_source_that_diffed() -> None:
     report, verdict = service.check(config, "main")
 
     strict.judge.assert_called_once_with(
-        config, source=diff_source.return_value, report=report
+        config, read_base=diff_source.return_value.read_base, report=report
     )
     assert verdict.strict == strict.judge.return_value
