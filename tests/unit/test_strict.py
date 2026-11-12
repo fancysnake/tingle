@@ -7,9 +7,18 @@ from unittest.mock import MagicMock
 import pytest
 
 from tingle.mills.config import validate
-from tingle.mills.strict import Scores, changed_modules, judged_at_base, loosenings
+from tingle.mills.strict import (
+    Scores,
+    StrictService,
+    changed_modules,
+    judged_at_base,
+    loosenings,
+)
 from tingle.pacts.check import Loosening, StrictVerdict
+from tingle.pacts.config import BaseConfig
+from tingle.pacts.diff import DiffReport
 from tingle.pacts.metrics import MetricResult, MetricType
+from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -162,3 +171,70 @@ def test_only_loosening_with_company_fails() -> None:
     assert not StrictVerdict(loosened=loosened).failed
     assert not StrictVerdict(alongside=(PurePath("a.py"),)).failed
     assert StrictVerdict(loosened=loosened, alongside=(PurePath("a.py"),)).failed
+
+
+def _service() -> tuple[StrictService, MagicMock, MagicMock]:
+    """Build a service whose base asks for strict, over an empty tree."""
+    project_files = MagicMock()
+    project_files.return_value.walk.return_value = ()
+    configs = MagicMock()
+    configs.at_base.return_value = BaseConfig(
+        config=_config("files", check={"strict": True}), source=PurePath(SOURCE.name)
+    )
+    service = StrictService(
+        configs=configs,
+        store=MagicMock(),
+        project_files=project_files,
+        metric_types=METRIC_TYPES,
+    )
+    return service, configs, project_files
+
+
+def _report(*changed: str) -> DiffReport:
+    return DiffReport(
+        root=SOURCE.parent,
+        source=SOURCE,
+        base_ref="main",
+        merge_base=None,
+        sections=(),
+        changed=tuple(PurePath(path) for path in changed),
+    )
+
+
+def test_judge_reads_the_base_through_the_source_it_is_handed() -> None:
+    service, configs, _ = _service()
+    source = MagicMock()
+    config = _config("files", check={"strict": True})
+
+    service.judge(config, source=source, report=_report("a.py"))
+
+    configs.at_base.assert_called_once_with(config, source.read_base)
+
+
+def test_judge_measures_nothing_when_the_branch_left_the_config_alone() -> None:
+    service, _, project_files = _service()
+
+    verdict = service.judge(
+        _config("files", check={"strict": True}),
+        source=MagicMock(),
+        report=_report("a.py"),
+    )
+
+    assert verdict == StrictVerdict()
+    project_files.assert_not_called()
+
+
+def test_judge_compares_a_config_in_another_file_though_the_base_one_is_unchanged() -> (
+    None
+):
+    service, _, project_files = _service()
+    other = validate(
+        {"metrics": [{"name": "files", "type": "with_diff"}]},
+        METRIC_TYPES,
+        source=SOURCE.with_name("pyproject.toml"),
+    )
+
+    verdict = service.judge(other, source=MagicMock(), report=_report("a.py"))
+
+    assert verdict.loosened[0].subject == "[check] strict"
+    project_files.assert_called_with(SOURCE.parent, prune=UNREACHABLE_DIRS)

@@ -13,9 +13,9 @@ if TYPE_CHECKING:
     from pathlib import Path, PurePath
 
     from tingle.pacts.browse import BrowseState, Row, SortKey
-    from tingle.pacts.check import CheckVerdict
+    from tingle.pacts.check import CheckVerdict, StrictVerdict
     from tingle.pacts.config import BaseConfig, Config, Library, MetricDraft
-    from tingle.pacts.diff import DiffOutcome, DiffReport
+    from tingle.pacts.diff import DiffOutcome, DiffReport, DiffSource
     from tingle.pacts.editor import EditorOpener
     from tingle.pacts.metrics import Checkpoint, MetricType, ProgressSink
     from tingle.pacts.report import MetricOutcome, ReportSection, RunReport
@@ -100,6 +100,20 @@ class MetricsServiceProtocol(Protocol):
         """Measure the branch, then judge it on every metric the config names.
 
         A `base` of None is the config's `diff_base`.
+        """
+
+
+class StrictServiceProtocol(Protocol):
+    """Judging a branch's config against the one it started from."""
+
+    @abstractmethod
+    def judge(
+        self, config: Config, *, source: DiffSource, report: DiffReport
+    ) -> StrictVerdict:
+        """Say how the branch loosened its config, and what it changed beside it.
+
+        `source` is the one that produced `report`: it reads the base only
+        once it has diffed.
         """
 
 
