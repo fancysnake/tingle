@@ -19,13 +19,14 @@ from tingle.pacts.metrics import (
     unwatched,
 )
 from tingle.pacts.report import MetricOutcome, RunReport
+from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
     from pathlib import PurePath
 
     from tingle.pacts.config import Config, MetricSpec, RangeSpec
-    from tingle.pacts.metrics import Checkpoint, ProgressSink
+    from tingle.pacts.metrics import Checkpoint, ProgressSink, ProjectFilesFactory
 
 #: What `announced` is counting through. It reports on anything a caller
 #: can name, so the runner and the diff runner share it over the two
@@ -52,6 +53,16 @@ class _RunContext:
     metric_types: Mapping[str, MetricType]
     loc: ProjectLoc
     ranges: ResolvedRanges
+
+
+def project_tree(project_files: ProjectFilesFactory, config: Config) -> ProjectFiles:
+    """Build the project tree, leaving what no range reaches unwalked.
+
+    Deciding that stays here: the adapter is told which directories to
+    skip rather than knowing any, so the exclusion and the skipping
+    are the same list read twice.
+    """
+    return project_files(config.root, prune=UNREACHABLE_DIRS)
 
 
 def run(

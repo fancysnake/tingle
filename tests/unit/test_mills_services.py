@@ -11,7 +11,6 @@ from tingle.mills.config import validate
 from tingle.mills.services import ConfigService, MetricsService
 from tingle.pacts.check import StrictVerdict
 from tingle.pacts.config import (
-    BaseConfig,
     BaseConfigError,
     Config,
     ConfigError,
@@ -167,8 +166,7 @@ def test_run_anchors_the_project_files_at_the_config_root() -> None:
         project_files=project_files,
         diff_source=MagicMock(),
         metric_types=METRIC_TYPES,
-        store=MagicMock(),
-        configs=MagicMock(),
+        strict=MagicMock(),
     )
 
     report = service.run(_config())
@@ -186,8 +184,7 @@ def _diff_service() -> tuple[MetricsService, MagicMock, MagicMock]:
         project_files=project_files,
         diff_source=diff_source,
         metric_types=METRIC_TYPES,
-        store=MagicMock(),
-        configs=MagicMock(),
+        strict=MagicMock(),
     )
     return service, project_files, diff_source
 
@@ -332,32 +329,28 @@ def test_at_base_resolves_nothing_when_neither_side_asks_for_strict() -> None:
     templates.load.assert_not_called()
 
 
-def _check_service(
-    at_base: BaseConfig, *changed: str
-) -> tuple[MetricsService, MagicMock, MagicMock]:
+def _check_service(*changed: str) -> tuple[MetricsService, MagicMock, MagicMock]:
     project_files = MagicMock()
     project_files.return_value.walk.return_value = ()
     diff_source = MagicMock()
     diff_source.return_value.branch_diff.return_value.files = tuple(
         FileDiff(path=PurePath(path), status=FileStatus.MODIFIED) for path in changed
     )
-    configs = MagicMock()
-    configs.at_base.return_value = at_base
+    strict = MagicMock()
+    strict.judge.return_value = StrictVerdict()
     service = MetricsService(
         project_files=project_files,
         diff_source=diff_source,
         metric_types=CHECKED_TYPES,
-        store=MagicMock(),
-        configs=configs,
+        strict=strict,
     )
-    return service, project_files, diff_source
+    return service, strict, diff_source
 
 
-def test_check_reads_the_base_through_the_source_that_diffed() -> None:
-    at_base = BaseConfig(config=_strict_config(), source=PurePath("tingle.toml"))
-    service, _, diff_source = _check_service(at_base, "a.py")
+def test_check_diffs_at_the_config_root() -> None:
+    service, _, diff_source = _check_service("a.py")
 
-    service.check(_strict_config(), "main")
+    service.check(_config(), "main")
 
     diff_source.assert_called_once_with(CWD)
     diff_source.return_value.branch_diff.assert_called_once_with("main")
@@ -367,33 +360,21 @@ def test_check_reads_the_base_through_the_source_that_diffed() -> None:
 def test_check_takes_the_base_asked_for_then_the_configured_one(
     asked: str | None, *, configured: str, resolved: str
 ) -> None:
-    config = replace(_strict_config(), diff_base=configured)
-    at_base = BaseConfig(config=config, source=PurePath("tingle.toml"))
-    service, _, diff_source = _check_service(at_base, "a.py")
+    service, _, diff_source = _check_service("a.py")
 
-    service.check(config, asked)
+    service.check(replace(_config(), diff_base=configured), asked)
 
     diff_source.return_value.branch_diff.assert_called_once_with(resolved)
 
 
-def test_check_measures_once_when_the_branch_left_the_config_alone() -> None:
-    at_base = BaseConfig(config=_strict_config(), source=PurePath("tingle.toml"))
-    service, project_files, _ = _check_service(at_base, "a.py")
+def test_check_has_strict_judged_through_the_source_that_diffed() -> None:
+    service, strict, diff_source = _check_service("a.py")
+    strict.judge.return_value = StrictVerdict(skipped="strict mode skipped: why")
+    config = _config()
 
-    _, verdict = service.check(_strict_config(), "main")
+    report, verdict = service.check(config, "main")
 
-    assert verdict.strict == StrictVerdict()
-    project_files.assert_called_once()
-
-
-def test_check_compares_a_config_in_another_file_though_the_base_one_is_unchanged() -> (
-    None
-):
-    at_base = BaseConfig(config=_strict_config(), source=PurePath("tingle.toml"))
-    service, project_files, _ = _check_service(at_base, "a.py")
-    other = validate(RAW, METRIC_TYPES, source=CWD / "pyproject.toml")
-
-    _, verdict = service.check(other, "main")
-
-    assert verdict.strict.loosened[0].subject == "[check] strict"
-    assert project_files.call_count > 1
+    strict.judge.assert_called_once_with(
+        config, read_base=diff_source.return_value.read_base, report=report
+    )
+    assert verdict.strict == strict.judge.return_value
