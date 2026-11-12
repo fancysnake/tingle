@@ -79,7 +79,19 @@ def test_markdown_lists_every_addition_that_fits() -> None:
 
     assert "<summary>Added (205)</summary>" in markdown
     assert "- `noqa` `a.py:205`" in markdown
-    assert "more" not in markdown
+    assert not re.search(r"^- …and \d+ more$", markdown, flags=re.MULTILINE)
+
+
+def test_markdown_keeps_additions_that_fill_the_comment_exactly() -> None:
+    path = "d/" * 280 + "a.py"
+    occurrences = [Occurrence(path, line=n) for n in range(100)]
+    short = check_markdown(*_judged(_worsened("noqa", *occurrences)))
+    occurrences[-1] = Occurrence(path + "x" * (COMMENT_ROOM - len(short)), line=99)
+
+    markdown = check_markdown(*_judged(_worsened("noqa", *occurrences)))
+
+    assert len(markdown) == COMMENT_ROOM
+    assert markdown.count(path) == 100
 
 
 def _left_out(markdown: str) -> int:
@@ -109,7 +121,7 @@ def test_markdown_cuts_the_files_changed_alongside_to_fit_a_comment() -> None:
 
     markdown = check_markdown(report, replace(verdict, strict=strict))
 
-    assert len(markdown) <= COMMENT_ROOM
+    assert COMMENT_ROOM - 100 < len(markdown) <= COMMENT_ROOM
     assert "- `noqa` `a.py:299`" in markdown
     assert markdown.count("- changed alongside: ") + _left_out(markdown) == 3000
 

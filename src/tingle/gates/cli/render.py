@@ -396,15 +396,19 @@ def check_markdown(report: DiffReport, verdict: CheckVerdict) -> str:
         if outcome.result is not None
         for occurrence in outcome.result.added_occurrences
     ]
-    opening = ["", f"<details><summary>Added ({len(added)})</summary>", ""]
-    closing = ["", "</details>"]
+    alongside = [f"- changed alongside: `{path}`" for path in verdict.strict.alongside]
     head = ["### tingle", "", summary, ""]
-    room = COMMENT_ROOM - _size([*head, *table, *opening, *closing])
-    # the files changed alongside get half, so neither list starves the other
-    strict = _strict_markdown(verdict.strict, room // 2)
-    lines = [*head, *strict, *table]
-    if added:
-        lines += [*opening, *_fitted(added, room - _size(strict)), *closing]
+    opening = (
+        ["", f"<details><summary>Added ({len(added)})</summary>", ""] if added else []
+    )
+    closing = ["", "</details>"] if added else []
+    frame = [*head, *table, *opening, *closing]
+    room = COMMENT_ROOM - _size([*frame, *_strict_markdown(verdict.strict, [])])
+    # the additions keep at most half, so neither list starves the other
+    alongside = _fitted(alongside, room - min(_size(added), room // 2))
+    strict = _strict_markdown(verdict.strict, alongside)
+    added = _fitted(added, COMMENT_ROOM - _size([*frame, *strict]))
+    lines = [*head, *strict, *table, *opening, *added, *closing]
     return "\n".join(lines) + "\n"
 
 
@@ -415,6 +419,8 @@ def _size(lines: list[str]) -> int:
 
 def _fitted(items: list[str], room: int) -> list[str]:
     """Keep the leading items that fit in `room` characters; count the rest."""
+    if _size(items) <= room:
+        return items
     room -= len(f"- …and {len(items)} more") + 1
     kept: list[str] = []
     for item in items:
@@ -425,13 +431,12 @@ def _fitted(items: list[str], room: int) -> list[str]:
     return kept
 
 
-def _strict_markdown(strict: StrictVerdict, room: int) -> list[str]:
+def _strict_markdown(strict: StrictVerdict, alongside: list[str]) -> list[str]:
     lines = [strict.skipped, ""] if strict.skipped else []
     if not strict.failed:
         return lines
-    lines += [f"- `{item.subject}`: {item.change}" for item in strict.loosened]
-    alongside = [f"- changed alongside: `{path}`" for path in strict.alongside]
-    return [*lines, *_fitted(alongside, room - _size(lines)), ""]
+    loosened = [f"- `{item.subject}`: {item.change}" for item in strict.loosened]
+    return [*lines, *loosened, *alongside, ""]
 
 
 def _markdown_row(outcome: DiffOutcome) -> str | None:
