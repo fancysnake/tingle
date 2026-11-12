@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import re
+from dataclasses import replace
 from pathlib import Path, PurePath
 
-from tingle.gates.cli.render import check_annotations, check_markdown, check_reason
+from tingle.gates.cli.render import (
+    COMMENT_ROOM,
+    check_annotations,
+    check_markdown,
+    check_reason,
+)
 from tingle.mills.display import sections
 from tingle.pacts.check import CheckVerdict, Loosening, StrictVerdict
 from tingle.pacts.config import CheckPolicy, MetricSpec
@@ -65,15 +72,77 @@ def test_annotation_paths_are_relative_to_the_working_directory() -> None:
     assert commands[0].startswith("::error file=sub/src/a.py,line=1,")
 
 
-def test_markdown_cuts_a_long_addition_list() -> None:
+def test_markdown_lists_every_addition_that_fits() -> None:
     outcome = _worsened("noqa", *(Occurrence("a.py", line=n) for n in range(1, 206)))
 
     markdown = check_markdown(*_judged(outcome))
 
     assert "<summary>Added (205)</summary>" in markdown
-    assert "- `noqa` `a.py:200`" in markdown
-    assert "a.py:201" not in markdown
-    assert "- …and 5 more" in markdown
+    assert "- `noqa` `a.py:205`" in markdown
+    assert not re.search(r"^- …and \d+ more$", markdown, flags=re.MULTILINE)
+
+
+def test_markdown_keeps_additions_that_fill_the_comment_exactly() -> None:
+    path = "d/" * 280 + "a.py"
+    occurrences = [Occurrence(path, line=n) for n in range(100)]
+    short = check_markdown(*_judged(_worsened("noqa", *occurrences)))
+    occurrences[-1] = Occurrence(path + "x" * (COMMENT_ROOM - len(short)), line=99)
+
+    markdown = check_markdown(*_judged(_worsened("noqa", *occurrences)))
+
+    assert len(markdown) == COMMENT_ROOM
+    assert markdown.count(path) == 100
+
+
+def _left_out(markdown: str) -> int:
+    (count,) = re.findall(r"^- …and (\d+) more$", markdown, flags=re.MULTILINE)
+    return int(count)
+
+
+def test_markdown_cuts_the_additions_to_fit_a_comment() -> None:
+    path = "d/" * 200 + "a.py"
+    outcome = _worsened("noqa", *(Occurrence(path, line=n) for n in range(300)))
+
+    markdown = check_markdown(*_judged(outcome))
+
+    assert len(markdown) <= COMMENT_ROOM
+    assert "<summary>Added (300)</summary>" in markdown
+    assert markdown.count(path) + _left_out(markdown) == 300
+    assert markdown.endswith("more\n\n</details>\n")
+
+
+def test_markdown_drops_the_count_of_additions_when_it_does_not_fit() -> None:
+    path = "d/" * 200 + "a.py"
+    outcome = _worsened("noqa", *(Occurrence(path, line=n) for n in range(300)))
+    report, verdict = _judged(outcome)
+    filled = check_markdown(report, replace(verdict, strict=StrictVerdict(skipped="s")))
+    listed = re.findall(r"^- (?:`noqa`|…and).*$", filled, flags=re.MULTILINE)
+    frame = len(filled) - sum(len(line) + 1 for line in listed)
+    skipped = "s" * (COMMENT_ROOM - frame - 4)
+
+    markdown = check_markdown(
+        report, replace(verdict, strict=StrictVerdict(skipped=skipped))
+    )
+
+    assert len(markdown) <= COMMENT_ROOM
+    assert "<summary>Added (300)</summary>" in markdown
+    assert path not in markdown
+    assert "more" not in markdown
+
+
+def test_markdown_cuts_the_files_changed_alongside_to_fit_a_comment() -> None:
+    outcome = _worsened("noqa", *(Occurrence("a.py", line=n) for n in range(300)))
+    report, verdict = _judged(outcome)
+    strict = StrictVerdict(
+        loosened=(Loosening("noqa", "5 to 3"),),
+        alongside=tuple(PurePath(f"src/package/module_{n}.py") for n in range(3000)),
+    )
+
+    markdown = check_markdown(report, replace(verdict, strict=strict))
+
+    assert COMMENT_ROOM - 100 < len(markdown) <= COMMENT_ROOM
+    assert "- `noqa` `a.py:299`" in markdown
+    assert markdown.count("- changed alongside: ") + _left_out(markdown) == 3000
 
 
 def _strict_verdict(*, failed: bool = False) -> CheckVerdict:
