@@ -24,6 +24,7 @@ from tingle.pacts.config import (
     TemplateNotFoundError,
 )
 from tingle.pacts.diff import DiffReport, DiffSourceError
+from tingle.pacts.skill import SkillExistsError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -131,6 +132,7 @@ class CliGate:
         self.app.command("library")(self.library)
         self.app.command("add")(self.add)
         self.app.command("init")(self.init)
+        self.app.command("skill")(self.skill)
 
     def run(self) -> None:
         """Parse the command line and dispatch."""
@@ -395,6 +397,15 @@ class CliGate:
             path = self._services.config.write_starter(Path.cwd())
         except ConfigError as exc:
             self._config_failure(exc)
+        typer.echo(f"Created {path}")
+
+    def skill(self, *, config: ConfigOption = None) -> None:
+        """Write an agent skill that says how to remove each metric's debt."""
+        try:
+            path = self._services.skill.write(self._load(config))
+        except SkillExistsError as exc:
+            typer.echo(f"skill error: {exc}", err=True)
+            raise typer.Exit(2) from None
         typer.echo(f"Created {path}")
 
     def _interactive(self, request: _MetricRequest) -> None:

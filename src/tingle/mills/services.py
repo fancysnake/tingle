@@ -11,6 +11,7 @@ from tingle.mills.check import judge
 from tingle.mills.config import asks_for_strict, narrowed, validate
 from tingle.mills.diff import DiffRunner
 from tingle.mills.runner import run
+from tingle.mills.skill import SKILL_NAME, render
 from tingle.mills.starter import starter_bases
 from tingle.mills.strict import (
     Scores,
@@ -32,6 +33,7 @@ from tingle.pacts.config import (
     Selection,
 )
 from tingle.pacts.metrics import uninterrupted, unwatched
+from tingle.pacts.services import SkillServiceProtocol
 from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
@@ -56,6 +58,7 @@ if TYPE_CHECKING:
     )
     from tingle.pacts.report import RunReport
     from tingle.pacts.services import ConfigServiceProtocol
+    from tingle.pacts.skill import SkillStore
 
 
 @dataclass(frozen=True)
@@ -380,6 +383,22 @@ class MetricsService:
                     path, before=source.read_base(path), after=project.read(path)
                 )
             )
+        )
+
+
+@dataclass(frozen=True)
+class SkillService(SkillServiceProtocol):
+    """Writing the agent skill that says how to remove each metric's debt."""
+
+    store: SkillStore
+
+    def write(self, config: Config) -> Path:
+        """Create the fix skill beside the config; return the file written.
+
+        Raises SkillExistsError if the project already has it.
+        """
+        return self.store.create(
+            config.root, name=SKILL_NAME, text=render(config.metrics)
         )
 
 

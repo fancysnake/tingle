@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `tingle skill` writes a Claude Code project skill, `tingle-fix`, into
+  `.claude/skills/`: the rule that debt is removed in the code, never by a
+  suppression or a looser config, and a placeholder per configured metric
+  for the project's own guidance. It refuses to overwrite the skill.
 - A pre-commit hook, `tingle`, that reports the tech-debt markers a commit
   adds; the CI gate page documents it and the equivalent hk step.
 - `check --json`: the `report --diff --json` payload plus the verdict.

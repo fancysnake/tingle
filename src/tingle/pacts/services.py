@@ -103,6 +103,17 @@ class MetricsServiceProtocol(Protocol):
         """
 
 
+class SkillServiceProtocol(Protocol):
+    """Writing the agent skill that says how to remove each metric's debt."""
+
+    @abstractmethod
+    def write(self, config: Config) -> Path:
+        """Create the fix skill beside the config; return the file written.
+
+        Raises SkillExistsError if the project already has it.
+        """
+
+
 class BrowseServiceProtocol(Protocol):
     """Driving a browsing session: what is visible, folded, sorted, searched.
 
@@ -164,6 +175,11 @@ class ServicesProtocol(Protocol):
     @abstractmethod
     def metrics(self) -> MetricsServiceProtocol:
         """Metric execution."""
+
+    @property
+    @abstractmethod
+    def skill(self) -> SkillServiceProtocol:
+        """Writing the fix skill."""
 
     @property
     @abstractmethod

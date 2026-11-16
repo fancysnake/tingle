@@ -10,9 +10,10 @@ from tingle.links.editor import VsCodeCli
 from tingle.links.fs.local import LocalProjectFiles
 from tingle.links.git.cli import GitCli
 from tingle.links.library.python import PythonTemplateLoader
+from tingle.links.skill_file.claude import ClaudeSkillStore
 from tingle.mills import browse
 from tingle.mills.metrics.registry import METRIC_TYPES
-from tingle.mills.services import ConfigService, MetricsService
+from tingle.mills.services import ConfigService, MetricsService, SkillService
 
 if TYPE_CHECKING:
     from tingle.pacts.services import BrowseServiceProtocol
@@ -41,6 +42,11 @@ class Services:
             store=TomlConfigStore(),
             configs=self.config,
         )
+
+    @cached_property
+    def skill(self) -> SkillService:
+        """Writing the fix skill, as a Claude Code project skill."""
+        return SkillService(store=ClaudeSkillStore())
 
     @cached_property
     def browse(self) -> BrowseServiceProtocol:

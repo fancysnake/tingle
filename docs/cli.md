@@ -1,5 +1,5 @@
 ---
-description: "tingle command-line reference: every command and option of stat, check, report, library, add, init and list, with metric selection and exit codes."
+description: "tingle command-line reference: every command and option of stat, check, report, library, add, init, skill and list, with metric selection and exit codes."
 ---
 
 # CLI reference
@@ -281,6 +281,40 @@ configured when its own config file sits in the current directory, or when
 `pyproject.toml`, `setup.cfg` or `tox.ini` holds its section. With none of
 them found, the starter holds commented examples instead. `init` runs no
 tool and reads no dependency list.
+
+## `tingle skill`
+
+Write a [Claude Code](https://claude.com/claude-code) skill, `tingle-fix`,
+that tells an agent how this project removes the debt its metrics count. The
+file is `.claude/skills/tingle-fix/SKILL.md` beside the config, where Claude
+Code reads project skills. Commit it.
+
+| Option | Meaning |
+| --- | --- |
+| `--config PATH` | path to the config file |
+
+The skill states one rule for every metric: change the code until the marker
+is not needed, add no suppression, and leave the tingle config alone. Under
+the rule, each configured metric has a section with its name, its description
+and a placeholder:
+
+```markdown
+<!-- tingle:metric noqa-comment -->
+### noqa-comment
+
+`# noqa` comments that silence ruff on one line.
+
+<!-- tingle:placeholder: replace the next line with this project's guidance -->
+_No guidance yet._
+<!-- /tingle:metric noqa-comment -->
+```
+
+Replace `_No guidance yet._` with what the project wants done: the
+refactoring that removes the marker, the helper to use, the cases to leave
+for a person. Keep the `tingle:` comments.
+
+`skill` refuses when the file exists (exit 2), so it never overwrites what
+the project wrote.
 
 ## `tingle list`
 
