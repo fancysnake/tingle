@@ -7,12 +7,12 @@ enter = "poetry install"
 [tools]
 # `jq` is what `release:bump` edits the plugin manifest with.
 jq = "1.8.2"
-markdownlint-cli2 = "0.23.3"
-node = "26.12.0"
-pipx = "1.18.2"
+markdownlint-cli2 = "0.24.0"
+node = "26.13.1"
+pipx = "1.18.16"
 "pipx:poetry" = "2.5.1"
 python = "3.11"
-trivy = "0.76.1"
+trivy = "0.76.2"
 
 [env]
 _.python.venv = { path = ".venv", create = true }
@@ -33,14 +33,15 @@ TEST_ENV_FILE = ".env.test"
 TOML_PATHS = "*.toml .*.toml"
 
 [task_config]
-includes = ["git::https://github.com/fancysnake/shared-configs.git//python.toml"]
+includes = [
+    "git::https://github.com/fancysnake/shared-configs.git//python.toml?ref=b6b86faa90848e7f6e0cf8a11e0cc1ada439e8d2",
+]
 
 # the shared dep:upgrade:py, with lint:trivy in place of its `pip-audit .`;
 # an included task cannot be overridden by name
 [tasks.update]
 run = [
     "mise upgrade --bump --exclude python --minimum-release-age=7d --local",
-    "pip install -U pip",
     "poetry update",
     "deptry {{ env.SRC_PATHS }} {{ env.SCRIPT_PATHS }} {{ env.TEST_PATHS }}",
     { task = "lint:trivy" },
@@ -78,17 +79,12 @@ run = [{ task = "site:_install" }, "mkdocs serve"]
 description = "Build the documentation site into site/"
 run = [{ task = "site:_install" }, "mkdocs build"]
 
-# `--with` rather than `--only`: a cast runs `gate`, which wants the package and
-# the dev group as well. Run on every cast, so a cabinet rev bump in the lock
-# reaches the next cast instead of leaving the old one installed.
-[tasks."rituals:_install"]
-hide = true
-run = "poetry install --with rituals --quiet"
-
+# Installs on every cast, so a cabinet bump in the lock reaches the next cast
+# instead of leaving the old one installed.
 [tasks.cast]
-description = "Install the rituals group and cast a vekna ritual"
+description = "Sync the environment with the lock and cast a vekna ritual"
 usage = 'arg "<ritual>"'
-run = [{ task = "rituals:_install" }, 'vekna cast "$usage_ritual"']
+run = ["poetry install --quiet", 'vekna cast "$usage_ritual"']
 
 # The plugin carries the package version, so a bump is two files that must
 # agree. `poetry version` is what validates the string; the manifest follows it.

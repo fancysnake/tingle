@@ -15,9 +15,8 @@ mise install
 poetry install
 ```
 
-`vekna cast` comes from the optional rituals group, which a plain
-`poetry install` leaves out. On Python 3.11–3.14, cast a ritual through mise,
-which installs the group first:
+`vekna cast` comes with the dev group. Cast a ritual through mise, which
+syncs the environment with the lock first:
 
 ```console
 mise run cast <ritual>
