@@ -1,7 +1,7 @@
 # What `vekna cast <ritual>` runs here: cabinet's pull request maintenance
-# rituals (refresh, cover, review, labels), read from the `[cabinet]` section.
-# Only what differs from cabinet's defaults; everything else follows the tome,
-# so a cabinet bump is not silently frozen out by a copied value.
+# rituals (heal, ci, review, answer, guide, labels), read from the `[cabinet]`
+# section. Only what differs from cabinet's defaults; everything else follows
+# the tome, so a cabinet bump is not silently frozen out by a copied value.
 [rituals]
 modules = ["cabinet.rituals"]
 
@@ -21,16 +21,21 @@ sign_commits = false
 gate = "mise run gate"
 coverage = "mise run test:py:cov:diff"
 
-# Job names in .github/workflows/ci.yml, matched by prefix: `tests` covers the
-# interpreter matrix. `tingle` is left out on purpose — it is continue-on-error
+# Job names in .github/workflows/ci.yml, matched by prefix, plus what Codecov
+# posts: `tests` covers the interpreter matrix. Each `gate` is the task that
+# reproduces the job here; `quality` has no single task, so the whole sweep
+# stands in for it. `tingle` is left out on purpose — it is continue-on-error
 # and never turns the board red.
-[cabinet.ci]
-gate_checks = ["quality", "tests"]
+[cabinet.ci.jobs.quality]
+gate = "mise run gate"
 
-# The unit suite, whole: mise appends arguments to the task's own pytest
-# invocation rather than replacing its paths, so this grants the 34 unit files
-# together, not one of them, and the prefix reaches the `:cov` variants too.
-# The integration suite is left out — it is the slow half the cover prompt
-# tells the agent to stay out of, and the sweeps stay the ritual's.
+[cabinet.ci.jobs.tests]
+gate = "mise run test:py"
+
+[cabinet.ci.jobs."codecov/patch"]
+covering = true
+
+# The gate and the coverage tasks are the ritual's to run already; this adds
+# the commit sweep, which reformats files an agent did not touch.
 [cabinet.agent]
 may_not_run = ["mise run fullcheck"]
