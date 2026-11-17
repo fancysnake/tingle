@@ -79,17 +79,12 @@ run = [{ task = "site:_install" }, "mkdocs serve"]
 description = "Build the documentation site into site/"
 run = [{ task = "site:_install" }, "mkdocs build"]
 
-# `--with` rather than `--only`: a cast runs `gate`, which wants the package and
-# the dev group as well. Run on every cast, so a cabinet rev bump in the lock
-# reaches the next cast instead of leaving the old one installed.
-[tasks."rituals:_install"]
-hide = true
-run = "poetry install --with rituals --quiet"
-
+# Installs on every cast, so a cabinet bump in the lock reaches the next cast
+# instead of leaving the old one installed.
 [tasks.cast]
-description = "Install the rituals group and cast a vekna ritual"
+description = "Sync the environment with the lock and cast a vekna ritual"
 usage = 'arg "<ritual>"'
-run = [{ task = "rituals:_install" }, 'vekna cast "$usage_ritual"']
+run = ["poetry install --quiet", 'vekna cast "$usage_ritual"']
 
 # The plugin carries the package version, so a bump is two files that must
 # agree. `poetry version` is what validates the string; the manifest follows it.
