@@ -21,6 +21,7 @@ from tingle.pacts.config import (
 )
 from tingle.pacts.diff import DiffResult, FileDiff, FileStatus
 from tingle.pacts.metrics import MetricResult, MetricType
+from tingle.pacts.services import StrictServiceProtocol
 from tingle.specs.ranges import UNREACHABLE_DIRS
 
 CWD = Path("/project")
@@ -336,7 +337,7 @@ def _check_service(*changed: str) -> tuple[MetricsService, MagicMock, MagicMock]
     diff_source.return_value.branch_diff.return_value.files = tuple(
         FileDiff(path=PurePath(path), status=FileStatus.MODIFIED) for path in changed
     )
-    strict = MagicMock()
+    strict = MagicMock(spec=StrictServiceProtocol)
     strict.judge.return_value = StrictVerdict()
     service = MetricsService(
         project_files=project_files,
