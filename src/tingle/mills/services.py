@@ -33,7 +33,6 @@ from tingle.pacts.config import (
     Selection,
 )
 from tingle.pacts.metrics import uninterrupted, unwatched
-from tingle.pacts.services import SkillServiceProtocol
 from tingle.specs.ranges import UNREACHABLE_DIRS
 
 if TYPE_CHECKING:
@@ -387,7 +386,7 @@ class MetricsService:
 
 
 @dataclass(frozen=True)
-class SkillService(SkillServiceProtocol):
+class SkillService:
     """Writing the agent skill that says how to remove each metric's debt."""
 
     store: SkillStore

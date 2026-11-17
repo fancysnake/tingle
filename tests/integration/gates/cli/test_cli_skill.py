@@ -41,11 +41,11 @@ def test_skill_writes_a_placeholder_for_every_configured_metric(workdir: Path) -
     text = (workdir / SKILL).read_text(encoding="utf-8")
     assert text.startswith("---\nname: tingle-fix\n")
     for name in ("noqa-comment", "todo-comments", "python-files"):
-        assert f"<!-- tingle:metric {name} -->\n### {name}\n" in text
-    assert text.count("<!-- tingle:placeholder") == len(
+        assert f"\n### {name}\n" in text
+    assert text.count("\n_No guidance yet._\n") == len(
         ("noqa-comment", "todo-comments", "python-files")
     )
-    assert "Work left for later." in text
+    assert "\n### todo-comments\n\nWork left for later.\n\n_No guidance yet._\n" in text
 
 
 def test_skill_refuses_to_overwrite_the_one_in_the_project(workdir: Path) -> None:

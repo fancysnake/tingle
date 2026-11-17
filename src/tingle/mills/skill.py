@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 
 SKILL_NAME = "tingle-fix"
 
-#: The line a project replaces. It is exact so that a later run can tell an
-#: empty section from one the project wrote.
 PLACEHOLDER = "_No guidance yet._"
 
 _HEAD = f"""---
@@ -47,23 +45,12 @@ rule above is all there is.
 ## Metrics
 """
 
-_SECTION = """
-<!-- tingle:metric {name} -->
-### {name}
-{description}
-<!-- tingle:placeholder: replace the next line with this project's guidance -->
-{placeholder}
-<!-- /tingle:metric {name} -->
-"""
-
 
 def render(metrics: Iterable[MetricSpec]) -> str:
     """Write the skill out: the rule, then a placeholder section per metric."""
-    return _HEAD + "".join(
-        _SECTION.format(
-            name=metric.name,
-            description=f"\n{metric.description}\n" if metric.description else "",
-            placeholder=PLACEHOLDER,
-        )
-        for metric in metrics
-    )
+    return _HEAD + "".join(f"\n{_section(metric)}\n" for metric in metrics)
+
+
+def _section(metric: MetricSpec) -> str:
+    parts = (f"### {metric.name}", metric.description, PLACEHOLDER)
+    return "\n\n".join(part for part in parts if part)

@@ -299,19 +299,16 @@ the rule, each configured metric has a section with its name, its description
 and a placeholder:
 
 ```markdown
-<!-- tingle:metric noqa-comment -->
 ### noqa-comment
 
 `# noqa` comments that silence ruff on one line.
 
-<!-- tingle:placeholder: replace the next line with this project's guidance -->
 _No guidance yet._
-<!-- /tingle:metric noqa-comment -->
 ```
 
 Replace `_No guidance yet._` with what the project wants done: the
 refactoring that removes the marker, the helper to use, the cases to leave
-for a person. Keep the `tingle:` comments.
+for a person.
 
 `skill` refuses when the file exists (exit 2), so it never overwrites what
 the project wrote.
