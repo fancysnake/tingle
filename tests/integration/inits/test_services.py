@@ -7,9 +7,23 @@ from tingle.links.config_file.toml import TomlConfigStore
 from tingle.links.fs.local import LocalProjectFiles
 from tingle.links.git.cli import GitCli
 from tingle.mills.metrics.registry import METRIC_TYPES
+from tingle.pacts.services import (
+    BrowseServiceProtocol,
+    ConfigServiceProtocol,
+    MetricsServiceProtocol,
+    ServicesProtocol,
+    SkillServiceProtocol,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+SERVICE_PROTOCOLS = {
+    "config": ConfigServiceProtocol,
+    "metrics": MetricsServiceProtocol,
+    "skill": SkillServiceProtocol,
+    "browse": BrowseServiceProtocol,
+}
 
 
 def test_config_service_is_backed_by_the_toml_store() -> None:
@@ -34,3 +48,13 @@ def test_service_leaves_are_cached_per_container() -> None:
     assert services.config is config
     assert services.metrics is metrics
     assert Services().config is not config
+
+
+def test_services_provide_every_method_the_gate_protocols_ask_for() -> None:
+    services = Services()
+
+    assert set(SERVICE_PROTOCOLS) < ServicesProtocol.__abstractmethods__
+    for name, protocol in SERVICE_PROTOCOLS.items():
+        service = getattr(services, name)
+        missing = {m for m in protocol.__abstractmethods__ if not hasattr(service, m)}
+        assert not missing, f"{name} lacks {missing}"
