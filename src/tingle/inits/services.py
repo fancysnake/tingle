@@ -14,6 +14,7 @@ from tingle.links.skill_file.claude import ClaudeSkillStore
 from tingle.mills import browse
 from tingle.mills.metrics.registry import METRIC_TYPES
 from tingle.mills.services import ConfigService, MetricsService, SkillService
+from tingle.mills.strict import StrictService
 
 if TYPE_CHECKING:
     from tingle.pacts.services import BrowseServiceProtocol
@@ -39,8 +40,17 @@ class Services:
             project_files=LocalProjectFiles,
             diff_source=GitCli,
             metric_types=METRIC_TYPES,
-            store=TomlConfigStore(),
+            strict=self.strict,
+        )
+
+    @cached_property
+    def strict(self) -> StrictService:
+        """Strict judging, measuring the local tree through the whole-tree run."""
+        return StrictService(
             configs=self.config,
+            store=TomlConfigStore(),
+            project_files=LocalProjectFiles,
+            metric_types=METRIC_TYPES,
         )
 
     @cached_property
