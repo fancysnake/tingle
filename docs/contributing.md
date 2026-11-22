@@ -15,22 +15,6 @@ mise install
 poetry install
 ```
 
-`vekna cast` comes with the dev group. Cast a ritual through mise, which
-syncs the environment with the lock first:
-
-```console
-mise run cast <ritual>
-```
-
-A cast pushes through an https remote, since it has no terminal for
-an ssh key passphrase. A fresh clone adds one once, substituting its own URL
-on a fork:
-
-```console
-git remote add https-origin https://github.com/fancysnake/tingle.git
-gh auth login && gh auth setup-git
-```
-
 ## Checks
 
 Tasks are defined in `mise.toml`; `mise tasks` lists them all.
