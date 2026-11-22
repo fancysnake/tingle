@@ -41,9 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Dependency vulnerabilities are checked by Trivy against the lockfiles, in
   `lint:trivy`, `check` and a CI job, replacing `pip-audit`.
-- cabinet, and with it `vekna cast`, is in an optional `rituals` group, so
-  the default dev install and CI skip its agent runtime;
-  `mise run cast <ritual>` installs it and casts.
 
 ### Removed
 
