@@ -25,6 +25,10 @@ mise run lint:py      # ruff, mypy, pylint, import-linter, codespell, vulture
 mise run format       # black, ruff --fix, taplo
 ```
 
+A per-user ritual config should call `gate` for the check and
+`test:py:cov:diff` for coverage. It must not call `fullcheck`, which reformats
+files.
+
 tingle dogfoods its own CI gate — `tingle check` runs on every pull request,
 so a branch that takes on debt fails the build.
 

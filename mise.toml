@@ -28,8 +28,8 @@ SRC_PATHS = "src"
 TEST_PATHS = "tests"
 SCRIPT_PATHS = ""
 TEST_ENV_FILE = ".env.test"
-# both globs, because a shell one does not match a leading dot and .vekna.toml
-# and .taplo.toml are held to the same column width as the rest
+# both globs, because a shell one does not match a leading dot and .taplo.toml
+# is held to the same column width as the rest
 TOML_PATHS = "*.toml .*.toml"
 
 [task_config]
@@ -79,13 +79,6 @@ run = [{ task = "site:_install" }, "mkdocs serve"]
 description = "Build the documentation site into site/"
 run = [{ task = "site:_install" }, "mkdocs build"]
 
-# Installs on every cast, so a cabinet bump in the lock reaches the next cast
-# instead of leaving the old one installed.
-[tasks.cast]
-description = "Sync the environment with the lock and cast a vekna ritual"
-usage = 'arg "<ritual>"'
-run = ["poetry install --quiet", 'vekna cast "$usage_ritual"']
-
 # The plugin carries the package version, so a bump is two files that must
 # agree. `poetry version` is what validates the string; the manifest follows it.
 [tasks."release:bump"]
@@ -116,10 +109,9 @@ run = [
 description = "Run every linter: Python, Markdown, and the scoped checks"
 run = [{ task = "lint:py" }, { task = "lint:markdown" }, { task = "lint:strict" }]
 
-# what an unattended `vekna cast` may run: it changes no file, so the ritual's
-# `git add -A` cannot sweep up a repo-wide reformat, and it measures no
-# coverage, because cabinet's own `coverage` key owns that and a gap found
-# there reaches the agent as a coverage report rather than a red gate.
+# the no-change check: it rewrites no file, so a caller that stages everything
+# afterwards cannot sweep up a repo-wide reformat, and it measures no coverage;
+# `test:py:cov:diff` does that.
 [tasks.gate]
 description = "Linters, types and the test suite, changing nothing"
 run = [{ task = "lint:all" }, { task = "lint:versions" }, { task = "test:py" }]
@@ -129,8 +121,7 @@ run = [{ task = "lint:all" }, { task = "lint:versions" }, { task = "test:py" }]
 # alone, since CI has it continue-on-error — tingle's own debt report.
 # The Trivy scan is here and not in `gate`: a newly published advisory would
 # fail a cast whose diff never touched a dependency.
-# `gate` stays without these: it is the unattended-cast task and wants to
-# stay fast and write nothing.
+# `gate` stays without these: it writes no file and stays fast.
 [tasks.check]
 description = "Run every check but tingle's own debt report"
 run = [
@@ -164,3 +155,13 @@ if [ "$plugin" != "$declared" ]; then
     exit 1
 fi
 """
+
+[tasks.pr-fix]
+description = "Pull Request Formatting and Readiness Check"
+run = [
+    "mise install",
+    "poetry install",
+    { task = "format:py" },
+    { task = "lint:py" },
+    { task = "test:py:cov", args = ['-xvv', '--fail-under=97'] },
+]
