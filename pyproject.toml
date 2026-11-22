@@ -54,7 +54,6 @@ packages = [{ include = "tingle", from = "src" }]
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.5.1"
-cabinet = { url = "https://github.com/fancysnake/cabinet/releases/download/v5.1.0/cabinet-5.1.0-py3-none-any.whl" }
 codespell = "^2.4.2"
 deptry = "^0.25.1"
 diff-cover = "^11.0.1"
