@@ -1,0 +1,6 @@
+ci = "github"
+docs = "mkdocs-pyproject"
+framework = "none"
+lang = "python"
+lint = "ruff"
+owner = "radoslaw-ganczarek"

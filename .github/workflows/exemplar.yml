@@ -1,0 +1,17 @@
+---
+name: exemplar
+
+"on":
+  pull_request:
+  push:
+    branches: ["main", "master"]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  exemplar:
+    permissions:
+      contents: read
+      issues: write
+    uses: fancysnake/exemplar/.github/workflows/check.yml@main
