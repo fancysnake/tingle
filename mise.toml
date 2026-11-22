@@ -163,5 +163,5 @@ run = [
     "poetry install",
     { task = "format:py" },
     { task = "lint:py" },
-    { task = "test:py:cov", args = ['-xvv', '--fail-under=97'] },
+    { task = "test:py:cov", args = ['-xvv', '--cov-fail-under=97'] },
 ]
