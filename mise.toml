@@ -7,7 +7,7 @@ enter = "poetry install"
 [tools]
 # `jq` is what `release:bump` edits the plugin manifest with.
 jq = "1.8.2"
-markdownlint-cli2 = "0.24.0"
+markdownlint-cli2 = "0.24.2"
 node = "26.13.1"
 pipx = "1.18.16"
 "pipx:poetry" = "2.5.1"
