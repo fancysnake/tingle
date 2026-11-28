@@ -1,7 +1,26 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:best-practices"],
+  "extends": ["config:best-practices", ":preserveSemverRanges"],
   "minimumReleaseAge": "7 days",
   "prCreation": "not-pending",
-  "internalChecksFilter": "strict"
+  "internalChecksFilter": "strict",
+  "packageRules": [
+    {
+      "description": "the ci standard holds exemplar at @main, unpinned",
+      "matchPackageNames": ["fancysnake/exemplar"],
+      "enabled": false
+    },
+    {
+      "description": "One PR for all small updates",
+      "groupName": "non-major dependencies",
+      "groupSlug": "non-major",
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "description": "A 0.x minor can break, so it gets its own PR",
+      "matchCurrentVersion": "/^0\\./",
+      "matchUpdateTypes": ["minor"],
+      "groupName": null
+    }
+  ]
 }
